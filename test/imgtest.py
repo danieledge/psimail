@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """imgtest.py [OUTDIR] [--rounds N] [--pictures DIR]
 
-The picture decoders (mail/engine/img) on a PC: builds imgtest.c with
+The picture decoders (core/mail/engine/img) on a PC: builds imgtest.c with
 AddressSanitizer, makes sample pictures of every kind the Psion will meet
 (baseline JPEG in 4:2:0, 4:2:2, 4:4:4 and greyscale; progressive JPEG in
 4:2:0, 4:4:4 and greyscale, with restart markers, cut short, and big
@@ -19,7 +19,7 @@ Needs gcc and Pillow. --pictures DIR adds your own JPEG/PNG/GIF files.
 import os, subprocess, sys, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOP = os.path.dirname(os.path.dirname(HERE))
+TOP = os.path.dirname(HERE)
 out = None
 rounds = 300
 extra = None
@@ -35,10 +35,10 @@ os.makedirs(out, exist_ok=True)
 # ---- the decoders, with the sanitizers on
 exe = os.path.join(out, "imgtest-asan")
 srcs = [os.path.join(HERE, "imgtest.c")] + \
-    [os.path.join(TOP, "mail/engine/img", f) for f in ("pmimg.c", "pmjpeg.c", "pmjprog.c", "pmpng.c", "pmgif.c", "picojpeg.c")] + \
-    [os.path.join(TOP, "ssh/zlib", f) for f in ("adler32.c", "crc32.c", "inflate.c", "inftrees.c", "inffast.c", "zutil.c")]
+    [os.path.join(TOP, "core/mail/engine/img", f) for f in ("pmimg.c", "pmjpeg.c", "pmjprog.c", "pmpng.c", "pmgif.c", "picojpeg.c")] + \
+    [os.path.join(TOP, "core/ssh/zlib", f) for f in ("adler32.c", "crc32.c", "inflate.c", "inftrees.c", "inffast.c", "zutil.c")]
 cmd = ["gcc", "-g", "-O1", "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=undefined",
-       "-I", os.path.join(TOP, "ssh/zlib"), "-o", exe] + srcs
+       "-I", os.path.join(TOP, "core/ssh/zlib"), "-o", exe] + srcs
 print("building", exe)
 subprocess.check_call(cmd)
 

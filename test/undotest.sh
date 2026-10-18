@@ -8,7 +8,7 @@
 # the message not taken for new mail afterwards; and the refusals.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-H=${1:-$HERE/../../build/mail-host/psimail-host}
+H=${1:-$HERE/../build/mail-host/psimail-host}
 PORT=1181
 fail=0
 check() { # check "expected" "got"

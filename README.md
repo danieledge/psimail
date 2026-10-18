@@ -11,11 +11,11 @@ TLS 1.3 client.
 **Status: 0.83, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
-please report them via [GitHub issues](https://github.com/danieledge/psiterm/issues).
+please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
 
 [![Download PsiMail.sis](https://img.shields.io/badge/Download-PsiMail.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiMail.sis)
 
-<p align="center"><img src="../docs/screenshots/psimail-mailbox.png" alt="PsiMail's Inbox: the folder tree and the message list, unread messages in bold" width="640"></p>
+<p align="center"><img src="docs/screenshots/psimail-mailbox.png" alt="PsiMail's Inbox: the folder tree and the message list, unread messages in bold" width="640"></p>
 
 ## Contents
 
@@ -29,27 +29,28 @@ please report them via [GitHub issues](https://github.com/danieledge/psiterm/iss
 - [Keys](#keys) and [writing a message](#writing-a-message)
 - [Updating from the Psion](#updating-from-the-psion)
 - [Troubleshooting](#troubleshooting)
-- [How it works](#how-it-works), [Security](#security), [Building](#building), [Files on the card](#files-on-the-card)
+- [How it works](#how-it-works), [Security](#security), [Building](#building), [Releases](#releases), [Files on the card](#files-on-the-card)
+- [The suite](#the-suite)
 - [Not yet](#not-yet)
 
 ## Screenshots
 
 <table>
 <tr>
-<td><a href="../docs/screenshots/psimail-reader.png"><img src="../docs/screenshots/psimail-reader.png" alt="Reading a message: the header and a picture in the text" width="400"></a><br>The reader: header and a picture</td>
-<td><a href="../docs/screenshots/psimail-newsletter.png"><img src="../docs/screenshots/psimail-newsletter.png" alt="An HTML newsletter with its banner, headings and links" width="400"></a><br>An HTML newsletter</td>
+<td><a href="../docs/screenshots/psimail-reader.png"><img src="docs/screenshots/psimail-reader.png" alt="Reading a message: the header and a picture in the text" width="400"></a><br>The reader: header and a picture</td>
+<td><a href="../docs/screenshots/psimail-newsletter.png"><img src="docs/screenshots/psimail-newsletter.png" alt="An HTML newsletter with its banner, headings and links" width="400"></a><br>An HTML newsletter</td>
 </tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-invitation.png"><img src="../docs/screenshots/psimail-invitation.png" alt="An invitation with Accept, Tentative and Decline" width="400"></a><br>An invitation</td>
-<td><a href="../docs/screenshots/psimail-contacts.png"><img src="../docs/screenshots/psimail-contacts.png" alt="Writing a message: Add from Contacts" width="400"></a><br>Addresses from Contacts</td>
+<td><a href="../docs/screenshots/psimail-invitation.png"><img src="docs/screenshots/psimail-invitation.png" alt="An invitation with Accept, Tentative and Decline" width="400"></a><br>An invitation</td>
+<td><a href="../docs/screenshots/psimail-contacts.png"><img src="docs/screenshots/psimail-contacts.png" alt="Writing a message: Add from Contacts" width="400"></a><br>Addresses from Contacts</td>
 </tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-calendar-week.png"><img src="../docs/screenshots/psimail-calendar-week.png" alt="The calendar's week view, with today's events" width="400"></a><br>The calendar: week</td>
-<td><a href="../docs/screenshots/psimail-calendar-month.png"><img src="../docs/screenshots/psimail-calendar-month.png" alt="The calendar's month view" width="400"></a><br>The calendar: month</td>
+<td><a href="../docs/screenshots/psimail-calendar-week.png"><img src="docs/screenshots/psimail-calendar-week.png" alt="The calendar's week view, with today's events" width="400"></a><br>The calendar: week</td>
+<td><a href="../docs/screenshots/psimail-calendar-month.png"><img src="docs/screenshots/psimail-calendar-month.png" alt="The calendar's month view" width="400"></a><br>The calendar: month</td>
 </tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-preferences.png"><img src="../docs/screenshots/psimail-preferences.png" alt="Tools > Preferences, the General page" width="400"></a><br>Preferences</td>
-<td><a href="../docs/screenshots/psimail-email-icon.png"><img src="../docs/screenshots/psimail-email-icon.png" alt="PsiMail asks whether the Email icon should open it" width="400"></a><br>The Email icon question</td>
+<td><a href="../docs/screenshots/psimail-preferences.png"><img src="docs/screenshots/psimail-preferences.png" alt="Tools > Preferences, the General page" width="400"></a><br>Preferences</td>
+<td><a href="../docs/screenshots/psimail-email-icon.png"><img src="docs/screenshots/psimail-email-icon.png" alt="PsiMail asks whether the Email icon should open it" width="400"></a><br>The Email icon question</td>
 </tr>
 </table>
 
@@ -231,7 +232,7 @@ Tools > Connection settings chooses how PsiMail reaches the Internet; the
 settings are shared with PsiTerm and PsiWeb.
 
 * **Modem**: a serial Wi-Fi modem (such as a WiRSa, a WiFi232 or the
-  [Atom modem](../firmware/atom-modem/README.md)) on the Psion's serial port.
+  [Atom modem](https://github.com/danieledge/psiconnect)) on the Psion's serial port.
   PsiMail dials the server with `ATDT host:port`. Set the baud rate to the
   modem's; 115200 with RTS/CTS flow control is fastest if the cable carries
   those lines. The line is only taken while PsiMail needs it, and File >
@@ -263,9 +264,8 @@ settings are shared with PsiTerm and PsiWeb.
     that run.
   * **Send log to server** (Tools > Troubleshooting), which needs PsiProxy.
 
-  [PsiProxy](../proxy/README.md), in this repository, is the proxy made for
-  these apps (port 8081 by default); the main
-  [README](../README.md#the-proxy-optional) says how to set it up.
+  [PsiProxy](https://github.com/danieledge/psiproxy) is the proxy made for
+  these apps (port 8081 by default); its README says how to set it up.
 * **Modem provides TLS** (Link page) is only for a modem whose firmware does
   the TLS itself (the Atom modem's); leave it at No for a WiRSa or a WiFi232.
   If it is Yes and the modem does not, PsiMail notices on the first IMAP or
@@ -385,7 +385,7 @@ event, where, the date, all day or start and end, and an alarm.
 Tools > Update PsiMail asks where to look: GitHub for published releases
 (raw.githubusercontent.com/danieledge/psiterm/main/dist/, over TLS 1.3), its
 test builds, or `host:port` of PsiTerm's local update server
-(server/psion-update.sh, port 8686). It fetches PsiMail-version.txt; if that
+(core/server/psion-update.sh, port 8686). It fetches PsiMail-version.txt; if that
 is newer, it downloads PsiMail.sis in 64 KB pieces (each checked, and fetched
 again if damaged) to D:\PsiMail-update.sis (C: without a card), checks the
 Ed25519 signature in PsiMail.sis.sig against the release key, and offers to
@@ -393,9 +393,9 @@ install it.
 
 To put a build on the local server:
 
-    tools/release/publish-local.sh PsiMail 0.3.1
+    core/tools/release/publish-local.sh PsiMail 0.3.1
 
-(signs with ~/.psiterm-signing/release.key; tools/release/sign.py works
+(signs with ~/.psiterm-signing/release.key; core/tools/release/sign.py works
 without the `cryptography` package too). The version must go up each time.
 
 ## Troubleshooting
@@ -491,12 +491,41 @@ Passwords are kept scrambled, not encrypted, in `C:\System\Apps\PsiMail\PsiMail.
 
 ## Building
 
-    PSION_SDK=/path/to/psion_cpp_sdk_linux mail/build.sh [host]
+PsiMail's own code is in this repository; the code it shares with the other
+programs (PsiTerm's networking and TLS, the picture decoders, the build
+container and the emulator tools) is [psion-core](https://github.com/danieledge/psion-core),
+carried here as the git submodule `core/`:
 
-builds `psimail.exe`, `PsiMail.app`, `pmbutton.exe` and `dist/PsiMail.sis`
-(and with `host` the PC version of the engine). The SDK is
-[psion_cpp_sdk_linux](https://github.com/static-void/psion_cpp_sdk_linux)
-(needs wine). Tests: see [test/README.md](test/README.md).
+    git clone --recurse-submodules https://github.com/danieledge/psimail.git
+    cd psimail
+    core/tools/docker/psibuild setup               # once: the build image and the SDK
+    core/tools/docker/psibuild "bash build.sh host"  # dist/PsiMail.sis
+
+builds `psimail.exe`, `PsiMail.app`, `pmbutton.exe`, `psihold.exe` and
+`dist/PsiMail.sis` (and with `host` the PC version of the engine,
+`build/mail-host/psimail-host`, for the tests). Without the container, set
+`PSION_SDK` to the [psion_cpp_sdk_linux](https://github.com/static-void/psion_cpp_sdk_linux)
+folder (needs wine) and run `bash build.sh [host]`. The details are in
+core's [BUILDING.md](https://github.com/danieledge/psion-core/blob/main/docs/BUILDING.md).
+Tests: see [test/README.md](test/README.md).
+
+## Releases
+
+Every installed PsiMail's updater (Tools > Update PsiMail) reads
+`dist/PsiMail-version.txt`, `dist/PsiMail.sis` and `dist/PsiMail.sis.sig`
+from the [psiterm](https://github.com/danieledge/psiterm) repository, as it
+did before PsiMail had a repository of its own; nothing in the program
+changed. So a release is still committed there:
+
+    release.sh 0.84
+
+signs `dist/PsiMail.sis` with the release key (kept outside every
+repository), writes `dist/PsiMail-version.txt`, and copies the three files
+together into the psiterm checkout beside this one (`../psiterm/dist/`, or
+`$PSITERM`), to be committed and pushed there (`dev` for the test builds,
+`main` for releases). The version goes in `app/psimail.cpp` (`KVersion`) and
+`pkg/psimail.pkg`, two digits (0.84 is `0,84,0`), because the EPOC installer
+compares major.minor only.
 
 ## Files on the card
 
@@ -530,6 +559,18 @@ it is the user's.
 * Server-side drafts (drafts stay in the Outbox).
 * Repeating entries made on the Psion, to-do lists and anniversaries in the
   calendar sync.
+
+## The suite
+
+PsiMail is one of a set of programs that bring the Series 5mx into 2026:
+[PsiTerm](https://github.com/danieledge/psiterm) (SSH and a terminal),
+[PsiWeb](https://github.com/danieledge/psiweb) (a web browser),
+[PsiCast](https://github.com/danieledge/psicast) (screen sharing),
+[PsiLinux](https://github.com/danieledge/psilinux),
+[PsiConnect](https://github.com/danieledge/psiconnect) (the Atom modem
+firmware) and [PsiProxy](https://github.com/danieledge/psiproxy), on the
+shared [psion-core](https://github.com/danieledge/psion-core). The suite's
+home page is [danieledge.github.io/psion](https://danieledge.github.io/psion/).
 
 ## Support
 

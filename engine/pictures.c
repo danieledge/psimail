@@ -36,8 +36,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pm.h"
-#include "img/pmimg.h"
-#include "../../ssh/psigrey.h"
+#include "../core/mail/engine/img/pmimg.h"
+#include "../core/ssh/psigrey.h"
 
 #define PIC_TIME_MS 90000L
 #define PIC_CMD_MS 150000L

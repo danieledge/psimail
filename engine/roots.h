@@ -1,4 +1,4 @@
-/* roots.h - root certificates PsiMail trusts. Made by mail/tools/mkroots.py */
+/* roots.h - root certificates PsiMail trusts. Made by tools/mkroots.py */
 typedef struct { const char *name; const unsigned char *subject; int subjectlen;
                  const unsigned char *n; int nlen; const unsigned char *e; int elen; } Root;
 /* CN=ISRG Root X1,O=Internet Security Research Group,C=US, 4096 bits, until 2035-06-04 */

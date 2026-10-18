@@ -1,4 +1,4 @@
-/* pmicons.h - made by mail/tools/mkicons.py: PsiMail.mbm ids */
+/* pmicons.h - made by tools/mkicons.py: PsiMail.mbm ids */
 #ifndef PMICONS_H
 #define PMICONS_H
 enum TPmIconId

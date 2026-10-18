@@ -3,7 +3,7 @@
 uses, written to PsiMail.aif with PsiTerm's AIF writer."""
 import os, sys
 from PIL import Image, ImageDraw
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/icon"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../core/tools/icon"))
 from aif import write_aif
 K, D, L, W = 0, 85, 170, 255
 

@@ -22,22 +22,22 @@ one fixture as the reader gets it. Built with AddressSanitizer.
 import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOP = os.path.dirname(os.path.dirname(HERE))
+TOP = os.path.dirname(HERE)
 OUT = os.path.join(TOP, "build", "htmltest")
 os.makedirs(OUT, exist_ok=True)
 FIX = os.path.join(HERE, "html")
 
 def build(html_c, exe):
     cmd = ["gcc", "-g", "-O1", "-std=gnu99", "-w", "-fsanitize=address,undefined", "-fno-sanitize-recover=undefined",
-           "-I", os.path.join(TOP, "ssh"), "-I", os.path.join(TOP, "mail/engine"), "-o", exe, os.path.join(HERE, "htmltest.c"), html_c,
-           os.path.join(TOP, "mail/engine/charset.c")]
+           "-I", os.path.join(TOP, "core/ssh"), "-I", os.path.join(TOP, "engine"), "-o", exe, os.path.join(HERE, "htmltest.c"), html_c,
+           os.path.join(TOP, "engine/charset.c")]
     subprocess.check_call(cmd)
 
 exe = os.path.join(OUT, "htmltest")
-build(os.path.join(TOP, "mail/engine/html.c"), exe)
+build(os.path.join(TOP, "engine/html.c"), exe)
 old_exe = None
 try:
-    src = subprocess.run(["git", "-C", TOP, "show", "64646cb:mail/engine/html.c"], capture_output=True, check=True).stdout
+    src = subprocess.run(["git", "-C", TOP, "show", "aa57fd5:engine/html.c"], capture_output=True, check=True).stdout
     old_c = os.path.join(OUT, "html_0_73.c")
     open(old_c, "wb").write(src)
     old_exe = os.path.join(OUT, "htmltest-0.73")

@@ -2,7 +2,7 @@
 """invitehost.py [OUTDIR]
 
 Invitations and contact cards through the host engine (build/mail-host/
-psimail-host, from `mail/build.sh host`), end to end, with no real server:
+psimail-host, from `bash build.sh host`), end to end, with no real server:
 
 1. fakeimap.py --invite serves an invitation (text/calendar, base64) and a
    message with a vCard attached; the engine downloads both messages and
@@ -18,7 +18,7 @@ psimail-host, from `mail/build.sh host`), end to end, with no real server:
 import base64, email, os, shutil, socket, subprocess, sys, tempfile, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOP = os.path.dirname(os.path.dirname(HERE))
+TOP = os.path.dirname(HERE)
 HOST = os.path.join(TOP, "build", "mail-host", "psimail-host")
 # (a short folder: the engine's store_dir holds 95 characters, plenty for
 # D:\System\Data\PsiMail\ but not for a deep build folder)
@@ -26,7 +26,7 @@ out = sys.argv[1] if len(sys.argv) > 1 else tempfile.mkdtemp(prefix="pminv")
 shutil.rmtree(out, ignore_errors=True)
 os.makedirs(out)
 if not os.path.exists(HOST):
-    sys.exit("build the host engine first: PSION_SDK=... mail/build.sh host")
+    sys.exit("build the host engine first: PSION_SDK=... bash build.sh host")
 
 IMAP_PORT, SMTP_PORT = 11743, 11744
 imap = subprocess.Popen([sys.executable, os.path.join(HERE, "fakeimap.py"), str(IMAP_PORT), "--invite"],

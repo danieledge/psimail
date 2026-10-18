@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""mkroots.py - writes mail/engine/roots.h, the root certificates PsiMail
+"""mkroots.py - writes engine/roots.h, the root certificates PsiMail
 trusts (RSA only), from PEM files.
 
-    mail/tools/mkroots.py mail/tools/roots.pem > mail/engine/roots.h
+    tools/mkroots.py tools/roots.pem > engine/roots.h
 
 roots.pem came from macOS's system roots (security find-certificate -p):
 ISRG Root X1 (Let's Encrypt: Fastmail), GTS Root R1 (Google), DigiCert,
@@ -24,7 +24,7 @@ certs = []
 for path in sys.argv[1:]:
     certs += x509.load_pem_x509_certificates(open(path, "rb").read())
 
-print("/* roots.h - root certificates PsiMail trusts. Made by mail/tools/mkroots.py */")
+print("/* roots.h - root certificates PsiMail trusts. Made by tools/mkroots.py */")
 print("typedef struct { const char *name; const unsigned char *subject; int subjectlen;")
 print("                 const unsigned char *n; int nlen; const unsigned char *e; int elen; } Root;")
 entries = []

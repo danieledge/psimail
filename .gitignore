@@ -1,0 +1,42 @@
+# build output (objects go to the SDK's folders and build/)
+/build/
+*.o
+*.obj
+*.lib
+*.map
+*.marm
+*.rpp
+__pycache__/
+*.pyc
+# the built package: releases are signed by release.sh and committed in the
+# psiterm repository's dist/, which the installed programs' updaters read
+/dist/
+
+# release signing key: never commit
+*.key
+signing/
+
+# the emulator's test seed must never be committed (core/tools/emu/seed.py off)
+*seed*
+
+# local debugging / device data
+*.psi
+upload-*.bin
+screenshots/
+!docs/screenshots/
+*.log
+*.log.old
+
+# local headers, environment
+*_local.h
+*_local.*
+.env
+.env.*
+!.env.example
+
+# editors / OS / Claude Code's local notes
+.DS_Store
+*~
+*.swp
+.claude/
+CLAUDE.local.md

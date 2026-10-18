@@ -15,7 +15,7 @@
 
 #include "pm.h"
 #ifndef PM_NO_TLS
-#include "../../ssh/tls13.h"
+#include "../core/ssh/tls13.h"
 extern int tls_pending(void);
 #endif
 

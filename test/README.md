@@ -3,7 +3,7 @@
 Everything here runs on a PC. The engine is tested two ways: built for the
 PC (`make TARGET=host` → `build/mail-host/psimail-host`) and as the real
 Psion ARM code in an emulator (`make TARGET=epoc emu` →
-`mail/emu/run_psimail.py`, which needs `pip install unicorn pefile`).
+`emu/run_psimail.py`, which needs `pip install unicorn pefile`).
 Both take the same commands and read the account from `PM_*` variables.
 
 ## A local server
@@ -24,7 +24,7 @@ Then, for example:
     export PM_HOST=localhost PM_PORT=9993 PM_SMTP=localhost PM_SMTP_PORT=9465 \
            PM_USER=dan@example.com PM_PASS=secret
     psimail-host folders , trustlast , sync INBOX , body INBOX 61 , attach INBOX 64 2
-    mail/emu/run_psimail.py --align --stack --count sendrecv , body INBOX 67
+    emu/run_psimail.py --align --stack --count sendrecv , body INBOX 67
 
 `PM_OVERRUN=60000,120000` (host build) throws away 200 bytes of what
 arrives at those points, as a serial overrun without RTS/CTS does: the
@@ -162,7 +162,7 @@ Let's Encrypt YR2 via ISRG Root YR, cross-signed by ISRG Root X1) passes
 ## The picture decoders (no server needed)
 
 `imgtest.py [OUTDIR] [--rounds N] [--pictures DIR]` builds `imgtest.c` with
-the decoders in `mail/engine/img` under AddressSanitizer and UBSan, makes
+the decoders in `core/mail/engine/img` under AddressSanitizer and UBSan, makes
 sample pictures with Pillow (baseline JPEG in every subsampling;
 progressive JPEG in 4:2:0, 4:4:4 and grey, with restart markers, cut short,
 and at each shrink - full size, 1/2, 1/4 and the DC-only 1/8 - for

@@ -2,7 +2,7 @@
 """PsiMail's icons (original pixel art, in the spirit of the Psion's own
 programs) -> BMP files for bmconv, and ui/pmicons.h with their ids.
 
-    mail/tools/mkicons.py OUTDIR HEADER
+    tools/mkicons.py OUTDIR HEADER
 
 Each icon is ASCII art: k black, d dark grey, l light grey, w white,
 . transparent. Every icon gets a 1-bit mask right after it in the MBM
@@ -450,7 +450,7 @@ def main():
         files += [fi, fm]
         ids.append(name)
     with open(header, 'w') as f:
-        f.write('/* pmicons.h - made by mail/tools/mkicons.py: PsiMail.mbm ids */\n')
+        f.write('/* pmicons.h - made by tools/mkicons.py: PsiMail.mbm ids */\n')
         f.write('#ifndef PMICONS_H\n#define PMICONS_H\nenum TPmIconId\n\t{\n')
         for i, n in enumerate(ids):
             f.write(f'\tEMbm{n} = {2 * i}, EMbm{n}Mask = {2 * i + 1},\n')
