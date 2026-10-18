@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../engine/img/pmimg.h"
+#include "../core/mail/engine/img/pmimg.h"
 
 static unsigned char *slurp(const char *path, long *len)
 {

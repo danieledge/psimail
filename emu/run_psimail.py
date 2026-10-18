@@ -10,7 +10,7 @@ certificate checks.
 
     run_psimail.py [--count] [--align] [--trace f1,f2] CMD [ARGS] [, CMD [ARGS]] ...
 
-Commands as mail/host/pmhost.c (folders, sync F, body F UID, attach F UID
+Commands as host/pmhost.c (folders, sync F, body F UID, attach F UID
 PART, pictures F UID PARTS, flag F UID +S, move F UID [DEST], search F WORDS, send, sendrecv,
 trustlast, older F, full F UID, hangup). The account comes from PM_*
 variables as for psimail-host; files go under $PM_EMU_ROOT
@@ -22,7 +22,7 @@ from unicorn import Uc, UcError, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_CODE, UC_HOOK
 from unicorn.arm_const import *
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BUILD = os.environ.get("PM_BUILD", os.path.join(HERE, "../../build/mail-epoc"))
+BUILD = os.environ.get("PM_BUILD", os.path.join(HERE, "../build/mail-epoc"))
 args = sys.argv[1:]
 ARMCLOCK = "--armclock" in args
 COUNT = "--count" in args or ARMCLOCK

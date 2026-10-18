@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pm.h"
-#include "../../ssh/pgdevbox.h"
+#include "../core/ssh/pgdevbox.h"
 
 #define WEB_MAX       16
 #define WEB_MAX_KB    300

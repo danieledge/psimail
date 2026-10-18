@@ -1,19 +1,27 @@
 #!/bin/bash
 # Builds PsiMail for the Psion Series 5mx and packages dist/PsiMail.sis.
-#   PSION_SDK=/path/to/psion_cpp_sdk_linux mail/build.sh [host]
+#   PSION_SDK=/path/to/psion_cpp_sdk_linux bash build.sh [host]
+# (or, without the SDK's tools installed: core/tools/docker/psibuild "bash build.sh host")
 # 'host' also builds build/mail-host/psimail-host, the same engine for a PC
-# (for the tests in mail/test).
+# (for the tests in test/).
+# The shared code (psiglue, TLS, the picture decoders, psihold.exe...) is
+# psion-core, the core/ submodule (PSION_CORE points elsewhere).
+# The .sis stays in this checkout's dist/: release.sh signs it and puts it,
+# with its .sig and version file, in the psiterm checkout's dist/, which
+# the installed programs' updaters read.
 set -e
 : "${PSION_SDK:?set PSION_SDK to your psion_cpp_sdk_linux directory}"
 HERE=$(cd "$(dirname "$0")" && pwd)
-TOP=$(cd "$HERE/.." && pwd)
+TOP=$HERE
+CORE=${PSION_CORE:-$TOP/core}
+[ -f "$CORE/ssh/psiglue.cpp" ] || { echo "no psion-core at $CORE: git submodule update --init"; exit 1; }
 export EPOCROOT=$PSION_SDK/epoc_cpp_sdk
 REL=$EPOCROOT/epoc32/release/marm/rel
 mkdir -p "$TOP/build"
 
 for t in epoc ${1:+$1}; do
 	echo "== psimail engine ($t)"
-	make -C "$HERE" -j4 TARGET=$t PSION_SDK="$PSION_SDK" > "$TOP/build/mail-$t.log" 2>&1 \
+	make -C "$HERE" -j4 TARGET=$t PSION_SDK="$PSION_SDK" ${PSION_CORE:+CORE="$PSION_CORE"} > "$TOP/build/mail-$t.log" 2>&1 \
 		|| { grep -E "error|undefined" "$TOP/build/mail-$t.log" | grep -v error_to_string | head -30; exit 1; }
 done
 
@@ -26,8 +34,8 @@ echo "== PsiMail.app"
 export PATH=/usr/bin:/bin:$PSION_SDK/gcc-3.0-psion-98r2-9/bin:$EPOCROOT/epoc32/tools
 export TMP=$EPOCROOT/tmp WINEDEBUG=-all
 mkdir -p "$TMP" "$EPOCROOT/ptproj"
-for l in psimail:mail/app psimailinc:mail psitermssh:ssh psimailbtn:mail/button; do
-	name=${l%%:*}; dir=$TOP/${l#*:}
+for l in psimail:$HERE/app psimailinc:$HERE psitermssh:$CORE/ssh psimailbtn:$HERE/button; do
+	name=${l%%:*}; dir=${l#*:}
 	if [ -e "$EPOCROOT/ptproj/$name" ] && [ ! -L "$EPOCROOT/ptproj/$name" ]; then
 		echo "$EPOCROOT/ptproj/$name exists and is not a link - move it away"; exit 1
 	fi
@@ -38,7 +46,7 @@ makmake psimail marm > "$TOP/build/psimail-makmake.log" 2>&1
 make -f psimail.marm rel > "$TOP/build/psimail-app.log" 2>&1 \
 	|| { grep -i -B1 -A4 "error\|undefined" "$TOP/build/psimail-app.log" | head -60; exit 1; }
 
-# the Email icon below the screen (mail/button): pmbutton.exe takes the key,
+# the Email icon below the screen (button/): pmbutton.exe takes the key,
 # pmbutton.rdl (a boot hook) is built but not installed: see README
 echo "== pmbutton.exe, pmbutton.rdl"
 cd "$EPOCROOT/ptproj/psimailbtn"
@@ -49,9 +57,9 @@ for t in pmbutton pmbtnrec; do
 done
 )
 
-# psihold.exe: holds the Psion Internet connection up after use (ssh/psihold.cpp)
+# psihold.exe: holds the Psion Internet connection up after use (core/ssh/psihold.cpp)
 echo "== psihold.exe"
-make -f "$TOP/ssh/psihold.mk" PSION_SDK="$PSION_SDK" > "$TOP/build/psihold.log" 2>&1 \
+make -f "$CORE/ssh/psihold.mk" PSION_SDK="$PSION_SDK" TOP="$TOP" > "$TOP/build/psihold.log" 2>&1 \
 	|| { grep -E "error|undefined" "$TOP/build/psihold.log" | head -20; exit 1; }
 
 echo "== package"

@@ -1,12 +1,19 @@
 # PsiMail - an email client for the Psion Series 5mx.  See README.md.
 #   make TARGET=host    psimail-host: the engine on a PC, for tests
 #   make TARGET=epoc    psimail.exe for the Psion (normally via ./build.sh)
+# The shared code (psiglue, TLS, zlib, LibTomCrypt, the picture decoders,
+# the C-library shims) is psion-core, the core/ submodule (CORE).
 MAIL    := $(abspath .)
-TOP     := $(abspath ..)
+TOP     := $(MAIL)
+# (a relative path: core's sources are compiled by paths relative to this
+# folder, so the __FILE__ that LibTomCrypt's LTC_ARGCHK embeds in
+# psimail.exe carries no machine's paths; $(O) and the -I paths may be absolute)
+CORE    ?= core
 TARGET  ?= epoc
 O       := $(TOP)/build/mail-$(TARGET)
-LTC     := $(TOP)/ssh/db/libtomcrypt/src
-LTM     := $(TOP)/ssh/db/libtommath
+LTC     := $(CORE)/ssh/db/libtomcrypt/src
+LTM     := $(CORE)/ssh/db/libtommath
+IMG     := $(CORE)/mail/engine/img
 
 ENGINE  := pmmain imap imapparse smtp compose mime charset html store pmnet certcheck pmrsa \
            caldav caltz ics http xmlscan pmupdate pictures undo invite invmsg webpics
@@ -15,7 +22,7 @@ Z_SRCS  := adler32 crc32 inflate inftrees inffast zutil
 LTC_SRCS := stream/chacha/chacha_crypt stream/chacha/chacha_ivctr32 stream/chacha/chacha_keystream \
 	stream/chacha/chacha_setup stream/chacha/chacha_done mac/poly1305/poly1305 hashes/sha2/sha256 \
 	hashes/sha2/sha384 hashes/sha2/sha512 misc/zeromem misc/burn_stack misc/crypt/crypt_argchk misc/compare_testvector
-LTM_SRCS := $(notdir $(basename $(shell sed -n 's|^libtommath/||p' $(TOP)/ssh/ltm_sources.txt)))
+LTM_SRCS := $(notdir $(basename $(shell sed -n 's|^libtommath/||p' $(CORE)/ssh/ltm_sources.txt)))
 
 ifeq ($(TARGET),host)
 CC      := cc
@@ -38,11 +45,11 @@ export TMP := /tmp/
 CC      := arm-pe-gcc
 ARCH    := -s -fomit-frame-pointer -O2 -fno-strict-aliasing -nostdinc -mcpu=arm710 -mapcs-32 -mshort-load-bytes -msoft-float
 DEFS    := -D__SYMBIAN32__ -D__PSISOFT32__ -D__GCC32__ -D__EPOC32__ -D__MARM__ -D__EXE__ -DNDEBUG -DTLS_VERIFY
-LIBC    := -I$(TOP)/web/compat -I$(E)/include/libc -I$(E)/include
-TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w $(LIBC) -include $(MAIL)/compat/pmcompat.h
+LIBC    := -I$(CORE)/web/compat -I$(E)/include/libc -I$(E)/include
+TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w $(LIBC) -include $(CORE)/mail/compat/pmcompat.h
 LTCFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTC)/headers -DLTC_SOURCE
 LTMFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTM)
-CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(MAIL) -I$(TOP)/ssh -I$(E)/include/libc -I$(E)/include
+CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc -I$(E)/include
 OUT     := $(REL)/psimail.exe
 PLAT    := $(O)/pmepoc.o $(O)/psiglue.o $(O)/nsprintf.o
 LIBGCC  := $(SDK)/gcc-3.0-psion-98r2-9/lib/gcc-lib/arm-epoc-pe/3.0-psion-98r2/libgcc.a
@@ -53,38 +60,38 @@ ENG_OBJS := $(addprefix $(O)/,$(ENGINE:=.o)) $(addprefix $(O)/img/,$(IMG_SRCS:=.
 TLS_OBJS := $(O)/tls13.o $(O)/x25519.o $(O)/pmrandom.o
 LTC_OBJS := $(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_OBJS := $(addprefix $(O)/ltm/,$(LTM_SRCS:=.o))
-HDRS    := $(MAIL)/psimail.h $(MAIL)/engine/pm.h $(MAIL)/engine/invite.h $(TOP)/ssh/psishared.h
+HDRS    := $(MAIL)/psimail.h $(MAIL)/engine/pm.h $(MAIL)/engine/invite.h $(CORE)/ssh/psishared.h
 
 all: $(OUT)
 
 $(O)/%.o: engine/%.c $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(TFLAGS) -I$(TOP)/ssh $< -o $@
-$(O)/pictures.o: engine/pictures.c engine/img/pmimg.h $(HDRS)
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
+$(O)/pictures.o: engine/pictures.c $(IMG)/pmimg.h $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(TFLAGS) -I$(TOP)/ssh $< -o $@
-# the picture decoders (engine/img, shared with PsiWeb) and zlib's inflate for PNG
-$(O)/img/%.o: engine/img/%.c engine/img/pmimg.h
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
+# the picture decoders (core/mail/engine/img, shared with the Atom firmware) and zlib's inflate for PNG
+$(O)/img/%.o: $(IMG)/%.c $(IMG)/pmimg.h
 	@mkdir -p $(dir $@)
-	$(CC) -c $(TFLAGS) -I$(TOP)/ssh/zlib $(if $(filter host,$(TARGET)),,-I$(TOP)/web/compat) $< -o $@
-$(O)/zlib/%.o: $(TOP)/ssh/zlib/%.c
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh/zlib $(if $(filter host,$(TARGET)),,-I$(CORE)/web/compat) $< -o $@
+$(O)/zlib/%.o: $(CORE)/ssh/zlib/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(ARCH) $(if $(filter host,$(TARGET)),,$(DEFS) -fno-builtin $(LIBC)) -w $< -o $@
 $(O)/certcheck.o: engine/certcheck.c engine/roots.h $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(LTCFLAGS) -I$(TOP)/ssh $< -o $@
+	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh $< -o $@
 $(O)/pmupdate.o: engine/pmupdate.c $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(LTCFLAGS) $(if $(filter host,$(TARGET)),-DPM_TEST_KEY) -I$(TOP)/ssh $< -o $@
+	$(CC) -c $(LTCFLAGS) $(if $(filter host,$(TARGET)),-DPM_TEST_KEY) -I$(CORE)/ssh $< -o $@
 $(O)/pmrsa.o: engine/pmrsa.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTMFLAGS) $< -o $@
-$(O)/tls13.o: $(TOP)/ssh/tls13.c tls/includes.h
+$(O)/tls13.o: $(CORE)/ssh/tls13.c tls/includes.h
 	@mkdir -p $(dir $@)
-	$(CC) -c $(LTCFLAGS) -I$(TOP)/ssh/db/src $< -o $@
+	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
 $(O)/%.o: tls/%.c tls/includes.h tls/options.h
 	@mkdir -p $(dir $@)
-	$(CC) -c $(LTCFLAGS) -I$(TOP)/ssh/db/src $< -o $@
+	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
 $(O)/ltc/%.o:
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) $(LTC)/$(subst __,/,$*).c -o $@
@@ -97,17 +104,20 @@ $(O)/libltm.a: $(LTM_OBJS)
 ifeq ($(TARGET),host)
 $(O)/%.o: host/%.c $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(TFLAGS) -I$(TOP)/ssh $< -o $@
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
+$(O)/pgnet_host.o: $(CORE)/mail/host/pgnet_host.c $(HDRS)
+	@mkdir -p $(dir $@)
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
 $(OUT): $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(PLAT) $(O)/libltm.a
 	$(CC) $(ARCH) -o $@ $^
 else
 $(O)/pmepoc.o: engine/pmepoc.cpp $(HDRS)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CXXFLAGS) $< -o $@
-$(O)/psiglue.o: $(TOP)/ssh/psiglue.cpp $(TOP)/ssh/psishared.h $(TOP)/ssh/psibell.h $(TOP)/ssh/psilink.h
+$(O)/psiglue.o: $(CORE)/ssh/psiglue.cpp $(CORE)/ssh/psishared.h $(CORE)/ssh/psibell.h $(CORE)/ssh/psilink.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CXXFLAGS) '-DPSI_SHARED_NAME="PsiMailShared"' $< -o $@
-$(O)/nsprintf.o: $(TOP)/web/compat/nsprintf.c
+$(O)/nsprintf.o: $(CORE)/web/compat/nsprintf.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(ARCH) $(DEFS) -fno-builtin -w $(LIBC) $< -o $@
 LINKOBJS = $(REL)/eexe.o $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(PLAT) $(O)/libltm.a $(REL)/ecrt0.o $(SYSLIBS)
@@ -125,7 +135,7 @@ ifneq ($(TARGET),host)
 EMU_OBJS := $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(O)/nsprintf.o $(O)/emu/emu_rt.o $(O)/emu/emu_hc.o $(O)/emu/emu_mail.o $(O)/libltm.a
 $(O)/emu/%.o: emu/%.c
 	@mkdir -p $(dir $@)
-	$(CC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(MAIL) -I$(TOP)/ssh -I$(E)/include/libc $< -o $@
+	$(CC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc $< -o $@
 $(O)/psimail-emu.pe: $(EMU_OBJS)
 	arm-pe-ld -o $@ -e main -Map $(O)/psimail-emu.map $(EMU_OBJS) $(LIBGCC)
 emu: $(O)/psimail-emu.pe

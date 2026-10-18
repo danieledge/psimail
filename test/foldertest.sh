@@ -5,7 +5,7 @@
 # standard folder and a folder with children; offline).
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-H=${1:-$HERE/../../build/mail-host/psimail-host}
+H=${1:-$HERE/../build/mail-host/psimail-host}
 PORT=1179
 STORE=$(mktemp -d /tmp/pmft.XXXXXX)
 python3 "$HERE/fakeimap.py" $PORT > "$STORE/server.log" 2>&1 &

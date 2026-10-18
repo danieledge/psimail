@@ -2,7 +2,7 @@
 """invtest.py [OUTDIR]
 
 The invitation (.ics / iTIP) and contact card (.vcf) parsers in
-mail/engine/invite.c on a PC: builds invtest.c with AddressSanitizer and
+engine/invite.c on a PC: builds invtest.c with AddressSanitizer and
 UBSan, writes sample files as Google Calendar, Outlook, Apple and phones
 send them, and checks what the parser makes of each - the times on the
 Psion's clock (time zones described in the file, named only, UTC, all
@@ -13,14 +13,14 @@ item groups) and 4.0. Any wrong answer or sanitizer report fails the run.
 import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOP = os.path.dirname(os.path.dirname(HERE))
+TOP = os.path.dirname(HERE)
 out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(TOP, "build", "invtest")
 os.makedirs(out, exist_ok=True)
 exe = os.path.join(out, "invtest-asan")
 srcs = [os.path.join(HERE, "invtest.c")] + \
-    [os.path.join(TOP, "mail/engine", f) for f in ("invite.c", "ics.c", "caltz.c", "charset.c", "mime.c", "imapparse.c")]
+    [os.path.join(TOP, "engine", f) for f in ("invite.c", "ics.c", "caltz.c", "charset.c", "mime.c", "imapparse.c")]
 subprocess.check_call(["gcc", "-g", "-O1", "-std=gnu99", "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
-                       "-fno-sanitize-recover=undefined", "-I", os.path.join(TOP, "ssh"), "-o", exe] + srcs)
+                       "-fno-sanitize-recover=undefined", "-I", os.path.join(TOP, "core/ssh"), "-o", exe] + srcs)
 
 def crlf(s): return s.strip("\n").replace("\n", "\r\n") + "\r\n"
 
