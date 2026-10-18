@@ -1,5 +1,7 @@
 # PsiMail
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/danedge)
+
 Email and a calendar for the **Psion Series 5mx**, made to replace the
 built-in Email program. PsiMail reads and sends mail through any IMAP/SMTP
 server with TLS - it is made for Fastmail - with the server's certificate
