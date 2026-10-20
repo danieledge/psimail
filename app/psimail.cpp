@@ -105,7 +105,8 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.92");          // also pkg/psimail.pkg
+_LIT(KVersion, "0.93");          // also pkg/psimail.pkg
+_LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
 const TInt KCalmTicks = 4;       // quick ticks with nothing going on before the slow pace (1 s)
@@ -463,6 +464,7 @@ void CPmView::CopySettingsToShared()
 	s->net.rtscts = iSettings->iRtsCts;
 	s->net.net_mode = iSettings->iNetMode;
 	s->net.modem_tls = (iSettings->iSpare[0] & KPmModemTlsBit) ? 1 : 0;
+	s->net.log_on = LogOn() ? 1 : 0;          // (0.93) Keep a log: else the engine writes no psimail.log
 	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), ppp);
 	s->offline = iSettings->iOffline;
 	s->prefetch = PrefetchCount(*iSettings);
@@ -3430,7 +3432,7 @@ TBool CPmConnDialog::OkToExitL(TInt aButtonId)
 	if (link.iKeepUp && iSettings.iNetMode)
 		{
 		TFileName near(iEikonEnv->EikAppUi()->Application()->AppFullName());
-		PsiHoldStart(fs, near);
+		PsiHoldStart(fs, near, (iSettings.iSpare[0] & KPmLogBit) != 0);   // (its log only with ours)
 		}
 	if (link.iModemTls)
 		iSettings.iSpare[0] |= KPmModemTlsBit;
@@ -5155,8 +5157,10 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		}
 	else if (aMenuId == R_PM_TROUBLE_MENU)
 		{
-		// (dimmed, not gone, until a proxy is set in Connection settings: the log goes to it)
-		aMenuPane->SetItemDimmed(EPmCmdSendLog, !iView->ProxyUsable() || iView->OpInFlight(PM_CMD_PUTLOG));
+		// (dimmed, not gone, until a proxy is set in Connection settings: the log goes to it;
+		// and (0.93) while no log is kept)
+		aMenuPane->SetItemDimmed(EPmCmdSendLog, !iView->LogOn() || !iView->ProxyUsable() || iView->OpInFlight(PM_CMD_PUTLOG));
+		aMenuPane->SetItemButtonState(EPmCmdKeepLog, iView->LogOn() ? EEikMenuItemSymbolOn : 0);
 		}
 	else if (aMenuId == R_PM_PRINT_MENU)
 		{
@@ -5267,7 +5271,8 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		aCommand != EPmCmdToggleToolbar && aCommand != EPmCmdToggleTitle && aCommand != EPmCmdToggleFolders &&
 		aCommand != EPmCmdStatusInfo && aCommand != EPmCmdStop && aCommand != EPmCmdPrefs &&
 		aCommand != EPmCmdZoomIn && aCommand != EPmCmdZoomOut && aCommand != EPmCmdCalSettings &&
-		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog)
+		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog &&
+		aCommand != EPmCmdKeepLog)
 		{
 		iView->Toast(_L("No account - add one with Tools > Accounts"));
 		return;
@@ -5607,16 +5612,42 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPmCmdSendLog:
 		// no dialog: the engine posts its logs to the web proxy (engine/webpics.c pm_send_log)
-		if (!iView->ProxyUsable())
+		if (!iView->LogOn())
+			iView->Toast(KPmLogIsOff);
+		else if (!iView->ProxyUsable())
 			iView->Toast(_L("Not available - set a proxy in Connection settings"));
 		else
 			iView->SendLog();
+		break;
+	case EPmCmdKeepLog:
+		// (0.93) off unless ticked; what is in psimail.log already stays. The
+		// engine reads the setting on every line, so it takes effect at once
+		iSettings.iSpare[0] ^= KPmLogBit;
+		SaveSettings();
+		iView->Shared()->net.log_on = iView->LogOn() ? 1 : 0;
+		iView->Toast(iView->LogOn() ? _L("Keeping a log") : _L("Not keeping a log"));
 		break;
 	case EPmCmdBack:
 		break;
 	default:
 		break;
 		}
+	}
+
+// (0.93) a dimmed command chosen: why, for the ones whose reason is not obvious
+void CPmAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
+	{
+	if (aCommandId == EPmCmdSendLog)
+		{
+		if (!iView->LogOn())
+			iView->Toast(KPmLogIsOff);
+		else if (!iView->ProxyUsable())
+			iView->Toast(_L("Not available - set a proxy in Connection settings"));
+		else
+			iView->Toast(_L("Not available - the log is being sent"));
+		return;
+		}
+	CEikAppUi::HandleAttemptDimmedSelectionL(aCommandId);
 	}
 
 // ============================================================================

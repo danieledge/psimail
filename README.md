@@ -264,7 +264,8 @@ settings are shared with PsiTerm and PsiWeb.
     decode, and formats the Psion cannot decode (WebP, AVIF) can be shown. If
     the proxy does not answer, the pictures come direct, for the rest of
     that run.
-  * **Send log to server** (Tools > Troubleshooting), which needs PsiProxy.
+  * **Send log to server** (Tools > Troubleshooting), which needs PsiProxy
+    and Tools > Troubleshooting > Keep a log ticked.
 
   [PsiProxy](https://github.com/danieledge/psiproxy) is the proxy made for
   these apps (port 8081 by default); its README says how to set it up.
@@ -407,21 +408,26 @@ without the `cryptography` package too). The version must go up each time.
   try again: every step (dialling, the modem's answer, logging in, each
   message) is shown at the bottom left. Check that the Remote link is off
   and that PsiTerm or PsiWeb isn't holding the serial port.
-* **`psimail.log`**, next to the program in `\System\Apps\PsiMail\` (on the
-  disk PsiMail is installed on), records what the mail engine did, each line
-  timed; after a crash or a restart the previous engine's log is kept as
-  `psimail.old`, with the reason it ended at the top of the new log. They
-  are the files to send with a bug report. Tools > Troubleshooting > Send
-  log to server sends them to your PsiProxy, if the shared proxy is one (it
-  is dimmed until a proxy is set). They go as plain HTTP and hold server and
-  account names, so send them only to your own PsiProxy.
+* **`psimail.log`**: PsiMail keeps no log unless Tools > Troubleshooting >
+  Keep a log is ticked (it is off at first, and after an update). Then the
+  mail engine writes what it does to `psimail.log`, next to the program in
+  `\System\Apps\PsiMail\` (on the disk PsiMail is installed on), each line
+  timed, at most 32 KB; after a crash or a restart the previous engine's log
+  is kept as `psimail.old`, with the reason it ended at the top of the new
+  log. The tick takes effect at once; untick it to stop (the log kept so far
+  stays). They are the files to send with a bug report. Tools >
+  Troubleshooting > Send log to server sends them to your PsiProxy, if the
+  shared proxy is one (it is dimmed until a proxy is set, and while no log
+  is kept). They go as plain HTTP and hold server, account and folder names
+  and the addresses of web pictures (never passwords), so send them only to
+  your own PsiProxy.
 * **"The mail engine is not running"**: the engine is a separate program;
   PsiMail starts it again by itself if it stops (not after three stops in
   10 minutes). Tools > Restart mail engine starts it by hand.
 * **Where is my mail?** View > Status information shows where the mail is
   kept. If the move to `\System\Data\PsiMail` failed, PsiMail says so,
   keeps using the old `\PsiMail\` folder, and writes why to `Store.log`
-  beside PsiMail.app.
+  beside PsiMail.app (with Keep a log ticked).
 * **A server's certificate is refused**: PsiMail checks the chain, the name
   and the dates (when the Psion's clock looks set). Check the Psion's date,
   or trust the server's key when asked - see [Security](#security).

@@ -23,7 +23,8 @@
 // into place - one quick rename on the same disk, whatever is in it. If
 // that fails (a file in use, the disk full or read-only) PsiMail goes on
 // using the old folder, says so once, and writes why to Store.log in
-// PsiMail's own folder; it tries again next time it opens.
+// PsiMail's own folder (0.93: only with Tools > Troubleshooting > Keep a
+// log ticked); it tries again next time it opens.
 //
 // Removing PsiMail leaves the store: it is the user's mail (Help says so).
 
@@ -50,8 +51,10 @@ static TBool IsDir(RFs& aFs, const TDesC& aPath)
 	}
 
 // a line in Store.log, beside PsiMail.app (for when something went wrong)
-static void StoreLog(RFs& aFs, const TDesC& aText)
+static void StoreLog(RFs& aFs, const TDesC& aText, TBool aOn)
 	{
+	if (!aOn)
+		return;                              // (0.93: no log unless Keep a log is ticked)
 	TParse parse;
 	parse.Set(CEikonEnv::Static()->EikAppUi()->Application()->AppFullName(), NULL, NULL);
 	TFileName path(parse.DriveAndPath());
@@ -112,14 +115,14 @@ void CPmView::StoreRoot(TChar aDrive, TDes& aRoot)
 			{
 			// keep using the old folder: nothing has moved
 			log.Format(_L("could not move %S to %S (%d) - still using %S"), &oldDir, &newDir, r, &oldDir);
-			StoreLog(fs, log);
+			StoreLog(fs, log, LogOn());
 			env->InfoMsg(_L("The mail could not be moved - it stays in \\PsiMail"));
 			aRoot = oldDir;
 			aRoot.Append('\\');
 			return;
 			}
 		log.Format(_L("moved %S to %S"), &oldDir, &newDir);
-		StoreLog(fs, log);
+		StoreLog(fs, log, LogOn());
 		// the attachments saved under the old store are the user's files:
 		// out to \Documents\Attachments, if there isn't one already
 		TBuf<60> oldAtt, userAtt, docs;
@@ -135,7 +138,7 @@ void CPmView::StoreRoot(TChar aDrive, TDes& aRoot)
 			if (d != KErrNone)
 				{
 				log.Format(_L("saved attachments left in %S (%d)"), &oldAtt, d);
-				StoreLog(fs, log);
+				StoreLog(fs, log, LogOn());
 				}
 			}
 		}

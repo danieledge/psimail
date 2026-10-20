@@ -389,7 +389,8 @@ RESOURCE MENU_PANE r_pm_trouble_menu
 	items=
 		{
 		MENU_ITEM { command=EPmCmdRestart; txt="Restart mail engine"; },
-		MENU_ITEM { command=EPmCmdSendLog; txt="Send log to server"; }
+		MENU_ITEM { command=EPmCmdSendLog; txt="Send log to server"; },
+		MENU_ITEM { command=EPmCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; }
 		};
 	}
 

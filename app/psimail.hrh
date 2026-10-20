@@ -96,7 +96,8 @@ enum TPmCommands
 	EPmCmdSaveWord,          // File > Save as Word file
 	// 0.75 (meng)
 	EPmCmdWebMenu,           // Message > Web (a cascade)
-	EPmCmdWebPictures        // Message > Web > Show web pictures (pmwebpic.cpp)
+	EPmCmdWebPictures,       // Message > Web > Show web pictures (pmwebpic.cpp)
+	EPmCmdKeepLog            // Tools > Troubleshooting > Keep a log (0.93)
 	};
 
 enum TPmDialogControls

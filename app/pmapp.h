@@ -83,6 +83,12 @@ const TInt KPmWebProxyBit = 0x4;
 // carries it to the engine through PmShared::net.modem_tls).
 const TInt KPmModemTlsBit = 0x8;
 
+// TPmSettings::iSpare[0] bit 4 (0.93): Tools > Troubleshooting > Keep a log.
+// Off (0, the standard, and what older settings read as): no psimail.log,
+// no Store.log, nothing written; on, the engine keeps psimail.log as before
+// (PmShared::net.log_on carries it to the engine, which reads it on every line)
+const TInt KPmLogBit = 0x10;
+
 // app-wide settings (accounts are PmAccount, as the engine uses them)
 struct TPmSettings
 	{
@@ -106,6 +112,7 @@ struct TPmSettings
 	                       // iSpare[0]: pictures in messages - 0 shown, 1 only attached files, 2 none (pmnative.cpp);
 	                       //   bits 8-9 (0x300, 0.75): pictures from the web - 0 ask, 1 always, 2 never (pmwebpic.cpp)
 	                       //   bit 2 (0x4, 0.84): web pictures fetched via the "psiproxy" HTTP proxy (pmwebpic.cpp)
+	                       //   bit 3 (0x8, 0.88): the modem does TLS; bit 4 (0x10, 0.93): keep a log (KPmLogBit)
 	                       // iSpare[1]: where PsiMail was when closed (CPmView::WhereToken)
 	PmAccount iAccounts[PM_MAX_ACCOUNTS];
 	};
@@ -589,6 +596,7 @@ public:
 	void ProxyToShared();                    // (0.87) the shared proxy (PsiLink.ini) into the chunk
 	TBool ProxyUsable();                     // ... and is it on, with a host?
 	TBool WebPicturesViaProxy() const;       // fetch them through the "psiproxy" HTTP proxy (iSpare[0] bit 2)
+	TBool LogOn() const { return (iSettings->iSpare[0] & KPmLogBit) != 0; }   // Keep a log (0.93)
 	TInt WebPictureCount() const { return iWebCount; }   // in the message shown (UpdateReaderL counts them)
 	TBool CanShowWebPictures() const;        // Message > Web > Show web pictures
 	void ShowWebPicturesL();                 // ... and the reader's line
@@ -956,6 +964,7 @@ private:
 	void AttachmentL(TBool aOpen);                 // Message > Attachments > Open / Save
 	void AddSenderL();                             // Edit > Add sender to Contacts
 	void DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane);
+	void HandleAttemptDimmedSelectionL(TInt aCommandId);   // (0.93) why Send log is dimmed
 	void HandleSwitchOnEventL(CCoeControl* aDestination);
 	void HandleSystemEventL(const TWsEvent& aEvent);   // a PsiWin backup: the engine's files are closed meanwhile
 	// Reading mode (docs/display.md): looked at after each key, tap and
