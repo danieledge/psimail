@@ -269,6 +269,8 @@ settings are shared with PsiTerm and PsiWeb.
 
   [PsiProxy](https://github.com/danieledge/psiproxy) is the proxy made for
   these apps (port 8081 by default); its README says how to set it up.
+  [Choosing your setup](https://github.com/danieledge/psion-core/blob/main/docs/SETUP.md) says what each set-up (the Atom modem,
+  PsiProxy, or both) gives across the suite.
 * **Modem provides TLS** (Link page) is only for a modem whose firmware does
   the TLS itself (the Atom modem's); leave it at No for a WiRSa or a WiFi232.
   If it is Yes and the modem does not, PsiMail notices on the first IMAP or
