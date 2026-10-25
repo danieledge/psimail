@@ -110,6 +110,14 @@ since ("Not undone - the message is no longer in Trash"). `fakeimap.py
 --arrive N,M` puts a new message in the Inbox before its Nth SELECT, for
 the new mail alert and the timed check.
 
+## Send log to server (no server needed)
+
+`putlogtest.py` runs Send log's engine side (`putlog`, psimail.log in a
+scratch folder) against a pretend proxy: PsiProxy's "Log saved: ..." is
+"Log sent"; the Atom modem's own proxy with no PsiProxy behind it (501 and
+"X-PsiConnect: no-psiproxy") and an older Atom's status page (200, HTML)
+are "Needs PsiProxy on a computer"; PsiProxy's 413 is "the log is too big".
+
 ## Certificates
 
 `certtest.c` + `certtest.py` check the chain code on a saved chain, e.g.

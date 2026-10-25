@@ -421,7 +421,10 @@ int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int why
  *
  * The body is streamed from the files in 1 KB pieces (nothing big on the
  * 64 KB stack). If it comes to more than LOG_MAX the front is cut, so the
- * newest lines are the ones kept. The reply is read for its status line only. */
+ * newest lines are the ones kept. The reply's status line, headers and
+ * first line are read: only PsiProxy's "Log saved: ..." is success, and the
+ * Atom modem's own proxy (501 and "X-PsiConnect: no-psiproxy", or an older
+ * Atom's status page) is "Needs PsiProxy on a computer" (pgdevbox.h). */
 #define LOG_MAX (1000L * 1024)
 
 static int log_send_file(const char *path, long skip, long *left)
@@ -449,12 +452,13 @@ int pm_send_log(char *why, int whymax)
 	static char req[400], line[300], pold[160], pcur[160];
 	PmShared *s = pm_shared();
 	long sold, scur, total, cut, left, ho = 0, hc = 0, skip_old = 0, skip_cur = 0;
-	int k, status = 0, ok = 1, lport;
+	int k, status = 0, ok = 1, lport, nopp = 0, saved = 0;
 	const char *lhost;
 
 	if (!PROXY_ON(s)) { snprintf(why, whymax, "Not available - set a proxy in Connection settings"); return PM_RES_FAILED; }
 	if (s->offline) { snprintf(why, whymax, "Working offline"); return PM_RES_OFFLINE; }
-	/* (not the Atom's own proxy: it has no /_putlog; then PsiDevBox.ini, if set) */
+	/* (behind the Atom's own proxy: PsiDevBox.ini if set, else the Atom's, which
+	   passes it on to a PsiProxy or says it has none) */
 	if (!pg_devbox(s->proxy_host, s->proxy_port, &lhost, &lport)) {
 		snprintf(why, whymax, "Not available - set a proxy in Connection settings");
 		return PM_RES_FAILED;
@@ -489,7 +493,7 @@ int pm_send_log(char *why, int whymax)
 	snprintf(req, sizeof(req),
 		"POST /_putlog?app=PsiMail&ver=%s HTTP/1.0\r\nHost: %s:%d\r\nUser-Agent: PsiMail (Psion Series 5mx)\r\n"
 		"Content-Type: text/plain\r\nContent-Length: %ld\r\nConnection: close\r\n\r\n",
-		s->net.version, lhost, lport, total);
+		s->net.version, pg_devbox_hostname(lhost), lport, total);
 	left = total;
 	if (pmn_write(req, (int)strlen(req)) != 0) ok = 0;
 	if (ok && ho > 0) { if (pmn_write(hdr_old, (int)strlen(hdr_old)) != 0) ok = 0; else left -= ho; }
@@ -511,7 +515,8 @@ int pm_send_log(char *why, int whymax)
 		snprintf(why, whymax, "the connection was lost");
 		return PM_RES_FAILED;
 	}
-	/* the status line (anything else is ignored; garbage is "not a web server") */
+	/* the status line (garbage is "not a web proxy"), the headers, and the
+	   body's first line; the rest is ignored */
 	for (k = 0; k < 20 && !status; k++) {
 		int n = pmn_readline(line, sizeof(line), 30000);
 		if (n < 0) { pmn_close(1); snprintf(why, whymax, pm_cancelled() ? "stopped" : "no reply from the proxy"); return pm_cancelled() ? PM_RES_CANCELLED : PM_RES_FAILED; }
@@ -519,9 +524,21 @@ int pm_send_log(char *why, int whymax)
 		if (strncmp(line, "HTTP/", 5) || !strchr(line, ' ')) { pmn_close(1); snprintf(why, whymax, "not a web proxy"); return PM_RES_FAILED; }
 		status = atoi(strchr(line, ' ') + 1);
 	}
+	for (k = 0; k < 40 && status; k++) {
+		int n = pmn_readline(line, sizeof(line), 30000);
+		if (n <= 0) break;                   /* (the end of the headers, or of the reply) */
+		if (pg_no_psiproxy_line(line)) nopp = 1;
+	}
+	if (status && k < 40 && pm_cancelled() == 0) {
+		line[0] = 0;
+		pmn_readline(line, sizeof(line), 30000);   /* (an older Atom's page has no line end: up to the close) */
+		saved = pg_putlog_saved(line);
+	}
 	pmn_close(0);
-	pm_log("send log: %ld bytes, the proxy said %d", total, status);
-	if (status == 200) { snprintf(why, whymax, "Log sent"); return PM_RES_OK; }
+	pm_log("send log: %ld bytes, the proxy said %d%s", total, status, nopp ? " (the Atom's own proxy: no PsiProxy)" : "");
+	k = pg_psiproxy_answer(status, nopp, saved);
+	if (k == PG_ANSWER_OK) { snprintf(why, whymax, "Log sent"); return PM_RES_OK; }
+	if (k == PG_ANSWER_NEEDS) { snprintf(why, whymax, PG_NEEDS_PSIPROXY); return PM_RES_FAILED; }
 	if (status == 413) snprintf(why, whymax, "the log is too big");
 	else snprintf(why, whymax, "the proxy said %d", status);
 	return PM_RES_FAILED;

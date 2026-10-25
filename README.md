@@ -416,9 +416,10 @@ without the `cryptography` package too). The version must go up each time.
   is kept as `psimail.old`, with the reason it ended at the top of the new
   log. The tick takes effect at once; untick it to stop (the log kept so far
   stays). They are the files to send with a bug report. Tools >
-  Troubleshooting > Send log to server sends them to your PsiProxy, if the
-  shared proxy is one (it is dimmed until a proxy is set, and while no log
-  is kept). They go as plain HTTP and hold server, account and folder names
+  Troubleshooting > Send log to server sends them to your PsiProxy: the
+  shared proxy, or, if that is the Atom modem's own, the PsiProxy set in the
+  modem's Web proxy settings (AT$PU; without one it says *Needs PsiProxy on
+  a computer*). It is dimmed until a proxy is set, and while no log is kept. They go as plain HTTP and hold server, account and folder names
   and the addresses of web pictures (never passwords), so send them only to
   your own PsiProxy.
 * **"The mail engine is not running"**: the engine is a separate program;

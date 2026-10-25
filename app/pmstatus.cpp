@@ -256,7 +256,8 @@ TBool CPmView::OutcomeText(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg, TDes
 			aOut = _L("Log sent");
 		else if (aRes == PM_RES_CANCELLED)
 			aOut = _L("Stopped");
-		else if (aMsg.Length() >= 2 && aMsg.Left(2) == _L("No"))   // "Not available ...", "No log to send"
+		else if ((aMsg.Length() >= 2 && aMsg.Left(2) == _L("No")) ||   // "Not available ...", "No log to send"
+			(aMsg.Length() >= 5 && aMsg.Left(5) == _L("Needs")))      // "Needs PsiProxy on a computer"
 			aOut.Copy(Clip(aMsg, aOut.MaxLength()));
 		else
 			{
