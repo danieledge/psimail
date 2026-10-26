@@ -52,7 +52,8 @@ LTMFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTM)
 CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc -I$(E)/include
 OUT     := $(REL)/psimail.exe
 PLAT    := $(O)/pmepoc.o $(O)/psiglue.o $(O)/nsprintf.o
-LIBGCC  := $(SDK)/gcc-3.0-psion-98r2-9/lib/gcc-lib/arm-epoc-pe/3.0-psion-98r2/libgcc.a
+V4BX_DIR := $(O)
+include $(CORE)/tools/v4bx.mk
 SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(REL)/esock.lib $(REL)/insock.lib $(REL)/nifman.lib $(LIBGCC)
 endif
 
@@ -121,10 +122,11 @@ $(O)/nsprintf.o: $(CORE)/web/compat/nsprintf.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(ARCH) $(DEFS) -fno-builtin -w $(LIBC) $< -o $@
 LINKOBJS = $(REL)/eexe.o $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(PLAT) $(O)/libltm.a $(REL)/ecrt0.o $(SYSLIBS)
-$(OUT): $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(PLAT) $(O)/libltm.a
+$(OUT): $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(PLAT) $(O)/libltm.a $(LIBGCC)
 	arm-pe-ld -s -e _E32Startup --base-file $(O)/psimail.bas -o $(O)/psimail.tmp.exe $(LINKOBJS)
 	arm-pe-dlltool --as=arm-pe-as --output-exp $(O)/psimail.exp --base-file $(O)/psimail.bas $(LINKOBJS)
 	arm-pe-ld -s -e _E32Startup -Map $(O)/psimail.map -o $(O)/psimail.tmp.exe $(O)/psimail.exp $(LINKOBJS)
+	python3 $(V4BX_PY) --check $(O)/psimail.tmp.exe     # (no BX: the netBook has none)
 	wine $(E)/tools/petran.exe $(O)/psimail.tmp.exe $@ -nocall -uid1 0x1000007a -uid2 0x00000000 -uid3 0x01000A7D -heap 0x10000 0x300000 -stack 0x10000
 	@ls -la $@
 endif
@@ -136,7 +138,7 @@ EMU_OBJS := $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(O)/nsprintf.o $(O)/emu/emu_rt.
 $(O)/emu/%.o: emu/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc $< -o $@
-$(O)/psimail-emu.pe: $(EMU_OBJS)
+$(O)/psimail-emu.pe: $(EMU_OBJS) $(LIBGCC)
 	arm-pe-ld -o $@ -e main -Map $(O)/psimail-emu.map $(EMU_OBJS) $(LIBGCC)
 emu: $(O)/psimail-emu.pe
 endif
