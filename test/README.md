@@ -95,6 +95,19 @@ NAME`, `delfolder FOLDER`. It checks the names go as modified UTF-7 under
 the right parent, that folders.txt and the store directories follow, and
 that the Inbox, a standard folder and a folder with children are refused.
 
+## A refused login (no server needed)
+
+`logintest.sh` runs `fakeimap.py --user dan@example.com` and logs in as
+"dan" (a user name where the server wants the address, as Proton Bridge
+does): each command fails with LOGIN_FAILED and the server's own words
+("no such user", which the app's Log in dialog shows); with no password
+saved it is NEED_PASS, without connecting; and once the user name is put
+right the mail comes, and a draft written meanwhile is still in the Outbox
+(no mail came under the wrong name, so the store is not taken for another
+account's). In the emulator, `core/tools/emu/net.py login`
+(`test/emu/login.net.py`) shows the dialog itself: one "Log in to ..."
+for the check, its Account... button, and no more questions after Cancel.
+
 ## Undo (no server needed)
 
 `undotest.sh` runs Edit > Undo's engine side (`undo FOLDER UID`, where the

@@ -402,8 +402,17 @@ static int Housekeeping()
 	TInt used = 0;
 	User::Heap().AllocSize(used);
 	s->heap_used = used;
-	// quit if PsiMail.app has gone (its heartbeat stopped): never leave the
-	// engine holding the serial port
+	// quit if PsiMail.app has gone: never leave the engine holding the
+	// serial port, nor its files (the installer says "in use" while
+	// psimail.exe runs). A process that has ended is looked for every
+	// second, heartbeat or not: one killed (Ctrl+Shift+Fn+K) used to be
+	// noticed only after 20 s of silence. A silent heartbeat alone is never
+	// enough.
+	if (s->app_pid && AppGone(s))
+		{
+		pm_log("PsiMail.app has ended: the engine quits");
+		return 1;
+		}
 	if (s->app_beat != gLastBeat || gBeatSeen == 0)
 		{
 		gLastBeat = s->app_beat;
