@@ -107,9 +107,9 @@ void CPmView::CheckDueL()
 		return;
 	if (++iCheckTicks * 5 < minutes)
 		return;
-	if (iMode == ENoAccount || !iRunning || iSettings->iOffline)
+	if (iMode == ENoAccount || !iRunning || iSettings->iOffline || iLoginHeld)
 		{
-		iCheckTicks = 0;                 // (working offline: never dial)
+		iCheckTicks = 0;                 // (working offline: never dial; a refused login: not until it is put right)
 		return;
 		}
 	// the engine busy (a command, downloading ahead, the calendar): in 5 minutes
@@ -199,7 +199,7 @@ void CPmView::AutoTickL()
 		iAutoCmd = 0;                    // (its result was passed over in a busy tick)
 	TBool up = s->online && !iAutoOnlineWas;
 	iAutoOnlineWas = s->online;
-	if (!up || iSettings->iOffline || (iSettings->iView & KPmViewNoAutoSend) || iMode == ENoAccount)
+	if (!up || iSettings->iOffline || (iSettings->iView & KPmViewNoAutoSend) || iMode == ENoAccount || iLoginHeld)
 		return;
 	if (OpInFlight(PM_CMD_SEND) || OpInFlight(PM_CMD_SENDRECV))
 		return;                          // (sending already)
@@ -209,7 +209,7 @@ void CPmView::AutoTickL()
 // Work offline has been turned off
 void CPmView::LeftOfflineL()
 	{
-	if (iSettings->iOffline || (iSettings->iView & KPmViewNoAutoSend) || iMode == ENoAccount)
+	if (iSettings->iOffline || (iSettings->iView & KPmViewNoAutoSend) || iMode == ENoAccount || iLoginHeld)
 		return;
 	if (OpInFlight(PM_CMD_SEND) || OpInFlight(PM_CMD_SENDRECV))
 		return;

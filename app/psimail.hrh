@@ -189,7 +189,8 @@ enum TPmButtons
 	EPmBidSave,
 	EPmBidSend,
 	EPmBidRemove,
-	EPmBidContacts           // compose: pick addresses from Contacts
+	EPmBidContacts,          // compose: pick addresses from Contacts
+	EPmBidAccount            // the login dialog: the account's settings
 	};
 
 enum TPmPages

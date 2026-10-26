@@ -513,6 +513,38 @@ RESOURCE DIALOG r_pm_password_dialog
 		};
 	}
 
+// a refused login (pmlogin.cpp): what the server said, then the user name
+// and password, with Account... for the servers and the rest
+RESOURCE DLG_BUTTONS r_pm_login_buttons
+	{
+	buttons=
+		{
+		DLG_BUTTON { id=EPmBidAccount; button=CMBUT { txt="Account..."; }; hotkey='A'; flags=0; },
+		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; },
+		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="OK"; }; hotkey=EEikBidOk; flags=0; }
+		};
+	}
+
+RESOURCE DIALOG r_pm_login_dialog
+	{
+	title="Log in";
+	flags=EEikDialogFlagWait|EEikDialogFlagButtonsRight;
+	buttons=r_pm_login_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1;
+			control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=46; txt="-"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2;
+			control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=62; txt="-"; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="User name"; id=EPmDlgUser;
+			control=EDWIN { width=20; maxlength=94; }; },
+		DLG_LINE { type=EEikCtSecretEd; prompt="Password"; id=EPmDlgPass;
+			control=SECRETED { num_letters=32; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3;
+			control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=50; txt="-"; }; }
+		};
+	}
+
 RESOURCE ARRAY r_pm_empty_array
 	{
 	items={ LBUF { txt="-"; } };

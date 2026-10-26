@@ -222,6 +222,7 @@ public:
 	TBool EngineExited() const { return !iRunning || iShared->state == PM_STATE_EXITED; }
 	void RestartEngineL();                   // Tools > Restart mail engine (and the update window's way out)
 	TBool Closing() const { return iClosing; }
+	TBool LoginHeld() const { return iLoginHeld; }   // a login was refused and not put right (pmlogin.cpp)
 	void EngineEnded();
 	void SettingsChanged();                  // accounts or connection edited
 	void AccountChangedL();                  // switched to another account
@@ -407,6 +408,8 @@ private:
 	RProcess iProcess;
 	TBool iRunning;
 	TBool iClosing;                  // the app is closing: the engine has been asked to stop (keys and pointer ignored meanwhile)
+	TBool iInResults;                // TickL is handing results to HandleResultL: a tick inside one of its dialogs takes none
+	void TakeResultsL();             // ... the commands that have finished since the last tick
 	TUint iOldEngineUntil;           // ConstructL found the last PsiMail's engine still on the chunk: wait for it until this tick (0 none)
 	TBool iOldEngineNoted;           // ... and said so (a busy message)
 	TInt iKeptCmds;                  // StartEngineL: commands the last engine left queued, kept for this one
@@ -556,6 +559,23 @@ private:
 	TInt iCheckTicks;                        // 5-minute ticks since the last check
 	TUint iAutoCmd;                          // cmd_head + 1 of the automatic check in flight (0 none)
 	TBool iAutoOnlineWas;
+	// a refused login (pmlogin.cpp, issue 1): asked about once, then quiet
+	void LoginFailedL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg);
+	void LoginAskL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg);   // the Log in dialog, and what its answer means
+	void LoginDeferredL();                   // from TickL: the question that waited for another dialog to close
+	TBool LoginQuietL(const PmCmd& aCmd);    // a login failure not to ask about again: says so quietly
+	void LoginRetryL(const PmCmd& aCmd);
+	void LoginHoldL();                       // Cancel: no more asking until the user acts
+	void UntrustedL(const PmCmd& aCmd);      // a certificate PsiMail can't check: asked once for each server
+	TBool iLoginHeld;                        // refused and not put right: automatic checks wait
+	TBool iLoginDeferred;                    // refused while another dialog or a menu was up: asked when it has gone
+	PmCmd iLoginCmd;                         // ... the command
+	TInt iLoginRes;                          // ... its result
+	TBuf<160> iLoginMsg;                     // ... and the server's words
+	TUint iLoginQuietTo;                     // results of commands up to this number (done_seq) were queued before the last answer
+	TUint iTrustQuietTo;                     // ... and the same for the certificate question
+	TBool iTrustYes;                         // ... which was answered Yes
+	TBuf<80> iTrustHost;                     // ... about this server
 	// 0.74 (mail2): the store's place, invitations, contact cards, Word files
 public:
 	void StoreRoot(TChar aDrive, TDes& aRoot);   // <disk>:\System\Data\PsiMail\, an old \PsiMail\ moved there (pmstore.cpp)
@@ -686,6 +706,24 @@ private:
 	TPtrC iTitle;
 	TPtrC iPrompt;
 	TDes& iText;
+	};
+
+// a refused login (pmlogin.cpp): the server's words, the user name and the
+// password, and Account... for the rest of the account's settings
+class CPmLoginDialog : public CEikDialog
+	{
+public:
+	CPmLoginDialog(const TDesC& aTitle, const TDesC& aWhat, const TDesC& aWhy, TDes& aUser, TDes& aPass, TBool aNeedPass)
+		: iTitle(aTitle), iWhat(aWhat), iWhy(aWhy), iUser(aUser), iPass(aPass), iNeedPass(aNeedPass) {}
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	TPtrC iTitle;
+	TPtrC iWhat;
+	TPtrC iWhy;
+	TDes& iUser;
+	TDes& iPass;
+	TBool iNeedPass;
 	};
 
 class CPmPasswordDialog : public CEikDialog
@@ -955,6 +993,9 @@ public:
 	void ForwardReadyL(TUint aUid, CDesCArray& aFiles);   // the attachments are here: compose the forward
 	CPmMbm* Mbm() { return iMbm; }                 // PsiMail.mbm (NULL if it couldn't be read)
 	void EmailButtonSoon();                        // once the window is up: the first-run question, then pmbutton.exe
+	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
+	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
+	CPmView* View() { return iView; }
 private:
 	static TInt EmailButtonCallback(TAny* aSelf);
 	void EmailButtonStartL();
@@ -980,6 +1021,8 @@ private:
 	void ExitTick();
 	CPeriodic* iExitTimer;
 	TUint iExitStart;
+	TInt iExitTicks;
+	void EscapeDialog();               // Close with a dialog or menu up: Esc, as if pressed
 	TBool iExiting;
 	TBool iBackupStopped;              // the engine was stopped for a backup: started again when it ends
 	void LoadSettings();
