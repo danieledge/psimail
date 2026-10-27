@@ -105,7 +105,8 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.92");          // also pkg/psimail.pkg
+_LIT(KVersion, "0.93");          // also pkg/psimail.pkg
+_LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
 const TInt KCalmTicks = 4;       // quick ticks with nothing going on before the slow pace (1 s)
@@ -463,6 +464,7 @@ void CPmView::CopySettingsToShared()
 	s->net.rtscts = iSettings->iRtsCts;
 	s->net.net_mode = iSettings->iNetMode;
 	s->net.modem_tls = (iSettings->iSpare[0] & KPmModemTlsBit) ? 1 : 0;
+	s->net.log_on = LogOn() ? 1 : 0;          // (0.93) Keep a log: else the engine writes no psimail.log
 	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), ppp);
 	s->offline = iSettings->iOffline;
 	s->prefetch = PrefetchCount(*iSettings);
@@ -795,7 +797,7 @@ TBool CPmView::TickWanted() const
 	PmShared* s = iShared;
 	if (!s || iStartPending || iOldEngineUntil)
 		return ETrue;
-	if (iStatusUntil || iWorkText.Length() || iBusyShown || iUpdDlg || iLinkMsg.Length())
+	if (iStatusUntil || iWorkText.Length() || iBusyShown || iUpdDlg || iLinkMsg.Length() || iLoginDeferred)
 		return ETrue;
 	if (!iRunning)
 		return EFalse;                       // (the engine has stopped: nothing to follow)
@@ -912,6 +914,7 @@ void CPmView::ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax)
 void CPmView::AccountChangedL()
 	{
 	CopySettingsToShared();
+	iLoginHeld = EFalse;                     // (edited, or another account)
 	iFolder = _L8("INBOX");
 	iSearch = EFalse;
 	PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
@@ -1329,8 +1332,9 @@ void CPmView::OpenFolderL(const TDesC8& aImap)
 	for (TInt i = 0; i < iFolders->Count(); i++)
 		if ((*iFolders)[i].iImap == iFolder) iFolderSel = i;
 	Render();
-	// always look for changes when a folder is opened
-	if (!iSettings->iOffline)
+	// always look for changes when a folder is opened (not while a refused
+	// login waits to be put right: pmlogin.cpp)
+	if (!iSettings->iOffline && !iLoginHeld)
 		Cmd(PM_CMD_SYNC, iFolder, 0, KNullDesC8);
 	}
 
@@ -1525,6 +1529,7 @@ void CPmView::ToggleFlagL(TChar aFlag)
 
 void CPmView::RefreshL()
 	{
+	iLoginHeld = EFalse;                     // asked for: a refused login is asked about again
 	if (iSidebar)
 		Cmd(PM_CMD_FOLDERS, KNullDesC8, 0, KNullDesC8);
 	else if (iMode == EOutbox)
@@ -1552,6 +1557,7 @@ void CPmView::SearchL(const TDesC& aWords)
 
 void CPmView::SendRecvL()
 	{
+	iLoginHeld = EFalse;                     // asked for: a refused login is asked about again
 	Cmd(PM_CMD_SENDRECV, iMode == EList || iMode == EMessage ? TPtrC8(iFolder) : TPtrC8(_L8("INBOX")), 0, KNullDesC8);
 	// the calendar sync follows once the mail part is done (HandleResultL):
 	// queued alongside, it would dial again after a failed connection and
@@ -2103,41 +2109,17 @@ void CPmView::TickL()
 		TRAPD(pe, RefreshPicturesL());
 		(void)pe;
 		}
-	if (s->done_seq != iDoneSeen)
+	if (s->done_seq != iDoneSeen && !iInResults && !iClosing)
 		{
-		// Every command that has finished since the last tick, in order: two
-		// can finish between ticks (an offline FLAG then a MOVE; a SEND that
-		// fails fast then a SYNC), and only the last one's outcome used to
-		// be acted on. Each one's outcome is in the engine's ring (psimail.h
-		// PmDone); it is copied over last_* for the handlers, which read
-		// those. (The engine writes last_* too, but nothing reads them except
-		// this path, which takes the ring's copy every time.)
-		TUint upto = s->done_seq;
-		if (upto - iDoneSeen > PM_CMDQ)
-			iDoneSeen = upto - PM_CMDQ;      // (can't happen: the queue is that long)
-		while (iDoneSeen != upto)
-			{
-			iDoneSeen++;
-			const PmDone& d = s->done[(iDoneSeen - 1) % PM_CMDQ];
-			s->last_op = d.op;
-			s->last_res = d.res;
-			s->last_uid = d.uid;
-			s->update_ready = d.update_ready;
-			Mem::Copy(s->last_msg, d.msg, sizeof(s->last_msg));
-			Mem::Copy(s->last_file, d.file, sizeof(s->last_file));
-			TBool changed = s->changed_seq != iChangedSeen;
-			iChangedSeen = s->changed_seq;
-			PmCmd cmd = iSent[(iDoneSeen - 1) % PM_CMDQ];
-			TInt res = d.res;
-			HandleResultL(cmd);
-			// (OK, OFFLINE and failures reload in HandleResultL)
-			if (changed && (res == PM_RES_CANCELLED || res == PM_RES_UNTRUSTED ||
-				res == PM_RES_NEED_PASS || res == PM_RES_LOGIN_FAILED))
-				ReloadL();
-			}
+		// (one result at a time: a dialog it brings is answered before the
+		// next is looked at, though this tick goes on inside the dialog)
+		iInResults = ETrue;
+		TRAPD(re, TakeResultsL());
+		iInResults = EFalse;
+		User::LeaveIfError(re);
 		redraw = ETrue;
 		}
-	else if (s->changed_seq != iChangedSeen && !s->busy)
+	else if (s->changed_seq != iChangedSeen && !s->busy && !iInResults && !iClosing)
 		{
 		// files changed (e.g. a sync saved the list): once the engine is done
 		iChangedSeen = s->changed_seq;
@@ -2200,6 +2182,7 @@ void CPmView::TickL()
 		redraw = ETrue;
 		}
 	AutoTickL();                             // a connection came up: send what waits (pmauto.cpp)
+	LoginDeferredL();                        // a refused login that waited for a dialog to close (pmlogin.cpp)
 	if (redraw)
 		Render();
 	// (0.81) the pace: quick while anything is going on, else slow with the
@@ -2208,6 +2191,46 @@ void CPmView::TickL()
 		TickFast();
 	else if (!iTickQuiet && ++iCalmTicks >= KCalmTicks)
 		TickQuiet();
+	}
+
+void CPmView::TakeResultsL()
+	{
+	PmShared* s = iShared;
+	// Every command that has finished since the last tick, in order: two
+	// can finish between ticks (an offline FLAG then a MOVE; a SEND that
+	// fails fast then a SYNC), and only the last one's outcome used to
+	// be acted on. Each one's outcome is in the engine's ring (psimail.h
+	// PmDone); it is copied over last_* for the handlers, which read
+	// those. (The engine writes last_* too, but nothing reads them except
+	// this path, which takes the ring's copy every time.)
+	TUint upto = s->done_seq;
+	if (upto - iDoneSeen > PM_CMDQ)
+		iDoneSeen = upto - PM_CMDQ;      // (can't happen: the queue is that long)
+	while (iDoneSeen != upto)
+		{
+		if (s->done_seq - iDoneSeen > PM_CMDQ)
+			{
+			iDoneSeen = s->done_seq - PM_CMDQ;   // (more ended while a dialog was up than the ring holds)
+			upto = s->done_seq;
+			}
+		iDoneSeen++;
+		const PmDone& d = s->done[(iDoneSeen - 1) % PM_CMDQ];
+		s->last_op = d.op;
+		s->last_res = d.res;
+		s->last_uid = d.uid;
+		s->update_ready = d.update_ready;
+		Mem::Copy(s->last_msg, d.msg, sizeof(s->last_msg));
+		Mem::Copy(s->last_file, d.file, sizeof(s->last_file));
+		TBool changed = s->changed_seq != iChangedSeen;
+		iChangedSeen = s->changed_seq;
+		PmCmd cmd = iSent[(iDoneSeen - 1) % PM_CMDQ];
+		TInt res = d.res;
+		HandleResultL(cmd);
+		// (OK, OFFLINE and failures reload in HandleResultL)
+		if (changed && (res == PM_RES_CANCELLED || res == PM_RES_UNTRUSTED ||
+			res == PM_RES_NEED_PASS || res == PM_RES_LOGIN_FAILED))
+			ReloadL();
+		}
 	}
 
 void CPmView::HandleResultL(const PmCmd& aCmd)
@@ -2334,58 +2357,12 @@ void CPmView::HandleResultL(const PmCmd& aCmd)
 		ReloadL();
 		break;
 	case PM_RES_UNTRUSTED:
-		{
-		TBuf<80> host;
-		FromC(host, s->trust_host);
-		TBuf<100> why;
-		FromC(why, s->trust_why);
-		TBuf<100> fp;
-		FromC(fp, s->trust_fp);
-		TBuf<200> lines[4];
-		lines[0] = _L("PsiMail can't be sure it is talking to");
-		lines[1] = host;
-		lines[1].Append(_L(": "));
-		lines[1].Append(why);
-		lines[2] = _L("Key: ");
-		lines[2].Append(Clip(fp, 95));
-		lines[3] = _L("Trust it only if you expected this (e.g. your own server)");
-		TPtrC ptrs[4];
-		for (TInt k = 0; k < 4; k++) ptrs[k].Set(lines[k]);
-		CPmInfoDialog* dlg = new(ELeave) CPmInfoDialog(_L("Certificate not trusted"), ptrs, 4);
-		dlg->ExecuteLD(R_PM_INFO_DIALOG);
-		if (iEikonEnv->QueryWinL(host, _L("Trust this server's key from now on?")))
-			{
-			TBuf8<80> hp;
-			hp.Copy(host);
-			Cmd(PM_CMD_TRUST, KNullDesC8, 0, hp);
-			// and try again
-			if (aCmd.op == PM_CMD_CALSYNC) iCalPending = ETrue;
-			Cmd(aCmd.op, TPtrC8((const TUint8*)aCmd.folder), aCmd.uid, TPtrC8((const TUint8*)aCmd.arg));
-			}
+		UntrustedL(aCmd);                    // (pmlogin.cpp: once for the commands queued together)
 		break;
-		}
 	case PM_RES_NEED_PASS:
 	case PM_RES_LOGIN_FAILED:
-		{
-		PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
-		if (res == PM_RES_LOGIN_FAILED)
-			iEikonEnv->InfoWinL(_L("The server refused the login"), Clip(msg, 100));
-		TBuf<100> prompt;
-		prompt = _L("Password for ");
-		TBuf<60> user;
-		FromC(user, a.user);
-		prompt.Append(user);
-		TBuf<32> pw;
-		CPmPasswordDialog* dlg = new(ELeave) CPmPasswordDialog(prompt, pw);
-		if (dlg->ExecuteLD(R_PM_PASSWORD_DIALOG) && pw.Length())
-			{
-			CopyToC(a.pass, sizeof(a.pass), pw);
-			((CPmAppUi*)iEikonEnv->EikAppUi())->SaveSettings();
-			CopySettingsToShared();
-			Cmd(aCmd.op, TPtrC8((const TUint8*)aCmd.folder), aCmd.uid, TPtrC8((const TUint8*)aCmd.arg));
-			}
+		LoginFailedL(aCmd, res, msg);        // (pmlogin.cpp: the user name too, and asked once)
 		break;
-		}
 	case PM_RES_OFFLINE:
 		if (aCmd.op == PM_CMD_ATTACH)
 			iFwdPending = 0;
@@ -3166,6 +3143,18 @@ TBool CPmComposeDialog::OkToExitL(TInt aButtonId)
 		}
 	if (aButtonId == EEikBidCancel)
 		{
+		// PsiMail is closing (the System screen's Close): what was written
+		// is kept in the Outbox as a draft, without asking
+		CPmAppUi* ui = (CPmAppUi*)iEikonEnv->EikAppUi();
+		if (ui->Exiting())
+			{
+			if (StateSum() != iSum0)
+				{
+				TRAPD(err, ui->View()->SaveDraftL(iDraft, EFalse));
+				(void)err;
+				}
+			return ETrue;
+			}
 		// (only if something was written: the style guide confirms only
 		// what would be lost)
 		if (StateSum() != iSum0)
@@ -3430,7 +3419,7 @@ TBool CPmConnDialog::OkToExitL(TInt aButtonId)
 	if (link.iKeepUp && iSettings.iNetMode)
 		{
 		TFileName near(iEikonEnv->EikAppUi()->Application()->AppFullName());
-		PsiHoldStart(fs, near);
+		PsiHoldStart(fs, near, (iSettings.iSpare[0] & KPmLogBit) != 0);   // (its log only with ours)
 		}
 	if (link.iModemTls)
 		iSettings.iSpare[0] |= KPmModemTlsBit;
@@ -3713,7 +3702,7 @@ void CPmAppUi::BeginExitL()
 		return;
 	iExiting = ETrue;
 	iView->AskEngineToStop();
-	if (iView->EngineExited())
+	if (iView->EngineExited() && !IsDisplayingMenuOrDialog())
 		{
 		iView->StopEngine(EFalse);
 		Exit();
@@ -3722,6 +3711,7 @@ void CPmAppUi::BeginExitL()
 	TRAPD(be, iEikonEnv->BusyMsgL(_L("Closing..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 	(void)be;
 	iExitStart = User::TickCount();
+	iExitTicks = 0;
 	if (!iExitTimer)
 		iExitTimer = CPeriodic::NewL(CActive::EPriorityStandard);
 	iExitTimer->Cancel();
@@ -3734,10 +3724,36 @@ TInt CPmAppUi::ExitCallback(TAny* aSelf)
 	return 1;
 	}
 
+// The System screen's Close (EApaSystemEventShutdown) can come while a
+// dialog or a menu is up - a question about the login, say. Exit() from
+// inside a dialog's wait need not end the program (it can end only that
+// wait): PsiMail then stayed, ignoring everything (iExiting), and could not
+// be closed again (issue 1). So the dialogs go first, as if Esc were pressed, one every
+// 0.3 s (a dialog can lead to another); the compose dialog keeps what was
+// written as a draft (CPmComposeDialog::OkToExitL). After 12 s it closes
+// regardless.
+void CPmAppUi::EscapeDialog()
+	{
+	TWsEvent event;
+	event.SetType(EEventKey);
+	event.SetHandle(0);
+	event.SetTimeNow();
+	TKeyEvent* key = event.Key();
+	key->iCode = EKeyEscape;
+	key->iScanCode = EStdKeyEscape;
+	key->iModifiers = 0;
+	key->iRepeats = 0;
+	iCoeEnv->WsSession().SendEventToWindowGroup(iCoeEnv->RootWin().Identifier(), event);
+	}
+
 void CPmAppUi::ExitTick()
 	{
-	if (!iView->EngineExited() && User::TickCount() - iExitStart < 64 * 6)
-		return;                              // still logging out or hanging up
+	TUint since = User::TickCount() - iExitStart;
+	TBool dialog = IsDisplayingMenuOrDialog() && since < 64 * 12;
+	if (dialog && iExitTicks++ % 3 == 0)
+		EscapeDialog();
+	if (dialog || (!iView->EngineExited() && since < 64 * 6))
+		return;                              // a dialog still up, or the engine still logging out or hanging up
 	iExitTimer->Cancel();
 	iEikonEnv->BusyMsgCancel();
 	iView->StopEngine(EFalse);               // gone, or killed after 6 s
@@ -5155,8 +5171,10 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		}
 	else if (aMenuId == R_PM_TROUBLE_MENU)
 		{
-		// (dimmed, not gone, until a proxy is set in Connection settings: the log goes to it)
-		aMenuPane->SetItemDimmed(EPmCmdSendLog, !iView->ProxyUsable() || iView->OpInFlight(PM_CMD_PUTLOG));
+		// (dimmed, not gone, until a proxy is set in Connection settings: the log goes to it;
+		// and (0.93) while no log is kept)
+		aMenuPane->SetItemDimmed(EPmCmdSendLog, !iView->LogOn() || !iView->ProxyUsable() || iView->OpInFlight(PM_CMD_PUTLOG));
+		aMenuPane->SetItemButtonState(EPmCmdKeepLog, iView->LogOn() ? EEikMenuItemSymbolOn : 0);
 		}
 	else if (aMenuId == R_PM_PRINT_MENU)
 		{
@@ -5267,7 +5285,8 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		aCommand != EPmCmdToggleToolbar && aCommand != EPmCmdToggleTitle && aCommand != EPmCmdToggleFolders &&
 		aCommand != EPmCmdStatusInfo && aCommand != EPmCmdStop && aCommand != EPmCmdPrefs &&
 		aCommand != EPmCmdZoomIn && aCommand != EPmCmdZoomOut && aCommand != EPmCmdCalSettings &&
-		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog)
+		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog &&
+		aCommand != EPmCmdKeepLog)
 		{
 		iView->Toast(_L("No account - add one with Tools > Accounts"));
 		return;
@@ -5607,16 +5626,42 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPmCmdSendLog:
 		// no dialog: the engine posts its logs to the web proxy (engine/webpics.c pm_send_log)
-		if (!iView->ProxyUsable())
+		if (!iView->LogOn())
+			iView->Toast(KPmLogIsOff);
+		else if (!iView->ProxyUsable())
 			iView->Toast(_L("Not available - set a proxy in Connection settings"));
 		else
 			iView->SendLog();
+		break;
+	case EPmCmdKeepLog:
+		// (0.93) off unless ticked; what is in psimail.log already stays. The
+		// engine reads the setting on every line, so it takes effect at once
+		iSettings.iSpare[0] ^= KPmLogBit;
+		SaveSettings();
+		iView->Shared()->net.log_on = iView->LogOn() ? 1 : 0;
+		iView->Toast(iView->LogOn() ? _L("Keeping a log") : _L("Not keeping a log"));
 		break;
 	case EPmCmdBack:
 		break;
 	default:
 		break;
 		}
+	}
+
+// (0.93) a dimmed command chosen: why, for the ones whose reason is not obvious
+void CPmAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
+	{
+	if (aCommandId == EPmCmdSendLog)
+		{
+		if (!iView->LogOn())
+			iView->Toast(KPmLogIsOff);
+		else if (!iView->ProxyUsable())
+			iView->Toast(_L("Not available - set a proxy in Connection settings"));
+		else
+			iView->Toast(_L("Not available - the log is being sent"));
+		return;
+		}
+	CEikAppUi::HandleAttemptDimmedSelectionL(aCommandId);
 	}
 
 // ============================================================================

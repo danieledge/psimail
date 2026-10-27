@@ -3,6 +3,7 @@
 
   fakeimap.py PORT [--drop-at N[,N...]] [--drop-every N] [--slow MS_PER_KB]
               [--mute-noop] [--no-uidplus] [--arrive N[,N...]] [--invite]
+              [--user NAME]
 
 Serves an INBOX of a few messages: one whose text has "NO CARRIER" on a
 line of its own (as an email about modems would), one of 30 KB (several
@@ -24,6 +25,9 @@ looks like once a router has quietly forgotten it. --invite adds two
 multipart messages: 106, an invitation (text/plain and a base64
 text/calendar METHOD:REQUEST part, as Google sends), and 107 with a vCard
 attached (invite.h).
+--user NAME refuses LOGIN for any other user name, with "NO
+[AUTHENTICATIONFAILED] no such user" (as Proton Bridge answers a user name
+that is not the account's address): see logintest.sh.
 --news DIR adds the newsletters in test/html/ as messages 201-206, with
 pictures from DIR (made by newspics.py): 201 and 202 point at pictures on
 the web (http://pics.example/..., for a local web server: see newspics.py),
@@ -41,6 +45,7 @@ NO_UIDPLUS = False
 ARRIVE = []
 INVITE = False
 NEWS = None
+USER = None
 args = sys.argv[2:]
 while args:
     a = args.pop(0)
@@ -52,6 +57,7 @@ while args:
     elif a == '--arrive': ARRIVE = [int(x) for x in args.pop(0).split(',')]
     elif a == '--invite': INVITE = True
     elif a == '--news': NEWS = args.pop(0)
+    elif a == '--user': USER = args.pop(0)
 CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE')
 
 def msg(uid, subject, text):
@@ -244,7 +250,13 @@ def handle(conn, addr):
             if len(parts) < 2: continue
             tag, cmd = parts[0], parts[1].upper()
             rest = parts[2] if len(parts) > 2 else ''
-            if cmd == 'LOGIN': send('%s OK [CAPABILITY %s] logged in\r\n' % (tag, CAPS))
+            if cmd == 'LOGIN':
+                who = rest.split(' ', 1)[0]
+                if who.startswith('"'): who = unquote(who)
+                if USER is not None and who != USER:
+                    send('%s NO [AUTHENTICATIONFAILED] no such user\r\n' % tag)
+                else:
+                    send('%s OK [CAPABILITY %s] logged in\r\n' % (tag, CAPS))
             elif cmd == 'CAPABILITY': send('* CAPABILITY %s\r\n%s OK done\r\n' % (CAPS, tag))
             elif cmd == 'NOOP':
                 if MUTE_NOOP:

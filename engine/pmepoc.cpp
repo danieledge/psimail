@@ -210,11 +210,15 @@ extern "C" long pm_free_kb(const char* aPath)
 // At most 32 KB, then it starts again with the last 32 KB kept as
 // psimail.old; a new engine (a restart after a crash too) moves the last
 // one's log there first, so what led up to a crash is still there to read.
+// (0.93) Only with Tools > Troubleshooting > Keep a log ticked
+// (net.log_on, looked at on every line, so the switch takes effect at once):
+// off, nothing is opened, moved or written.
 
 static FILE* gLog = 0;
 static long gLogLen = 0;
 static TInt gLogReopen = 0;              // closed by pm_log_release (a copy was wanted): opened again to append
 static TUint gLogFailAt = 0;             // when opening the log last failed (0 = never): tried again a minute later
+static TInt gLogKept = 0;                // the last engine's log moved to psimail.old (once, at the first line kept)
 
 static void LogPath(char* aOut, int aMax, const char* aName)
 	{
@@ -256,12 +260,29 @@ extern "C" void pm_log_release(void)
 
 extern "C" void pm_log(const char* aFmt, ...)
 	{
+	PsiShared* sh = pg_shared();
+	if (!sh || !sh->log_on)
+		{
+		// (0.93) no log kept: one open is shut (turned off), to append if turned on again
+		if (gLog)
+			{
+			fclose(gLog);
+			gLog = 0;
+			gLogReopen = 1;
+			}
+		return;
+		}
 	char b[400];
 	va_list ap;
 	va_start(ap, aFmt);
 	int n = vsnprintf(b, sizeof(b) - 2, aFmt, ap);
 	va_end(ap);
 	if (n < 0) return;
+	if (!gLogKept)
+		{
+		gLogKept = 1;
+		LogKeepOld();                        // (the last engine's log: psimail.old)
+		}
 	if (n > (int)sizeof(b) - 2) n = sizeof(b) - 2;
 	b[n++] = '\n';
 	b[n] = 0;
@@ -381,8 +402,17 @@ static int Housekeeping()
 	TInt used = 0;
 	User::Heap().AllocSize(used);
 	s->heap_used = used;
-	// quit if PsiMail.app has gone (its heartbeat stopped): never leave the
-	// engine holding the serial port
+	// quit if PsiMail.app has gone: never leave the engine holding the
+	// serial port, nor its files (the installer says "in use" while
+	// psimail.exe runs). A process that has ended is looked for every
+	// second, heartbeat or not: one killed (Ctrl+Shift+Fn+K) used to be
+	// noticed only after 20 s of silence. A silent heartbeat alone is never
+	// enough.
+	if (s->app_pid && AppGone(s))
+		{
+		pm_log("PsiMail.app has ended: the engine quits");
+		return 1;
+		}
 	if (s->app_beat != gLastBeat || gBeatSeen == 0)
 		{
 		gLastBeat = s->app_beat;
@@ -417,7 +447,6 @@ int main(int, char**)
 		delete cleanup;
 		return 1;
 		}
-	LogKeepOld();                            // (the last engine's log: psimail.old)
 	{
 	TMemoryInfoV1Buf mi;
 	TInt freeRam = UserHal::MemoryInfo(mi) == KErrNone ? mi().iFreeRamInBytes : 0;

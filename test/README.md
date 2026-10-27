@@ -95,6 +95,19 @@ NAME`, `delfolder FOLDER`. It checks the names go as modified UTF-7 under
 the right parent, that folders.txt and the store directories follow, and
 that the Inbox, a standard folder and a folder with children are refused.
 
+## A refused login (no server needed)
+
+`logintest.sh` runs `fakeimap.py --user dan@example.com` and logs in as
+"dan" (a user name where the server wants the address, as Proton Bridge
+does): each command fails with LOGIN_FAILED and the server's own words
+("no such user", which the app's Log in dialog shows); with no password
+saved it is NEED_PASS, without connecting; and once the user name is put
+right the mail comes, and a draft written meanwhile is still in the Outbox
+(no mail came under the wrong name, so the store is not taken for another
+account's). In the emulator, `core/tools/emu/net.py login`
+(`test/emu/login.net.py`) shows the dialog itself: one "Log in to ..."
+for the check, its Account... button, and no more questions after Cancel.
+
 ## Undo (no server needed)
 
 `undotest.sh` runs Edit > Undo's engine side (`undo FOLDER UID`, where the
@@ -109,6 +122,14 @@ server's new uid); "Nothing to undo"; and a message deleted from the Trash
 since ("Not undone - the message is no longer in Trash"). `fakeimap.py
 --arrive N,M` puts a new message in the Inbox before its Nth SELECT, for
 the new mail alert and the timed check.
+
+## Send log to server (no server needed)
+
+`putlogtest.py` runs Send log's engine side (`putlog`, psimail.log in a
+scratch folder) against a pretend proxy: PsiProxy's "Log saved: ..." is
+"Log sent"; the Atom modem's own proxy with no PsiProxy behind it (501 and
+"X-PsiConnect: no-psiproxy") and an older Atom's status page (200, HTML)
+are "Needs PsiProxy on a computer"; PsiProxy's 413 is "the log is too big".
 
 ## Certificates
 

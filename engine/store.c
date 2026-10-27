@@ -54,6 +54,20 @@ void st_changed(void)
 	pm_shared()->changed_seq++;
 }
 
+/* has anything come from the server into this account's files? */
+static int st_fetched(int acct)
+{
+	char path[200];
+	FILE *f;
+	st_acct_dir(acct, path, sizeof(path));
+	pm_copy(path + strlen(path), "folders.txt", sizeof(path) - (int)strlen(path));
+	if ((f = fopen(path, "r")) != 0) { fclose(f); return 1; }
+	st_folder_dir(acct, "INBOX", path, sizeof(path));
+	pm_copy(path + strlen(path), "index.txt", sizeof(path) - (int)strlen(path));
+	if ((f = fopen(path, "r")) != 0) { fclose(f); return 1; }
+	return 0;
+}
+
 int st_check_account(int acct)
 {
 	char dir[160], path[180], want[180], have[180];
@@ -72,8 +86,12 @@ int st_check_account(int acct)
 		char tmp[190];
 		/* another account's mail: start afresh. Only when the file really
 		   names one (user@host): a short or odd line is a damaged file, not
-		   another account, and must not throw the outbox and pending.txt away */
-		if (strchr(have, '@') && strchr(have, '@') > have && strchr(have, '@')[1]) pm_rmtree(dir);
+		   another account, and must not throw the outbox and pending.txt away.
+		   Nor when nothing ever came from that server under the old name (no
+		   folder list, no Inbox): a user name put right after the server
+		   refused it (issue 1) keeps what was written meanwhile */
+		if (strchr(have, '@') && strchr(have, '@') > have && strchr(have, '@')[1] && st_fetched(acct))
+			pm_rmtree(dir);
 		pm_mkdir(pm_shared()->store_dir);
 		pm_mkdir(dir);
 		/* written whole, then put in place: a partial file would read as

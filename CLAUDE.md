@@ -59,6 +59,7 @@ calendar pane), and one file per feature:
 | Quiet or detailed progress | `pmstatus.cpp` |
 | Reader header | `pmheader.cpp` |
 | Engine restart | `pmrecover.cpp` |
+| A refused login (asked once, the user name too) | `pmlogin.cpp` |
 | Help | `pmhelp.cpp` |
 
 `ui/pmquote.cpp` is reply quoting, `ui/pmcalmodel.cpp` the calendar model,
@@ -98,7 +99,7 @@ core/tools/docker/psibuild "cd test && bash foldertest.sh"
 ```
 
 Host tests (`test/`, after `bash build.sh host` or `make TARGET=host`):
-`foldertest.sh`, `undotest.sh`, `invtest.py`, `invitehost.py`, `htmltest.py`,
+`foldertest.sh`, `undotest.sh`, `logintest.sh`, `invtest.py`, `invitehost.py`, `htmltest.py`,
 `imgtest.py` (ASan/UBSan, fuzzing the picture decoders), `parsefuzz.py`
 (MIME/IMAP/ICS/XML/HTML fuzzer), `certtest.py`. `fakeimap.py` is a
 scriptable fake server. All network input is untrusted: run `parsefuzz.py`
