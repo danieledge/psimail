@@ -58,6 +58,11 @@ static void StoreLog(RFs& aFs, const TDesC& aText, TBool aOn)
 	TParse parse;
 	parse.Set(CEikonEnv::Static()->EikAppUi()->Application()->AppFullName(), NULL, NULL);
 	TFileName path(parse.DriveAndPath());
+	if (path.Length() && (path[0] == 'Z' || path[0] == 'z'))
+		{
+		path[0] = 'C';                       // (PsiMail in the ROM: Z: is read only)
+		aFs.MkDirAll(path);
+		}
 	path.Append(KStoreLog);
 	RFile f;
 	TInt r = f.Open(aFs, path, EFileWrite | EFileShareExclusive);

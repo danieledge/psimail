@@ -589,7 +589,15 @@ void CPmView::StartEngineL()
 	TParse parse;
 	parse.Set(CEikonEnv::Static()->EikAppUi()->Application()->AppFullName(), NULL, NULL);
 	TFileName dir(parse.DriveAndPath());
-	TPtrC home = dir.Left(dir.Length() - 1);      // without the last '\'
+	// what the engine writes (psimail.log) goes in the same folder, but on C:
+	// when PsiMail is in the ROM (Z:, read only: a custom netBook image)
+	TFileName writable(dir);
+	if (writable.Length() && (writable[0] == 'Z' || writable[0] == 'z'))
+		{
+		writable[0] = 'C';
+		iCoeEnv->FsSession().MkDirAll(writable);
+		}
+	TPtrC home = writable.Left(writable.Length() - 1);      // without the last '\'
 	CopyToC(s->net.home, sizeof(s->net.home), home);
 	TFileName exe(dir);
 	exe.Append(KEngineExe);
