@@ -60,7 +60,13 @@ calendar pane), and one file per feature:
 | Reader header | `pmheader.cpp` |
 | Engine restart | `pmrecover.cpp` |
 | A refused login (asked once, the user name too) | `pmlogin.cpp` |
+| The preview under the list (tall screens: netBook, Series 7) | `pmpreview.cpp` |
 | Help | `pmhelp.cpp` |
+
+The screen is looked at once at start (`CPmAppUi::iColour`, `iTall`): the
+5mx keeps its layout and greys; a colour screen takes the system's colours
+through `PmBack()`, `PmFace()`, `PmHighlight()`... in `pmnative.cpp`; a tall
+one gets the preview, a taller compose and Help (`docs/netbook-review.md`).
 
 `ui/pmquote.cpp` is reply quoting, `ui/pmcalmodel.cpp` the calendar model,
 `ui/pmicons.h` the toolbar pictures (`tools/mkicons.py` draws them).

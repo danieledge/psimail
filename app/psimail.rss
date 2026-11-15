@@ -323,11 +323,9 @@ RESOURCE MENU_PANE r_pm_view_menu
 		{
 		MENU_ITEM { command=EPmCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPmCmdZoomOut; txt="Zoom out"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdToggleToolbar; txt="Show toolbar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdToggleTitle; txt="Show title bar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdToggleFolders; txt="Show list of folders"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdSort; txt="Sort..."; },
 		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdShowMenu; cascade=r_pm_show_menu; txt="Show"; },
 		MENU_ITEM { command=EPmCmdGoToMenu; cascade=r_pm_goto_menu; txt="Go to"; }
 		};
 	}
@@ -340,12 +338,23 @@ RESOURCE MENU_PANE r_pm_cal_view_menu
 		{
 		MENU_ITEM { command=EPmCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPmCmdZoomOut; txt="Zoom out"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdToggleToolbar; txt="Show toolbar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdToggleTitle; txt="Show title bar"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdToggleFolders; txt="Show list of folders"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdSwitchViewMenu; cascade=r_pm_switch_view_menu; txt="Switch view"; },
 		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdShowMenu; cascade=r_pm_show_menu; txt="Show"; },
 		MENU_ITEM { command=EPmCmdGoToMenu; cascade=r_pm_goto_menu; txt="Go to"; }
+		};
+	}
+
+// (0.96) View > Show: what is on the screen. Preview is the selected message
+// under the list, on a tall screen (dimmed on the 5mx's)
+RESOURCE MENU_PANE r_pm_show_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EPmCmdToggleToolbar; txt="Toolbar"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdToggleTitle; txt="Title bar"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdToggleFolders; txt="List of folders"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdTogglePreview; txt="Preview"; flags=EEikMenuItemCheckBox; }
 		};
 	}
 
@@ -621,6 +630,21 @@ RESOURCE DIALOG r_pm_help_dialog
 		};
 	}
 
+// (0.96) on a screen of 480 lines: more of the text at once
+RESOURCE DIALOG r_pm_help_dialog_tall
+	{
+	title="Help on PsiMail";
+	flags=EEikDialogFlagWait|EEikDialogFlagNotifyEsc;
+	buttons=R_EIK_BUTTONS_CONTINUE;
+	items=
+		{
+		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPmDlgHelpTopic;
+			control=CHOICELIST { array_id=r_pm_empty_array; }; },
+		DLG_LINE { type=EPmCtHelpText; prompt=""; id=EPmDlgHelpText;
+			control=RTXTED { width=495; height=320; numlines=20; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
+		};
+	}
+
 // writing: the whole screen, as the built-in Email program does it - the
 // address lines, the subject, a rule, the text; its buttons on the right
 RESOURCE DLG_BUTTONS r_pm_compose_buttons
@@ -653,6 +677,29 @@ RESOURCE DIALOG r_pm_compose_dialog
 			control=EDWIN { width=26; maxlength=200; }; },
 		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPmDlgBody; itemflags=EEikDlgItemTakesEnterKey;
 			control=RTXTED { width=546; height=84; numlines=4; textlimit=30000; flags=EEikEdwinNoAutoSelection; }; }
+		};
+	}
+
+// (0.96) the same on a screen of 480 lines (the netBook, the Series 7): the
+// text takes the rest of the height
+RESOURCE DIALOG r_pm_compose_dialog_tall
+	{
+	flags=EEikDialogFlagWait|EEikDialogFlagButtonsRight|EEikDialogFlagNotifyEsc|EEikDialogFlagNoTitleBar|EEikDialogFlagNoDrag;
+	buttons=r_pm_compose_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; prompt="To:"; id=EPmDlgTo;
+			control=EDWIN { width=26; maxlength=500; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="CC:"; id=EPmDlgCc;
+			control=EDWIN { width=26; maxlength=500; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="BCC:"; id=EPmDlgBcc;
+			control=EDWIN { width=26; maxlength=300; }; },
+		DLG_LINE { type=EEikCtLabel; prompt="Attachments:"; id=EPmDlgAttachments;
+			control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="none"; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Subject:"; id=EPmDlgSubject;
+			control=EDWIN { width=26; maxlength=200; }; },
+		DLG_LINE { type=EEikCtRichTextEditor; prompt=""; id=EPmDlgBody; itemflags=EEikDlgItemTakesEnterKey;
+			control=RTXTED { width=546; height=324; numlines=18; textlimit=30000; flags=EEikEdwinNoAutoSelection; }; }
 		};
 	}
 
@@ -978,7 +1025,7 @@ RESOURCE DIALOG r_pm_about_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { standard_font=EEikLabelFontLegend; reserve_length=24; txt="PsiMail"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { reserve_length=60; txt="Email & calendar for the Psion Series 5mx"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { reserve_length=80; txt="Email & calendar for the Psion 5mx, netBook & Series 7"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { standard_font=EEikLabelFontAnnotation; reserve_length=60; txt="-"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="IMAP, SMTP & CalDAV over TLS 1.3 - networking from PsiTerm"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="LibTomCrypt, LibTomMath - public domain"; }; },

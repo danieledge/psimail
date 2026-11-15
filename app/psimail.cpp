@@ -39,7 +39,14 @@ static TInt PrefetchCount(const TPmSettings& aSettings)
 	if (aSettings.iPrefetch < 0)
 		return 0;
 	if (aSettings.iPrefetch == 0)
-		return 10;                           // the default
+		{
+		// the default: 10, or 25 on a machine with the memory and the disk
+		// for it (0.96: the netBook and Series 7 have 32 MB or more)
+		TMemoryInfoV1Buf mem;
+		if (UserHal::MemoryInfo(mem) == KErrNone && mem().iTotalRamInBytes >= 24 * 1024 * 1024)
+			return 25;
+		return 10;
+		}
 	return aSettings.iPrefetch > 50 ? 50 : aSettings.iPrefetch;
 	}
 
@@ -105,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.95");          // also pkg/psimail.pkg
+_LIT(KVersion, "0.96");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -2641,6 +2648,8 @@ void CPmView::HandlePointerEventL(const TPointerEvent& aEvent)
 	// list boxes and the reader take the pen themselves
 	if (NativePointerL(aEvent))
 		return;
+	if (PreviewPointerL(aEvent))
+		return;                              // (0.96) a tap on the preview opens the message
 	if (iMode == ECalendar && CalendarPointerL(aEvent))
 		return;
 	CCoeControl::HandlePointerEventL(aEvent);
@@ -3184,12 +3193,23 @@ void CPmPrefsDialog::PreLayoutDynInitL()
 	SetChoiceListCurrentItem(EPmDlgEmailButton, (iSettings.iView & KPmViewEmailButton) ? 0 : 1);
 	SetChoiceListCurrentItem(EPmDlgReading, (iSettings.iView & KPmViewReading) ? 1 : 0);
 	NewMailInitL();                           // the New mail page (pmauto.cpp)
+	// (0.96) the greys are the 5mx's screen's: a colour screen has none to set
+	if (PmColour())
+		{
+		CEikCommandButtonBase* b = ButtonPanel()->ButtonById(EPmBidGreys);
+		if (b) b->SetDimmed(ETrue);
+		}
 	}
 
 TBool CPmPrefsDialog::OkToExitL(TInt aButtonId)
 	{
 	if (aButtonId == EPmBidGreys)
 		{
+		if (PmColour())
+			{
+			iEikonEnv->InfoMsg(_L("Not available on a colour screen"));
+			return EFalse;
+			}
 		// the greys screen shared with PsiTerm and PsiWeb, on top of this
 		// dialog; the engine reads PsiGrey.ini for every picture it sets out
 		PsiGrey grey;
@@ -3443,6 +3463,9 @@ TBool CPmConnDialog::OkToExitL(TInt aButtonId)
 void CPmAppUi::ConstructL()
 	{
 	BaseConstructL();
+	// (0.96) the screen: colour and 480 lines on the netBook and Series 7
+	iColour = iCoeEnv->ScreenDevice()->DisplayMode() >= EColor16;
+	iTall = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
 	LoadSettings();
 	LoadCalSettings();
 	TRAPD(mbm, iMbm = CPmMbm::NewL(iCoeEnv->FsSession(), Application()->BitmapStoreName()));
@@ -4279,7 +4302,7 @@ void CPmAppUi::ComposeL(CPmDraft* aDraft, const TDesC& aTitle)
 	for (;;)
 		{
 		CPmComposeDialog* dlg = new(ELeave) CPmComposeDialog(*aDraft, aTitle);
-		TInt r = dlg->ExecuteLD(R_PM_COMPOSE_DIALOG);
+		TInt r = dlg->ExecuteLD(PmTall() ? R_PM_COMPOSE_DIALOG_TALL : R_PM_COMPOSE_DIALOG);
 		if (r != EPmBidSend && r != EPmBidSave)
 			break;
 		TRAPD(err, iView->SaveDraftL(*aDraft, r == EPmBidSend));
@@ -5153,7 +5176,7 @@ void CPmAboutDialog::PreLayoutDynInitL()
 	title.Append(KVersion);
 	SetLabelL(EPmDlgInfo1, title);
 	((CEikLabel*)Control(EPmDlgInfo1))->SetFont(iEikonEnv->TitleFont());   // as PsiTerm's and PsiWeb's
-	TBuf<80> who(_L("Email & calendar for the Psion Series 5mx - "));
+	TBuf<80> who(_L("Email & calendar for the Psion 5mx, netBook & Series 7 - "));
 	who.Append(TChar(0xa9));                  // (c), as the Psion's fonts have it
 	who.Append(_L(" 2026 Dan Edge"));
 	SetLabelL(EPmDlgInfo2, who);
@@ -5245,14 +5268,16 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		aMenuPane->SetItemButtonState(EPmCmdWeekView, month ? 0 : EEikMenuItemSymbolOn);
 		aMenuPane->SetItemButtonState(EPmCmdMonthView, month ? EEikMenuItemSymbolOn : 0);
 		}
-	else if (aMenuId == R_PM_VIEW_MENU || aMenuId == R_PM_CAL_VIEW_MENU)
+	else if (aMenuId == R_PM_VIEW_MENU)
+		aMenuPane->SetItemDimmed(EPmCmdSort, m != CPmView::EList);   // (only the mail's View has Sort)
+	else if (aMenuId == R_PM_SHOW_MENU)
 		{
 		aMenuPane->SetItemButtonState(EPmCmdToggleToolbar, (iSettings.iView & 1) ? 0 : EEikMenuItemSymbolOn);
 		aMenuPane->SetItemButtonState(EPmCmdToggleTitle, (iSettings.iView & 2) ? 0 : EEikMenuItemSymbolOn);
 		aMenuPane->SetItemButtonState(EPmCmdToggleFolders, (iSettings.iView & 4) ? 0 : EEikMenuItemSymbolOn);
-		// (only the mail's View has Sort)
-		if (aMenuId == R_PM_VIEW_MENU)
-			aMenuPane->SetItemDimmed(EPmCmdSort, m != CPmView::EList);
+		// (0.96) the preview: only a tall screen has the room
+		aMenuPane->SetItemButtonState(EPmCmdTogglePreview, iView->PreviewWanted() ? EEikMenuItemSymbolOn : 0);
+		aMenuPane->SetItemDimmed(EPmCmdTogglePreview, !PmTall());
 		}
 	else if (aMenuId == R_PM_GOTO_MENU)
 		{
@@ -5291,6 +5316,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 	if (m == CPmView::ENoAccount && aCommand != EEikCmdExit && aCommand != EPmCmdNewAccount &&
 		aCommand != EPmCmdConnSettings && aCommand != EPmCmdAbout && aCommand != EPmCmdUpdate &&
 		aCommand != EPmCmdToggleToolbar && aCommand != EPmCmdToggleTitle && aCommand != EPmCmdToggleFolders &&
+		aCommand != EPmCmdTogglePreview &&
 		aCommand != EPmCmdStatusInfo && aCommand != EPmCmdStop && aCommand != EPmCmdPrefs &&
 		aCommand != EPmCmdZoomIn && aCommand != EPmCmdZoomOut && aCommand != EPmCmdCalSettings &&
 		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog &&
@@ -5431,6 +5457,9 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPmCmdToggleFolders:
 		iView->ToggleViewL(4);
+		break;
+	case EPmCmdTogglePreview:
+		iView->TogglePreviewL();
 		break;
 	case EPmCmdStatusInfo:
 		iView->StatusInfoL();
@@ -5659,6 +5688,11 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 // (0.93) a dimmed command chosen: why, for the ones whose reason is not obvious
 void CPmAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 	{
+	if (aCommandId == EPmCmdTogglePreview)
+		{
+		iView->Toast(_L("Not available - this screen is too small"));
+		return;
+		}
 	if (aCommandId == EPmCmdSendLog)
 		{
 		if (!iView->LogOn())

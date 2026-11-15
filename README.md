@@ -11,18 +11,18 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 0.95, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 0.96, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
 
 [![Download PsiMail.sis](https://img.shields.io/badge/Download-PsiMail.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiMail.sis)
 
-<p align="center"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="PsiMail's Inbox on the netBook: the folder tree and the message list, unread messages in bold" width="640"></p>
+<p align="center"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="PsiMail's Inbox on the netBook: the folder tree, the message list with unread messages in bold, and the selected message under it" width="640"></p>
 
 ## Contents
 
-- [What's new in 0.95](#whats-new-in-095)
+- [What's new in 0.96](#whats-new-in-096)
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,28 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 0.95
+## What's new in 0.96
+
+On the netBook and Series 7:
+
+- The selected message is shown under the list of messages. Space pages through it, Shift+Space goes back, and Enter or a tap on it opens it. It shows what has been downloaded already and does not mark the message read. View > Show > Preview turns it off.
+- What PsiMail draws itself now takes the system's colours: the highlight in the folder list and the calendar, the column headings, the scroll bars. It follows the machine's colour scheme.
+- Links are blue. Quoted text has a colour for each level. A flagged message has a red flag.
+- The calendar's month view lists each day's events, as many as fit, each in its calendar's colour. The day's list has a bar in the calendar's colour beside each event. Today has a red frame.
+- Writing a message: the text takes the whole height of the screen. It was four lines high.
+- Help opens in a taller window.
+- Download ahead fetches 25 messages unless you set another number. This goes by memory: 24 MB or more. It is still 10 on a 16 MB 5mx.
+- Preferences > Screen greys is dimmed. The greys are the 5mx's screen's.
+
+On every machine:
+
+- View > Show toolbar, Show title bar and Show list of folders are now in a View > Show menu, with Preview. The shortcuts are the same.
+- About PsiMail names the three machines.
+- The Series 5mx looks and works as it did in 0.95.
+
+The review behind this, with what was left for later, is in [docs/netbook-review.md](docs/netbook-review.md).
+
+### 0.95
 
 Since 0.93, the last signed release.
 
@@ -52,14 +73,19 @@ Since 0.93, the last signed release.
 
 ## Screenshots
 
-PsiMail 0.95 on the netBook and the Series 5mx, with the same demo account and mail (made up). Taken in emulators. Tap or click one to see it full size.
+PsiMail 0.96 on the netBook and the Series 5mx, with the same demo account, mail and calendar (made up). Taken in emulators. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
-<tr><td colspan="2"><b>The Inbox: folders and messages</b></td></tr>
+<tr><td colspan="2"><b>The Inbox. On the netBook the selected message is shown under the list</b></td></tr>
 <tr>
-<td><a href="docs/screenshots/netbook-psimail-inbox.png"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="netBook: the Inbox with the folder list and the messages" width="400"></a></td>
+<td><a href="docs/screenshots/netbook-psimail-inbox.png"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="netBook: the Inbox with the folder list, the messages and the preview" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-inbox.png"><img src="docs/screenshots/5mx-psimail-inbox.png" alt="Series 5mx: the Inbox with the folder list and the messages" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>A message. Links are blue and each level of quoted text has a colour on the netBook</b></td></tr>
+<tr>
+<td><a href="docs/screenshots/netbook-psimail-reader-quotes.png"><img src="docs/screenshots/netbook-psimail-reader-quotes.png" alt="netBook: a reply with a link and two levels of quoted text" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-reader-quotes.png"><img src="docs/screenshots/5mx-psimail-reader-quotes.png" alt="Series 5mx: a reply with a link and two levels of quoted text" width="400"></a></td>
 </tr>
 <tr><td colspan="2"><b>A message with a picture in the text</b></td></tr>
 <tr>
@@ -70,6 +96,21 @@ PsiMail 0.95 on the netBook and the Series 5mx, with the same demo account and m
 <tr>
 <td><a href="docs/screenshots/netbook-psimail-reader.png"><img src="docs/screenshots/netbook-psimail-reader.png" alt="netBook: a JPEG photo in a message" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-reader.png"><img src="docs/screenshots/5mx-psimail-reader.png" alt="Series 5mx: a JPEG photo in a message" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>The calendar: a week and the chosen day</b></td></tr>
+<tr>
+<td><a href="docs/screenshots/netbook-psimail-calendar-week.png"><img src="docs/screenshots/netbook-psimail-calendar-week.png" alt="netBook: the week, with a bar in each calendar's colour" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-calendar-week.png"><img src="docs/screenshots/5mx-psimail-calendar-week.png" alt="Series 5mx: the week and the day's events" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>The calendar: a month</b></td></tr>
+<tr>
+<td><a href="docs/screenshots/netbook-psimail-calendar-month.png"><img src="docs/screenshots/netbook-psimail-calendar-month.png" alt="netBook: the month, with each day's events" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-calendar-month.png"><img src="docs/screenshots/5mx-psimail-calendar-month.png" alt="Series 5mx: the month, with each day's first event" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>Writing a message</b></td></tr>
+<tr>
+<td><a href="docs/screenshots/netbook-psimail-compose.png"><img src="docs/screenshots/netbook-psimail-compose.png" alt="netBook: the text takes the height of the screen" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-compose.png"><img src="docs/screenshots/5mx-psimail-compose.png" alt="Series 5mx: the same on 240 lines" width="400"></a></td>
 </tr>
 </table>
 
@@ -82,7 +123,9 @@ PsiMail 0.95 on the netBook and the Series 5mx, with the same demo account and m
   a folder tree with pictures, status pictures in the message list, a
   read-only rich text reader with a scroll bar, the standard toolbar (New and
   Reply/f'ward pop up a choice, Check mail, Delete - or Close when reading),
-  and View > Show toolbar / title bar / list of folders.
+  and View > Show > Toolbar / Title bar / List of folders. On the netBook
+  and Series 7 the selected message is shown under the list (View > Show >
+  Preview).
 * Menus, shortcuts, wording and messages follow Symbian's EIKON Application
   Style Guide: standard shortcuts, busy messages bottom left, infoprints, a
   second tap opens, and zoom goes round three sizes like the built-in Email

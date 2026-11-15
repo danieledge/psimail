@@ -97,7 +97,9 @@ enum TPmCommands
 	// 0.75 (meng)
 	EPmCmdWebMenu,           // Message > Web (a cascade)
 	EPmCmdWebPictures,       // Message > Web > Show web pictures (pmwebpic.cpp)
-	EPmCmdKeepLog            // Tools > Troubleshooting > Keep a log (0.93)
+	EPmCmdKeepLog,           // Tools > Troubleshooting > Keep a log (0.93)
+	EPmCmdShowMenu,          // View > Show (a cascade, 0.96)
+	EPmCmdTogglePreview      // View > Show > Preview (0.96: tall screens)
 	};
 
 enum TPmDialogControls

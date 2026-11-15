@@ -47,6 +47,10 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "are in bold. Move with the arrow keys, open with Enter, and go back with Esc. Tab moves between "
 	  "the folder list and the messages. A tap selects a message and a second tap opens it.\n"
 	  "\n"
+	  "On the netBook and Series 7 the selected message is also shown under the list, as far as it "
+	  "has been downloaded. Space pages through it (Shift+Space goes back) and Enter, or a tap on it, "
+	  "opens it. View > Show > Preview turns this off.\n"
+	  "\n"
 	  "A message's text is downloaded when you open it (up to 64 KB - Message > Get whole message "
 	  "fetches the rest). Left and Right step to the previous and next message. Tab moves between the "
 	  "links and attachments in a message and Enter opens one; Message > View as web page "
@@ -534,7 +538,7 @@ SEikControlInfo CPmHelpDialog::CreateCustomControlL(TInt aControlType)
 void CPmAppUi::HelpL(TInt aTopic)
 	{
 	CPmHelpDialog* dlg = new(ELeave) CPmHelpDialog(aTopic);
-	dlg->ExecuteLD(R_PM_HELP_DIALOG);
+	dlg->ExecuteLD(PmTall() ? R_PM_HELP_DIALOG_TALL : R_PM_HELP_DIALOG);   // (0.96: more of it on 480 lines)
 	}
 
 void CPmHelpDialog::PreLayoutDynInitL()

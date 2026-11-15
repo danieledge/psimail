@@ -120,6 +120,74 @@ void PmDrawIcon(CWindowGc& aGc, CArrayPtr<CFbsBitmap>* aIcons, TInt aId, const T
 	aGc.BitBltMasked(aPos, bmp, TRect(bmp->SizeInPixels()), mask, ETrue);
 	}
 
+// ----- (0.96) the screen and its colours ---------------------------------------------
+
+// The 5mx: 16 greys and 240 lines, and PsiMail's own black, white and light
+// grey as before. A colour screen (the netBook, the Series 7): the system's
+// colour list, which the machine's colour scheme sets, so that what PsiMail
+// draws itself matches EIKON's lists, buttons and dialogs beside it.
+TBool PmColour()
+	{
+	CPmAppUi* ui = (CPmAppUi*)CEikonEnv::Static()->EikAppUi();
+	return ui && ui->iColour;
+	}
+
+TBool PmTall()
+	{
+	CPmAppUi* ui = (CPmAppUi*)CEikonEnv::Static()->EikAppUi();
+	return ui && ui->iTall;
+	}
+
+static TRgb SysColour(TInt aLogical, const TRgb& aGrey)
+	{
+	return PmColour() ? CEikonEnv::Static()->Color((TEikLogicalColor)aLogical) : aGrey;
+	}
+
+TRgb PmBack() { return SysColour(EEikColorControlBackground, KRgbWhite); }
+TRgb PmText() { return SysColour(EEikColorControlText, KRgbBlack); }
+TRgb PmFace() { return SysColour(EEikColorButtonFaceClear, TRgb(170, 170, 170)); }
+TRgb PmFaceText() { return SysColour(EEikColorButtonText, KRgbBlack); }
+TRgb PmHighlight() { return SysColour(EEikColorControlHighlightBackground, KRgbBlack); }
+TRgb PmHighlightText() { return SysColour(EEikColorControlHighlightText, KRgbWhite); }
+
+// the colours with a meaning (colour screens only; all from the 256's
+// 6x6x6 cube, so none is dithered). Dark on a light workspace, light on a
+// dark one (a dark colour scheme)
+static TBool DarkWorkspace()
+	{
+	TRgb b = PmBack();
+	return b.Red() + b.Green() + b.Blue() < 384;
+	}
+
+TRgb PmLinkColour()
+	{
+	if (!PmColour()) return KRgbBlack;
+	return DarkWorkspace() ? TRgb(102, 204, 255) : TRgb(0, 0, 204);
+	}
+
+TRgb PmQuoteColour(TInt aLevel)
+	{
+	if (!PmColour()) return KRgbBlack;
+	if (DarkWorkspace())
+		return aLevel <= 1 ? TRgb(153, 204, 255) : aLevel == 2 ? TRgb(153, 255, 153) : TRgb(255, 204, 153);
+	return aLevel <= 1 ? TRgb(0, 51, 153) : aLevel == 2 ? TRgb(0, 102, 51) : TRgb(153, 51, 0);
+	}
+
+TRgb PmFlagColour()
+	{
+	if (!PmColour()) return KRgbBlack;
+	return DarkWorkspace() ? TRgb(255, 102, 102) : TRgb(204, 0, 0);
+	}
+
+TRgb PmCalColour(TInt aShade)
+	{
+	if (!PmColour()) return KRgbBlack;
+	static const TUint8 KLight[4][3] = { { 0, 51, 153 }, { 0, 102, 51 }, { 153, 51, 0 }, { 102, 0, 153 } };
+	static const TUint8 KDark[4][3] = { { 153, 204, 255 }, { 153, 255, 153 }, { 255, 204, 153 }, { 255, 153, 255 } };
+	const TUint8* c = DarkWorkspace() ? KDark[aShade & 3] : KLight[aShade & 3];
+	return TRgb(c[0], c[1], c[2]);
+	}
+
 // ----- the folder tree: a text list box that draws lines and pictures ---------------
 
 class CPmTreeDrawer : public CTextListItemDrawer
@@ -142,7 +210,7 @@ void CPmTreeDrawer::DrawActualItem(TInt aItemIndex, const TRect& aRect, TBool aC
 	CWindowGc& gc = *iGc;
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KRgbWhite);
+	gc.SetBrushColor(PmBack());
 	gc.DrawRect(aRect);
 	TInt v = (iTree && aItemIndex < iTree->Count()) ? (*iTree)[aItemIndex] : 0;
 	TInt depth = v & 7;
@@ -154,7 +222,7 @@ void CPmTreeDrawer::DrawActualItem(TInt aItemIndex, const TRect& aRect, TBool aC
 	TInt mid = top + aRect.Height() / 2;
 	// the tree's lines: down from the parent, across to the picture
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	for (TInt l = 1; l <= depth; l++)
 		{
 		TInt lx = x0 + (l - 1) * KIndent + 7;
@@ -188,15 +256,15 @@ void CPmTreeDrawer::DrawActualItem(TInt aItemIndex, const TRect& aRect, TBool aC
 	if (aCurrent && aEmphasized)
 		{
 		gc.SetPenStyle(CGraphicsContext::ENullPen);
-		gc.SetBrushColor(KRgbBlack);
-		gc.SetPenColor(KRgbWhite);
+		gc.SetBrushColor(PmHighlight());     // (0.96: the system's highlight on a colour screen)
+		gc.SetPenColor(PmHighlightText());
 		gc.SetPenStyle(CGraphicsContext::ESolidPen);
 		gc.DrawText(text, tr, base, CGraphicsContext::ELeft, 2);
 		}
 	else
 		{
-		gc.SetBrushColor(KRgbWhite);
-		gc.SetPenColor(KRgbBlack);
+		gc.SetBrushColor(PmBack());
+		gc.SetPenColor(PmText());
 		gc.DrawText(text, tr, base, CGraphicsContext::ELeft, 2);
 		if (aCurrent)
 			{
@@ -270,10 +338,24 @@ public:
 			{
 			iGc->SetPenStyle(CGraphicsContext::ENullPen);
 			iGc->SetBrushStyle(CGraphicsContext::ESolidBrush);
-			iGc->SetBrushColor(KRgbWhite);
+			iGc->SetBrushColor(PmBack());
 			iGc->DrawRect(TRect(aRect.iTl.iX, aRect.iTl.iY, aRect.iTl.iX + KIconCol - 2, aRect.iBr.iY));
 			}
-		if (icon != 0xff)
+		if (icon == EMbmMsgFlag && PmColour())
+			{
+			// (0.96) on a colour screen the flag is red: drawn here, as the
+			// pictures in PsiMail.mbm are greys
+			TInt x = aRect.iTl.iX + 2;
+			iGc->SetPenStyle(CGraphicsContext::ESolidPen);
+			iGc->SetPenColor(PmText());
+			iGc->DrawLine(TPoint(x, y), TPoint(x, y + 11));
+			iGc->SetPenColor(PmFlagColour());
+			iGc->SetBrushStyle(CGraphicsContext::ESolidBrush);
+			iGc->SetBrushColor(PmFlagColour());
+			iGc->DrawRect(TRect(x + 1, y, x + 8, y + 6));
+			iGc->SetBrushStyle(CGraphicsContext::ENullBrush);
+			}
+		else if (icon != 0xff)
 			PmDrawIcon(*iGc, iIcons, icon, TPoint(aRect.iTl.iX + 1, y));
 		if (v & KMsgAttach)
 			PmDrawIcon(*iGc, iIcons, EMbmMsgAttach, TPoint(aRect.iTl.iX + 11, y));
@@ -398,6 +480,9 @@ void CPmView::CreateNativeL()
 	iReader->SetContainerWindowL(*this);
 	iReader->ConstructL(this, 0, 0, CEikEdwin::EReadOnly | CEikEdwin::ENoAutoSelection | CEikEdwin::EAlwaysShowSelection);
 	// (the reader's scroll bar is drawn here: see DrawReaderBar)
+	if (PmColour())
+		iReader->SetBackgroundColorL(PmBack());   // (0.96) the workspace's colour, whatever the colour scheme
+	CreatePreviewL();                          // (0.96) the preview under the list (pmpreview.cpp)
 	iPictures = CPmPictures::NewL();
 
 	ApplyZoomL();
@@ -412,6 +497,8 @@ void CPmView::DestroyNative()
 	iMsgList = NULL;
 	delete iReader;                              // (its pictures go with it, before their bitmaps)
 	iReader = NULL;
+	delete iPreview;
+	iPreview = NULL;
 	delete iPictures;
 	iPictures = NULL;
 	CWsScreenDevice* dev = iCoeEnv->ScreenDevice();
@@ -439,7 +526,7 @@ void CPmView::DestroyNative()
 
 TInt CPmView::CountComponentControls() const
 	{
-	return iFolderList ? 3 : 0;
+	return iFolderList ? (iPreview ? 4 : 3) : 0;
 	}
 
 CCoeControl* CPmView::ComponentControl(TInt aIndex) const
@@ -448,7 +535,8 @@ CCoeControl* CPmView::ComponentControl(TInt aIndex) const
 		{
 	case 0: return iFolderList;
 	case 1: return iMsgList;
-	default: return iReader;
+	case 2: return iReader;
+	default: return iPreview;
 		}
 	}
 
@@ -494,6 +582,11 @@ void CPmView::ApplyZoomL()
 
 	iZoomFactor->SetZoomFactor(KZoomFactors[z]);
 	iReader->SetZoomFactorL(iZoomFactor);
+	if (iPreview)
+		{
+		iPreview->SetZoomFactorL(iZoomFactor);
+		iPrevUid = 0;                              // (set out again at this size)
+		}
 	LayoutNative();
 	}
 
@@ -535,7 +628,23 @@ void CPmView::LayoutNative()
 		}
 	TInt msgX = r.iTl.iX + (folders ? iSplitX + 1 : 0);
 	TRAPD(e1, iFolderList->SetRectL(TRect(TPoint(r.iTl.iX, listTop), TSize(folders ? iSplitX : 1, r.iBr.iY - listTop))));
-	TRAPD(e2a, iMsgList->SetRectL(TRect(TPoint(msgX, listTop), r.iBr)));
+	// (0.96) on a tall screen the list has the top of its pane, and the
+	// selected message is shown under it (pmpreview.cpp): whole rows, a
+	// little under half the height
+	TRect listRect(TPoint(msgX, listTop), r.iBr);
+	iPrevRect = TRect();
+	if (PreviewOn())
+		{
+		TInt rh = RowHeight();
+		TInt rows = listRect.Height() * 45 / 100 / rh;
+		if (rows < 3) rows = 3;
+		if (rows * rh + 80 < listRect.Height())
+			{
+			listRect.iBr.iY = listTop + rows * rh;
+			LayoutPreview(TRect(msgX, listRect.iBr.iY, r.iBr.iX, r.iBr.iY));
+			}
+		}
+	TRAPD(e2a, iMsgList->SetRectL(listRect));
 	TRAPD(e3, iReader->SetRectL(TRect(TPoint(r.iTl.iX, top), TPoint(r.iBr.iX - KScrollBarW, r.iBr.iY))));
 	iBarRect = TRect(r.iBr.iX - KScrollBarW, top, r.iBr.iX, r.iBr.iY);
 	(void)e1; (void)e2a; (void)e3;
@@ -613,6 +722,8 @@ void CPmView::ShowNative(TBool aShow)
 	iFolderList->MakeVisible(folders);
 	iMsgList->MakeVisible(msgs);
 	iReader->MakeVisible(reader);
+	if (iPreview)
+		iPreview->MakeVisible(msgs && PreviewOn() && !iPrevRect.IsEmpty());
 	// (the scroll bars are controls of their own: hide them with their owner)
 	ListScrollBar(iFolderList, folders);
 	ListScrollBar(iMsgList, msgs);
@@ -905,7 +1016,8 @@ void CPmView::SortL(TInt aMode)
 
 // character and paragraph styles collected while the text is put together
 struct TPmSpan { TInt iPos; TInt iLen; TInt iKind; TInt iArg; };
-enum { ESpanBold, ESpanItalic, ESpanUnder, ESpanBig, ESpanMono, ESpanIndent, ESpanSpaceBefore, ESpanRuleBelow };
+enum { ESpanBold, ESpanItalic, ESpanUnder, ESpanBig, ESpanMono, ESpanIndent, ESpanSpaceBefore, ESpanRuleBelow,
+	ESpanColour };      // (0.96) iArg: a TRgb's value (colour screens: links, quoted text)
 
 static void AddSpan(CArrayFixFlat<TPmSpan>& aSpans, TInt aPos, TInt aLen, TInt aKind, TInt aArg = 0)
 	{
@@ -1147,6 +1259,8 @@ void CPmView::UpdateReaderL()
 						lr.iPos = link; lr.iLen = t.Length() - link; lr.iLink = linkNo;
 						iLinks->AppendL(lr);
 						AddSpan(*spans, link, lr.iLen, ESpanUnder);
+						if (PmColour())
+							AddSpan(*spans, link, lr.iLen, ESpanColour, PmLinkColour().Value());
 						}
 					link = -1;
 					break;
@@ -1172,6 +1286,8 @@ void CPmView::UpdateReaderL()
 			case 'q':
 				AddSpan(*spans, paraStart, plen, ESpanIndent, arg * 2);
 				AddSpan(*spans, paraStart, plen, ESpanItalic);
+				if (PmColour())
+					AddSpan(*spans, paraStart, plen, ESpanColour, PmQuoteColour(arg).Value());
 				break;
 			case 'c': AddSpan(*spans, paraStart, plen, ESpanMono); break;
 			case 'i':
@@ -1268,6 +1384,12 @@ void CPmView::UpdateReaderL()
 	TCharFormatMask cm;
 	cm.SetAttrib(EAttFontTypeface);
 	cm.SetAttrib(EAttFontHeight);
+	if (PmColour())
+		{
+		// (0.96) the workspace's colours, as the lists beside it
+		cf.iFontPresentation.iTextColor = PmText();
+		cm.SetAttrib(EAttColor);
+		}
 	rt->ApplyCharFormatL(cf, cm, 0, rt->DocumentLength());
 	}
 	for (TInt s = 0; s < spans->Count(); s++)
@@ -1294,6 +1416,10 @@ void CPmView::UpdateReaderL()
 		case ESpanBig:
 			cf.iFontSpec.iHeight = baseTwips * sp.iArg / 1000;
 			cm.SetAttrib(EAttFontHeight);
+			break;
+		case ESpanColour:
+			cf.iFontPresentation.iTextColor = TRgb((TUint32)sp.iArg);
+			cm.SetAttrib(EAttColor);
 			break;
 		case ESpanMono:
 			cf.iFontSpec.iTypeface.iName = _L("Courier");
@@ -1576,11 +1702,11 @@ void PmDrawScrollBar(CWindowGc& gc, const TRect& aRect, TInt aTotal, TInt aShown
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
 	gc.SetPenColor(KRgbBlack);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KPmLightGrey);
+	gc.SetBrushColor(SysColour(EEikColorScrollBarShaft, TRgb(170, 170, 170)));
 	gc.DrawRect(shaft);
 	// the thumb: a raised button with grip lines
 	TRect t(thumb.iTl.iX + 1, thumb.iTl.iY, thumb.iBr.iX - 1, thumb.iBr.iY);
-	PmDrawButtonFace(gc, t, EFalse);
+	PmDrawButtonFace(gc, t, EFalse, ETrue);
 	gc.SetPenColor(KRgbBlack);
 	TInt cy = t.iTl.iY + t.Height() / 2;
 	for (TInt k = -4; k <= 4; k += 2)
@@ -1790,11 +1916,14 @@ void CPmView::NativeActivateLinkL()
 // ----- the title band and the column headings (drawn here, around the controls) ----
 
 // an EIKON button face: light grey, lit from the top left
-void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown)
+void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown, TBool aScrollBar)
 	{
 	aGc.SetPenStyle(CGraphicsContext::ENullPen);
 	aGc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	aGc.SetBrushColor(aDown ? KPmDarkGrey : KPmLightGrey);
+	// (0.96) a scroll bar's parts in the system's scroll bar colour on a
+	// colour screen, as EIKON's own scroll bars beside it
+	TRgb face = aScrollBar ? SysColour(EEikColorScrollButtonThumbBackground, TRgb(170, 170, 170)) : KPmLightGrey;
+	aGc.SetBrushColor(aDown ? KPmDarkGrey : face);
 	aGc.DrawRect(aRect);
 	aGc.SetPenStyle(CGraphicsContext::ESolidPen);
 	TPoint tl = aRect.iTl, br(aRect.iBr.iX - 1, aRect.iBr.iY - 1);
@@ -1815,9 +1944,9 @@ void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown)
 // the scroll bar's buttons: a face with a solid triangle
 static void DrawBarButton(CWindowGc& aGc, const TRect& aRect, TBool aUp, TBool aDown)
 	{
-	PmDrawButtonFace(aGc, aRect, aDown);
+	PmDrawButtonFace(aGc, aRect, aDown, ETrue);
 	aGc.SetPenStyle(CGraphicsContext::ESolidPen);
-	aGc.SetPenColor(KRgbBlack);
+	aGc.SetPenColor(SysColour(EEikColorScrollButtonIcon, KRgbBlack));
 	TInt cx = aRect.iTl.iX + aRect.Width() / 2, cy = aRect.iTl.iY + aRect.Height() / 2;
 	for (TInt k = 0; k < 5; k++)
 		{
@@ -1873,9 +2002,9 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 	// shows as streaks; black, white and small greys stay steady
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KRgbWhite);
+	gc.SetBrushColor(PmBack());
 	gc.DrawRect(band);
-	gc.SetBrushColor(KRgbBlack);
+	gc.SetBrushColor(PmText());
 	gc.DrawRect(TRect(band.iTl.iX, band.iBr.iY - 1, band.iBr.iX, band.iBr.iY));
 	// the folder-list button (it shows or hides the folders)
 	TRect btn(band.iTl.iX + 1, band.iTl.iY + 1, band.iTl.iX + iTitleH + 3, band.iBr.iY - 1);
@@ -1894,7 +2023,7 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 		TInt cw = iTitleFont->TextWidthInPixels(conn) + 12;
 		box = TRect(band.iBr.iX - cw - 2, band.iTl.iY + 2, band.iBr.iX - 2, band.iBr.iY - 2);
 		gc.SetPenStyle(CGraphicsContext::ESolidPen);
-		gc.SetPenColor(KRgbBlack);
+		gc.SetPenColor(PmFaceText());
 		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
 		gc.SetBrushColor(iPenHead == 11 ? KPmDarkGrey : KPmLightGrey);
 		gc.DrawRect(box);
@@ -1924,7 +2053,7 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 	TInt maxW = (box.iTl.iX - x) / 2;
 	if (maxW > 10 && iTitleFont->TextWidthInPixels(where) > maxW)
 		TextUtils::ClipToFit(where, *iTitleFont, maxW);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	gc.DrawText(where, TPoint(x, base));
 	TInt ww = iTitleFont->TextWidthInPixels(where);
 	// the middle: what's happening, or how many messages
@@ -1965,7 +2094,7 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 	TInt mw = iSmallFont->TextWidthInPixels(mid);
 	TInt mx = ml + (mr - ml - mw) / 2;
 	TInt mbase = band.iTl.iY + (iTitleH - iSmallFont->HeightInPixels()) / 2 + iSmallFont->AscentInPixels();
-	gc.SetPenColor(KRgbBlack);               // (small, but black: small grey text is hard to read on the 5mx)
+	gc.SetPenColor(PmText());                // (small, but black: small grey text is hard to read on the 5mx)
 	gc.DrawText(mid, TPoint(mx, mbase));
 	gc.DiscardFont();
 	}
@@ -1997,7 +2126,7 @@ void CPmView::DrawHeaders(CWindowGc& gc) const
 		TRect b(x0, y, x1, y + iHeadH);
 		PmDrawButtonFace(gc, b, iPenHead == i);
 		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
-		gc.SetPenColor(KRgbBlack);
+		gc.SetPenColor(PmFaceText());
 		TPtrC name(KNames[i]);
 		TInt base = y + (iHeadH - iBoldFont->HeightInPixels()) / 2 + iBoldFont->AscentInPixels();
 		// which column sorts the list, and which way
@@ -2075,15 +2204,17 @@ void CPmView::DrawNative(const TRect& /*aRect*/) const
 	TRect r = Rect();
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KRgbWhite);
+	gc.SetBrushColor(PmBack());
 	gc.DrawRect(TRect(r.iTl.iX, r.iTl.iY + iTitleH, r.iBr.iX, r.iBr.iY));
 	DrawTitle(gc);
 	DrawHeaders(gc);
 	DrawReaderBar(gc);
 	if (iMode == ECalendar)
 		DrawCalendar(gc);
+	if (PreviewOn())
+		DrawPreviewHead(gc);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	TInt top = r.iTl.iY + iTitleH + iHeadH;
 	if ((ListMode(iMode) || iMode == ECalendar) && iSplitX)
 		gc.DrawLine(TPoint(r.iTl.iX + iSplitX, top), TPoint(r.iTl.iX + iSplitX, r.iBr.iY));
@@ -2122,6 +2253,8 @@ void CPmView::DrawNative(const TRect& /*aRect*/) const
 void CPmView::UpdateNativeL()
 	{
 	TBool modeChanged = iNativeMode != iMode;
+	if (modeChanged && iPreview)
+		LayoutNative();                          // (0.96: the list makes room for the preview, or takes it back)
 	if (iMode == EList || iMode == EOutbox)
 		{
 		UpdateFolderListL();
@@ -2154,6 +2287,7 @@ void CPmView::UpdateNativeL()
 		}
 	else
 		UpdateStatusLine();                     // (the lists redraw themselves when they change)
+	PreviewSyncL();                             // (0.96) the selected message under the list
 	}
 
 void CPmView::SyncSelectionFromLists()
@@ -2346,6 +2480,13 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 				iMsgList->OfferKeyEventL(aKeyEvent, aType);
 			SyncSelectionFromLists();
 			UpdateStatusLine();
+			PreviewSyncL();
+			return EKeyWasConsumed;
+			}
+		if (code == ' ' && PreviewOn() && !iSidebar)
+			{
+			// (0.96) Space pages the preview, Shift+Space back
+			PreviewPageL(!(aKeyEvent.iModifiers & EModifierShift));
 			return EKeyWasConsumed;
 			}
 		switch (code)
@@ -2489,5 +2630,6 @@ void CPmView::HandleListBoxEventL(CEikListBox* aListBox, TListBoxEvent aEventTyp
 			Render();
 		else
 			UpdateStatusLine();
+		PreviewSyncL();
 		}
 	}

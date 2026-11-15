@@ -326,7 +326,7 @@ static void DrawTodayFrame(CWindowGc& gc, const TRect& aRect, const TRgb& aColor
 static void DrawFocusFrame(CWindowGc& gc, const TRect& aRect)
 	{
 	gc.SetPenStyle(CGraphicsContext::EDottedPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 	gc.DrawRect(aRect);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
@@ -336,7 +336,7 @@ static void DrawFocusFrame(CWindowGc& gc, const TRect& aRect)
 static void DrawChevron(CWindowGc& gc, const TRect& aRect, TBool aLeft)
 	{
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmFaceText());
 	TInt cx = aRect.iTl.iX + aRect.Width() / 2, cy = aRect.iTl.iY + aRect.Height() / 2;
 	for (TInt k = 0; k < 4; k++)
 		{
@@ -364,12 +364,12 @@ void CPmView::DrawCalHead(CWindowGc& gc) const
 	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
 	TInt base = Baseline(iBoldFont, h);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmFaceText());
 	gc.DrawText(_L("Today"), TPoint(b[1].iTl.iX + 7, base));
 	// a latched button reads white on the dark face
-	gc.SetPenColor(!iCalMonth ? KRgbWhite : KRgbBlack);
+	gc.SetPenColor(!iCalMonth ? KRgbWhite : PmFaceText());
 	gc.DrawText(_L("Week"), TPoint(b[3].iTl.iX + 7, base));
-	gc.SetPenColor(iCalMonth ? KRgbWhite : KRgbBlack);
+	gc.SetPenColor(iCalMonth ? KRgbWhite : PmFaceText());
 	gc.DrawText(_L("Month"), TPoint(b[4].iTl.iX + 7, base));
 	// the month and year in the middle (the short name when the long one won't fit)
 	int y, m, d;
@@ -380,7 +380,7 @@ void CPmView::DrawCalHead(CWindowGc& gc) const
 	if (iBoldFont->TextWidthInPixels(title) > x1 - x0)
 		title.Format(_L("%s %d"), KMonth[(m - 1) % 12], y);
 	Fit(iBoldFont, title, x1 - x0);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmFaceText());
 	gc.DrawText(title, TPoint(x0, base));
 	gc.DiscardFont();
 	}
@@ -389,10 +389,10 @@ void CPmView::DrawCalHead(CWindowGc& gc) const
 void CPmView::DrawCalEvent(CWindowGc& gc, const PmUiEvent& e, const TRect& aRect, TBool aSel) const
 	{
 	TBool inv = aSel && !iSidebar;
-	TRgb fg = inv ? KRgbWhite : KRgbBlack;
+	TRgb fg = inv ? PmHighlightText() : PmText();
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(inv ? KRgbBlack : KRgbWhite);
+	gc.SetBrushColor(inv ? PmHighlight() : PmBack());
 	gc.DrawRect(aRect);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
 	gc.SetPenColor(fg);
@@ -413,9 +413,21 @@ void CPmView::DrawCalEvent(CWindowGc& gc, const PmUiEvent& e, const TRect& aRect
 			}
 		}
 	TInt timeW = iListFont->TextWidthInPixels(_L("00:00-00:00")) + 10;
+	TInt left = aRect.iTl.iX + 4;
+	if (PmColour())
+		{
+		// (0.96) which calendar it is in: a bar of that calendar's colour
+		gc.SetPenStyle(CGraphicsContext::ENullPen);
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(PmCalColour(e.shade));
+		gc.DrawRect(TRect(aRect.iTl.iX + 2, aRect.iTl.iY + 3, aRect.iTl.iX + 6, aRect.iBr.iY - 3));
+		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		left += 6;
+		}
 	gc.UseFont(iListFont);
 	TInt base = Baseline(iListFont, aRect);
-	gc.DrawText(when, TPoint(aRect.iTl.iX + 4, base));
+	gc.DrawText(when, TPoint(left, base));
 	// marks at the right: waiting to be sent, one of a series, an alarm
 	TInt right = aRect.iBr.iX - 4;
 	TInt icons[3];
@@ -431,7 +443,7 @@ void CPmView::DrawCalEvent(CWindowGc& gc, const PmUiEvent& e, const TRect& aRect
 			{
 			gc.SetPenStyle(CGraphicsContext::ENullPen);
 			gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-			gc.SetBrushColor(KRgbWhite);
+			gc.SetBrushColor(PmBack());
 			gc.DrawRect(TRect(right - w, aRect.iTl.iY + 1, right + 2, aRect.iBr.iY - 1));
 			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 			gc.SetPenStyle(CGraphicsContext::ESolidPen);
@@ -446,7 +458,7 @@ void CPmView::DrawCalEvent(CWindowGc& gc, const PmUiEvent& e, const TRect& aRect
 	Copy8(title, e.title, e.tlen);
 	if (!title.Length()) title = _L("(no name)");
 	if (e.allday && e.days > 1) title.AppendFormat(_L(" (%d days)"), e.days);
-	TInt tx = aRect.iTl.iX + 4 + timeW;
+	TInt tx = left + timeW;
 	TInt room = right - tx;
 	TBuf<120> where;
 	Copy8(where, e.loc, e.llen);
@@ -493,9 +505,9 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		TBool inv = sel && !iSidebar;
 		gc.SetPenStyle(CGraphicsContext::ENullPen);
 		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-		gc.SetBrushColor(inv ? KRgbBlack : KRgbWhite);
+		gc.SetBrushColor(inv ? PmHighlight() : PmBack());
 		gc.DrawRect(cell);
-		TRgb fg = inv ? KRgbWhite : KRgbBlack;
+		TRgb fg = inv ? PmHighlightText() : PmText();
 		gc.SetPenStyle(CGraphicsContext::ESolidPen);
 		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 		gc.SetPenColor(fg);
@@ -515,7 +527,7 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		gc.DiscardFont();
 		DrawMarks(gc, d.count, cx, cell.iBr.iY - 5, fg);
 		if (d.today && !inv)
-			DrawTodayFrame(gc, cell, KRgbBlack);
+			DrawTodayFrame(gc, cell, PmFlagColour());   // (0.96: red on a colour screen)
 		if (sel && iSidebar)
 			{
 			TRect fr(cell);
@@ -525,14 +537,14 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		}
 	// a line under the strip
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	gc.DrawLine(TPoint(strip.iTl.iX, strip.iBr.iY), TPoint(strip.iBr.iX, strip.iBr.iY));
 
 	// the day's name on a heading band, and how much is on
 	TRect day = CalDayRect();
 	PmDrawButtonFace(gc, day, EFalse);
 	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmFaceText());
 	// "Wednesday 30 September - Today", shortened as the room runs out
 	TBuf<24> count;
 	if (k.nevents == 1) count = _L("1 event");
@@ -572,7 +584,7 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 	TRect rowsRect(list.iTl.iX, list.iTl.iY, list.iBr.iX - (bar ? KScrollBarW : 0), list.iBr.iY);
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KRgbWhite);
+	gc.SetBrushColor(PmBack());
 	gc.DrawRect(list);
 	if (k.nevents == 0)
 		{
@@ -580,7 +592,7 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		gc.UseFont(iListFont);
 		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 		gc.SetPenStyle(CGraphicsContext::ESolidPen);
-		gc.SetPenColor(KRgbBlack);
+		gc.SetPenColor(PmText());
 		TBuf<60> a;
 		TBuf<130> b;
 		if (!k.enabled && iCalModel.n == 0)
@@ -627,7 +639,7 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		if (nowY > list.iTl.iY && nowY < list.iBr.iY)
 			{
 			gc.SetPenStyle(CGraphicsContext::ESolidPen);
-			gc.SetPenColor(KRgbBlack);
+			gc.SetPenColor(PmText());
 			gc.DrawLine(TPoint(rowsRect.iTl.iX, nowY), TPoint(rowsRect.iBr.iX, nowY));
 			gc.DrawLine(TPoint(rowsRect.iTl.iX, nowY - 1), TPoint(rowsRect.iBr.iX, nowY - 1));
 			for (TInt t = 0; t < 4; t++)
@@ -649,13 +661,13 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 	TRect r = CalRect();
 	gc.SetPenStyle(CGraphicsContext::ENullPen);
 	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-	gc.SetBrushColor(KRgbWhite);
+	gc.SetBrushColor(PmBack());
 	gc.DrawRect(TRect(r.iTl.iX, names.iTl.iY, r.iBr.iX, r.iBr.iY));
 	// the weekdays over the columns, in bold
 	gc.UseFont(iSmallFont);
 	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmText());
 	for (TInt i = 0; i < 7; i++)
 		{
 		TPtrC name(KWeekday[i]);
@@ -670,6 +682,12 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 	TBool twoLines = 2 * smallH + 5 <= ch;
 	const CFont* nf = (!twoLines || iListFont->HeightInPixels() + smallH + 5 <= ch) && iListFont->HeightInPixels() + 4 <= ch ? iListFont : iSmallFont;
 	TBool titles = twoLines;
+	// (0.96) a cell with room for more (the netBook's 480 lines) lists the
+	// day's events, each in its calendar's colour; the 5mx's shows the first
+	TInt lineH = smallH + 1;
+	TInt more = (ch - nf->HeightInPixels() - 5) / lineH;
+	if (more > 5) more = 5;
+	long first = (long)iCalDay - k.mSel;       // the day in the grid's first cell
 	for (TInt row = 0; row < 6; row++)
 		for (TInt col = 0; col < 7; col++)
 			{
@@ -683,11 +701,11 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 				{
 				gc.SetPenStyle(CGraphicsContext::ENullPen);
 				gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
-				gc.SetBrushColor(KRgbBlack);
+				gc.SetBrushColor(PmHighlight());
 				gc.DrawRect(cell);
 				}
 			// the date: black in this month, dimmed (dark grey) around it
-			TRgb fg = inv ? KRgbWhite : in ? KRgbBlack : KPmDarkGrey;
+			TRgb fg = inv ? PmHighlightText() : in ? PmText() : KPmDarkGrey;
 			gc.SetPenStyle(CGraphicsContext::ESolidPen);
 			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 			gc.SetPenColor(fg);
@@ -702,7 +720,32 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 			if (d.count)
 				{
 				DrawMarks(gc, d.count, cell.iBr.iX - 9, cell.iTl.iY + 3, fg);
-				if (titles && k.mtitle[n])
+				if (more >= 2)
+					{
+					PmUiEvent evs[12];             // (all of the day's, so that the earliest are the ones shown)
+					TInt got = calm_day(&iCalModel, first + n, evs, 12);
+					TInt shown = d.count > more ? more - 1 : got;
+					TInt y = cell.iTl.iY + 3 + nf->HeightInPixels();
+					gc.UseFont(iSmallFont);
+					for (TInt e = 0; e < shown && e < got; e++)
+						{
+						TBuf<60> t;
+						Copy8(t, evs[e].title, evs[e].tlen);
+						if (!t.Length()) t = _L("(no name)");
+						Fit(iSmallFont, t, cell.Width() - 5);
+						gc.SetPenColor(inv ? fg : in ? PmCalColour(evs[e].shade) : fg);
+						gc.DrawText(t, TPoint(cell.iTl.iX + 3, y + e * lineH + iSmallFont->AscentInPixels()));
+						}
+					if (d.count > more)
+						{
+						TBuf<24> t;
+						t.Format(_L("+%d more"), d.count - shown);
+						gc.SetPenColor(fg);
+						gc.DrawText(t, TPoint(cell.iTl.iX + 3, y + shown * lineH + iSmallFont->AscentInPixels()));
+						}
+					gc.DiscardFont();
+					}
+				else if (titles && k.mtitle[n])
 					{
 					// the first thing on that day
 					TBuf<60> t;
@@ -715,7 +758,7 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 					}
 				}
 			if (d.today && !inv)
-				DrawTodayFrame(gc, cell, KRgbBlack);
+				DrawTodayFrame(gc, cell, PmFlagColour());   // (0.96: red on a colour screen)
 			if (sel && iSidebar)
 				{
 				TRect fr(cell);
@@ -725,7 +768,7 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 			}
 	// the grid's lines
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
+	gc.SetPenColor(PmColour() ? TRgb(153, 153, 153) : KRgbBlack);   // (0.96: a lighter grid on a colour screen);
 	for (TInt col = 0; col <= 7; col++)
 		gc.DrawLine(TPoint(grid.iTl.iX + col * cw, grid.iTl.iY), TPoint(grid.iTl.iX + col * cw, grid.iBr.iY));
 	for (TInt row = 0; row <= 6; row++)

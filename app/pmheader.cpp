@@ -762,7 +762,8 @@ void CPmView::HeaderFormatL(CRichText& aText)
 			// (0.82) the secondary parts (address, date, To and Cc) stay
 			// smaller but are black: small dark grey text is made on the
 			// 5mx's passive screen by flickering pixels, and was hard to read
-			cf.iFontPresentation.iTextColor = KRgbBlack;
+			// (0.96) a colour screen is a TFT: grey there, as first meant
+			cf.iFontPresentation.iTextColor = PmColour() ? TRgb(102, 102, 102) : KRgbBlack;
 			cm.SetAttrib(EAttColor);
 			break;
 		case EHdUnder:
@@ -821,7 +822,7 @@ void CPmView::HeaderFormatL(CRichText& aText)
 				}
 			else if (kind == EHdFill)
 				{
-				pf->iFillColor = KRgbWhite;
+				pf->iFillColor = PmBack();
 				pm.SetAttrib(EAttFillColor);
 				}
 			else if (kind == EHdRule)

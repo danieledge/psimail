@@ -72,6 +72,10 @@ const TInt KPmViewDetailedProgress = 0x80000;
 // (the standard); on, the contrast goes up and the backlight stays on while
 // a message is open in front (ssh/psidisp.h)
 const TInt KPmViewReading = 0x100000;
+// bit 21 (0.96): View > Show > Preview is off. Zero (the standard) shows the
+// selected message under the list on a tall screen (the netBook and Series
+// 7's 480 lines); the 5mx's 240 lines have no room for it (pmpreview.cpp)
+const TInt KPmViewNoPreview = 0x200000;
 
 // TPmSettings::iSpare[0] bit 2 (0.84): web pictures fetched through the
 // "psiproxy" HTTP proxy (pmwebpic.cpp, engine/webpics.c)
@@ -108,6 +112,7 @@ struct TPmSettings
 	                       // 0x3000, 0x1C000, 0x20000, 0x40000: new mail alert, timed check, sending (KPmView* above)
 	                       // 0x80000: show detailed progress (0.75)
 	                       // 0x100000: Reading mode (0.81)
+	                       // 0x200000: no preview under the list (0.96, tall screens)
 	TInt iSpare[2];        // (TPmSettings is saved whole: keep its size)
 	                       // iSpare[0]: pictures in messages - 0 shown, 1 only attached files, 2 none (pmnative.cpp);
 	                       //   bits 8-9 (0x300, 0.75): pictures from the web - 0 ask, 1 always, 2 never (pmwebpic.cpp)
@@ -348,6 +353,26 @@ private:
 	TBool CalendarPointerL(const TPointerEvent& aEvent);
 	void CalendarText(TDes& aMid) const;     // the title band's middle
 	void CalScrollL(TInt aMovement);         // the event list's scroll bar
+public:
+	// ---- 0.96: the preview under the list on a tall screen (pmpreview.cpp)
+	TBool PreviewWanted() const;             // a tall screen, and View > Show > Preview is on
+	TBool PreviewOn() const;                 // ... and a folder's messages are showing
+	void TogglePreviewL();                   // View > Show > Preview
+private:
+	void CreatePreviewL();
+	void LayoutPreview(const TRect& aArea);  // the part of the list's room it takes (LayoutNative)
+	void PreviewSyncL();                     // the selected message into it, if it isn't there already
+	void PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC& aFile);
+	void DrawPreviewHead(CWindowGc& aGc) const;
+	void PreviewPageL(TBool aDown);          // Space and Shift+Space
+	TBool PreviewPointerL(const TPointerEvent& aEvent);
+	CEikRichTextEditor* iPreview;
+	TRect iPrevRect;                         // all of it: the rule, the heading, the text (empty: none)
+	TRect iPrevHead;                         // its heading: subject, sender, date
+	TUint iPrevUid;                          // what it shows (0 nothing)
+	TBuf8<128> iPrevFolder;
+	TInt iPrevHave;                          // ... 1 the text, 0 "not downloaded"
+	TBool iPrevPen;                          // the pen went down on it
 public:
 	void SortL(TInt aMode);                  // Tools > Sort, a column heading
 	void ToggleViewL(TInt aFlag);            // View > Show toolbar / title bar / folders
@@ -967,8 +992,25 @@ private:
 // faces and headings light grey; dimmed text dark grey), and the pieces the
 // native screens share (pmnative.cpp)
 #define KPmDarkGrey  TRgb(85, 85, 85)
-#define KPmLightGrey TRgb(170, 170, 170)
-void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown);
+#define KPmLightGrey PmFace()
+// (0.96) The screen, looked at once when PsiMail starts: a colour screen
+// (the netBook's and Series 7's 256 colours) and a tall one (their 480
+// lines). On the 5mx both are false and everything is as it was. On a
+// colour screen what PsiMail draws itself takes the system's colours
+// (CEikonEnv::Color), so it follows the machine's colour scheme.
+TBool PmColour();
+TBool PmTall();
+TRgb PmBack();                  // the workspace (5mx: white)
+TRgb PmText();                  // ... and its text (5mx: black)
+TRgb PmFace();                  // a button's face, a heading (5mx: light grey)
+TRgb PmFaceText();              // ... and its text (5mx: black)
+TRgb PmHighlight();             // the highlight behind the chosen item (5mx: black)
+TRgb PmHighlightText();         // ... and its text (5mx: white)
+TRgb PmLinkColour();            // a link in a message (5mx: black, underlined as before)
+TRgb PmQuoteColour(TInt aLevel);   // quoted text, by depth (5mx: black)
+TRgb PmFlagColour();            // a flagged message's flag, today in the calendar (5mx: black)
+TRgb PmCalColour(TInt aShade);  // a calendar's own colour (5mx: black)
+void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown, TBool aScrollBar = EFalse);   // (aScrollBar: a scroll bar's thumb or button)
 void PmDrawIcon(CWindowGc& aGc, CArrayPtr<CFbsBitmap>* aIcons, TInt aId, const TPoint& aPos);
 // a scroll bar as EIKON draws its own: the shaft and thumb, the up and down
 // buttons at the bottom; aPress 1 up, 2 down
@@ -996,6 +1038,8 @@ public:
 	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
+	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7
+	TBool iTall;                                   // ... of 400 lines or more
 private:
 	static TInt EmailButtonCallback(TAny* aSelf);
 	void EmailButtonStartL();
