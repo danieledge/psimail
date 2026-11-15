@@ -2,7 +2,8 @@
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/danedge)
 
-Email and a calendar for the **Psion Series 5mx**, made to replace the
+Email and a calendar for the **Psion Series 5mx**, **netBook** and **Series 7**,
+made to replace the
 built-in Email program. PsiMail reads and sends mail through any IMAP/SMTP
 server with TLS - it is made for Fastmail - with the server's certificate
 checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
@@ -10,17 +11,18 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 0.83, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 0.95, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
 
 [![Download PsiMail.sis](https://img.shields.io/badge/Download-PsiMail.sis-2ea44f?logo=github)](https://github.com/danieledge/psiterm/raw/main/dist/PsiMail.sis)
 
-<p align="center"><img src="docs/screenshots/psimail-mailbox.png" alt="PsiMail's Inbox: the folder tree and the message list, unread messages in bold" width="640"></p>
+<p align="center"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="PsiMail's Inbox on the netBook: the folder tree and the message list, unread messages in bold" width="640"></p>
 
 ## Contents
 
+- [What's new in 0.95](#whats-new-in-095)
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -35,24 +37,39 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 0.95
+
+Since 0.93, the last signed release.
+
+- Runs on the netBook and Series 7 as well as the 5mx, on the whole 640x480 screen, with the program icon in colour. Secure connections work there: the engine no longer uses the BX instruction, which the netBook's StrongARM does not have.
+- When the server refuses the login, PsiMail asks once, in one Log in dialog with the server's reply, the user name and the password. It used to ask for the password again for every command that failed.
+- Cancel in that dialog leaves PsiMail usable. It stops checking and sending until you change the account, check mail or refresh.
+- Correcting the user name keeps the Outbox and anything waiting to be sent.
+- "Certificate not trusted" is asked once, not once per command.
+- Send log goes through the Atom modem's own proxy to PsiProxy, and only says "Log sent" if PsiProxy got it.
+- Fixed: closing PsiMail from the System screen with a dialog open could leave it running. A message being written is now kept as a draft.
+- Fixed: the mail engine kept running after PsiMail was killed, so the installer found its files in use.
+
 ## Screenshots
 
+PsiMail 0.95 on the netBook and the Series 5mx, with the same demo account and mail (made up). Taken in emulators. Tap or click one to see it full size.
+
 <table>
+<tr><th>netBook</th><th>Series 5mx</th></tr>
+<tr><td colspan="2"><b>The Inbox: folders and messages</b></td></tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-reader.png"><img src="docs/screenshots/psimail-reader.png" alt="Reading a message: the header and a picture in the text" width="400"></a><br>The reader: header and a picture</td>
-<td><a href="../docs/screenshots/psimail-newsletter.png"><img src="docs/screenshots/psimail-newsletter.png" alt="An HTML newsletter with its banner, headings and links" width="400"></a><br>An HTML newsletter</td>
+<td><a href="docs/screenshots/netbook-psimail-inbox.png"><img src="docs/screenshots/netbook-psimail-inbox.png" alt="netBook: the Inbox with the folder list and the messages" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-inbox.png"><img src="docs/screenshots/5mx-psimail-inbox.png" alt="Series 5mx: the Inbox with the folder list and the messages" width="400"></a></td>
 </tr>
+<tr><td colspan="2"><b>A message with a picture in the text</b></td></tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-invitation.png"><img src="docs/screenshots/psimail-invitation.png" alt="An invitation with Accept, Tentative and Decline" width="400"></a><br>An invitation</td>
-<td><a href="../docs/screenshots/psimail-contacts.png"><img src="docs/screenshots/psimail-contacts.png" alt="Writing a message: Add from Contacts" width="400"></a><br>Addresses from Contacts</td>
+<td><a href="docs/screenshots/netbook-psimail-reader-logo.png"><img src="docs/screenshots/netbook-psimail-reader-logo.png" alt="netBook: the start of a message, with a PNG logo" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-reader-logo.png"><img src="docs/screenshots/5mx-psimail-reader-logo.png" alt="Series 5mx: the start of a message, with a PNG logo" width="400"></a></td>
 </tr>
+<tr><td colspan="2"><b>Further down: a photo, dithered on the Psion</b></td></tr>
 <tr>
-<td><a href="../docs/screenshots/psimail-calendar-week.png"><img src="docs/screenshots/psimail-calendar-week.png" alt="The calendar's week view, with today's events" width="400"></a><br>The calendar: week</td>
-<td><a href="../docs/screenshots/psimail-calendar-month.png"><img src="docs/screenshots/psimail-calendar-month.png" alt="The calendar's month view" width="400"></a><br>The calendar: month</td>
-</tr>
-<tr>
-<td><a href="../docs/screenshots/psimail-preferences.png"><img src="docs/screenshots/psimail-preferences.png" alt="Tools > Preferences, the General page" width="400"></a><br>Preferences</td>
-<td><a href="../docs/screenshots/psimail-email-icon.png"><img src="docs/screenshots/psimail-email-icon.png" alt="PsiMail asks whether the Email icon should open it" width="400"></a><br>The Email icon question</td>
+<td><a href="docs/screenshots/netbook-psimail-reader.png"><img src="docs/screenshots/netbook-psimail-reader.png" alt="netBook: a JPEG photo in a message" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-reader.png"><img src="docs/screenshots/5mx-psimail-reader.png" alt="Series 5mx: a JPEG photo in a message" width="400"></a></td>
 </tr>
 </table>
 
