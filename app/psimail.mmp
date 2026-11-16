@@ -1,4 +1,5 @@
 // PSIMAIL.MMP - PsiMail.app (the engine, psimail.exe, is built by ../Makefile)
+// pmcal.cpp, the Agenda half of the calendar, is psion-core's (core/mail/agenda)
 TARGET        psimail.app
 TARGETTYPE    app
 UID           0x1000006c 0x01000A7C
@@ -7,7 +8,7 @@ TARGETPATH    \system\apps\psimail
 PROJECT       ptproj
 SUBPROJECT    psimail
 
-SOURCE        psimail.cpp pmcal.cpp pmcalview.cpp pmwrite.cpp pmnative.cpp pmcontacts.cpp pmhelp.cpp pmpict.cpp
+SOURCE        psimail.cpp pmcalview.cpp pmwrite.cpp pmnative.cpp pmcontacts.cpp pmhelp.cpp pmpict.cpp
 SOURCE        pmundo.cpp pmauto.cpp pmprint.cpp
 SOURCE        pmstore.cpp pminvite.cpp pmvcard.cpp pmsaveword.cpp
 SOURCE        pmrecover.cpp pmwebpic.cpp
@@ -16,11 +17,13 @@ SUBPROJECT    psimailinc\ui
 SOURCE        pmquote.cpp pmcalmodel.cpp
 SUBPROJECT    psitermssh
 SOURCE        pglinktest.cpp psigreyui.cpp
+SUBPROJECT    psicoreagenda
+SOURCE        pmcal.cpp
 SUBPROJECT    psimail
 RESOURCE      psimail.rss
 
-USERINCLUDE   \ptproj\psimail \ptproj\psimailinc\ui
-SYSTEMINCLUDE \ptproj\psimailinc \ptproj\psitermssh \epoc32\include\libc \epoc32\include
+USERINCLUDE   \ptproj\psimail \ptproj\psimailinc\ui \ptproj\psicoreagenda
+SYSTEMINCLUDE \ptproj\psimailinc \ptproj\psitermssh \ptproj\psicorecal \epoc32\include\libc \epoc32\include
 
 LIBRARY       euser.lib efsrv.lib apparc.lib cone.lib eikon.lib ws32.lib gdi.lib
 LIBRARY       fbscli.lib bafl.lib apgrfx.lib etext.lib agnmodel.lib estor.lib form.lib nifman.lib cntmodel.lib

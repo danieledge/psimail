@@ -502,13 +502,14 @@ Like PsiWeb, two programs share a chunk of memory (`psimail.h`):
 * `psimail.exe` (`engine/`, C): IMAP (`imap.c`, `imapparse.c`), SMTP
   (`smtp.c`), MIME (`mime.c`, `compose.c`), character sets (`charset.c`:
   the Psion's UI is Windows-1252), HTML to text (`html.c`), the files on the
-  card (`store.c`), certificate checks (`certcheck.c`, `pmrsa.c`,
-  `roots.h`), on `ssh/psiglue.cpp` and `ssh/tls13.c` (built with
+  card (`store.c`), certificate checks (psion-core's
+  `core/mail/engine/tlsv/`), on `ssh/psiglue.cpp` and `ssh/tls13.c` (built with
   `TLS_VERIFY`). `pmepoc.cpp` is its EPOC side, with the heartbeat that
   ends the engine only once the app has really gone.
-  The calendar is `caldav.c` (CalDAV over `http.c`, with `xmlscan.c`),
+  The calendar engine is psion-core's `core/mail/engine/cal/`, shared
+  with PsiSync: `caldav.c` (CalDAV over `http.c`, with `xmlscan.c`),
   `ics.c` (iCalendar) and `caltz.c` (time zones: servers send UTC, the
-  Agenda wants wall-clock times). Invitations and contact cards in
+  Agenda wants wall-clock times); `pmcalport.c` gives it PsiMail's settings. Invitations and contact cards in
   messages are `invite.c` (parsing, the iTIP reply) and `invmsg.c`
   (fetching the parts when a message is read). Pictures are `pictures.c`
   over `img/` (picojpeg for baseline JPEG, `pmjprog.c` for progressive),
@@ -606,7 +607,7 @@ holds the first account: `folders.txt`, a folder per mail folder with
 (and `<uid>.htm`, the HTML original; `<uid>.inv` / `.vcd`, an invitation or
 contact card summed up - see `engine/invite.h`), and `outbox\`. The
 calendar's files are in `D:\System\Data\PsiMail\cal\` (see
-`engine/caldav.c` and `app/pmcal.h`). Without a card (or with
+`core/mail/engine/cal/caldav.c` and `core/mail/agenda/pmcal.h`). Without a card (or with
 Tools > Preferences > Keep mail on set to the internal disk) it is the same
 on C:.
 

@@ -550,7 +550,7 @@ void CPmView::AnswerInviteL(TInt aChoice)
 					alarm = -1;
 				if (alarm < 0 && !allDay)
 					alarm = 15;                  // (as Create new event has it)
-				TRAP(err, CPmCalSync::AddToAgendaL(iCal->iAgendaFile, summary, where, start, end, allDay, alarm));
+				TRAP(err, CPmCalSync::AddToAgendaL(CEikonEnv::Static()->FsSession(), iCal->iAgendaFile, summary, where, start, end, allDay, alarm));
 				if (err != KErrNone)
 					{
 					AgendaTrouble(*this, err);

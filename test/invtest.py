@@ -14,13 +14,16 @@ import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.dirname(HERE)
+CORE = os.environ.get("PSION_CORE") or os.path.join(TOP, "core")
+CAL = os.path.join(CORE, "mail/engine/cal")
 out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(TOP, "build", "invtest")
 os.makedirs(out, exist_ok=True)
 exe = os.path.join(out, "invtest-asan")
 srcs = [os.path.join(HERE, "invtest.c")] + \
-    [os.path.join(TOP, "engine", f) for f in ("invite.c", "ics.c", "caltz.c", "charset.c", "mime.c", "imapparse.c")]
+    [os.path.join(TOP, "engine", f) for f in ("invite.c", "charset.c", "mime.c", "imapparse.c")] + \
+    [os.path.join(CAL, f) for f in ("ics.c", "caltz.c", "cp1252.c", "calutil.c")]
 subprocess.check_call(["gcc", "-g", "-O1", "-std=gnu99", "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
-                       "-fno-sanitize-recover=undefined", "-I", os.path.join(TOP, "core/ssh"), "-o", exe] + srcs)
+                       "-fno-sanitize-recover=undefined", "-I", os.path.join(CORE, "ssh"), "-I", CAL, "-o", exe] + srcs)
 
 def crlf(s): return s.strip("\n").replace("\n", "\r\n") + "\r\n"
 

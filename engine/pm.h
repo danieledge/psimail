@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "../psimail.h"
+/* the shared calendar engine's port (core/mail/engine/cal): pm_copy and
+   the other helpers it shares with PsiMail are declared there too */
+#include "calport.h"
 
 /* ---- platform (pmepoc.cpp on the Psion, host/pmhost.c on a PC) */
 PmShared *pm_shared(void);

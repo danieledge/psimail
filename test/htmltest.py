@@ -23,14 +23,16 @@ import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.dirname(HERE)
+CORE = os.environ.get("PSION_CORE") or os.path.join(TOP, "core")
+CAL = os.path.join(CORE, "mail/engine/cal")
 OUT = os.path.join(TOP, "build", "htmltest")
 os.makedirs(OUT, exist_ok=True)
 FIX = os.path.join(HERE, "html")
 
 def build(html_c, exe):
     cmd = ["gcc", "-g", "-O1", "-std=gnu99", "-w", "-fsanitize=address,undefined", "-fno-sanitize-recover=undefined",
-           "-I", os.path.join(TOP, "core/ssh"), "-I", os.path.join(TOP, "engine"), "-o", exe, os.path.join(HERE, "htmltest.c"), html_c,
-           os.path.join(TOP, "engine/charset.c")]
+           "-I", os.path.join(CORE, "ssh"), "-I", CAL, "-I", os.path.join(TOP, "engine"), "-o", exe, os.path.join(HERE, "htmltest.c"), html_c,
+           os.path.join(TOP, "engine/charset.c"), os.path.join(CAL, "cp1252.c"), os.path.join(CAL, "calutil.c")]
     subprocess.check_call(cmd)
 
 exe = os.path.join(OUT, "htmltest")

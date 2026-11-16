@@ -15,8 +15,12 @@ LTC     := $(CORE)/ssh/db/libtomcrypt/src
 LTM     := $(CORE)/ssh/db/libtommath
 IMG     := $(CORE)/mail/engine/img
 
-ENGINE  := pmmain imap imapparse smtp compose mime charset html store pmnet certcheck pmrsa \
-           caldav caltz ics http xmlscan pmupdate pictures undo invite invmsg webpics
+ENGINE  := pmmain imap imapparse smtp compose mime charset html store pmnet \
+           pmcalport pmupdate pictures undo invite invmsg webpics
+# the calendar engine and the certificate check, shared with PsiSync (psion-core)
+CAL     := $(CORE)/mail/engine/cal
+TLSV    := $(CORE)/mail/engine/tlsv
+CAL_SRCS := caldav caltz ics http xmlscan cp1252 calutil
 IMG_SRCS := pmimg pmjpeg pmjprog pmpng pmgif picojpeg
 Z_SRCS  := adler32 crc32 inflate inftrees inffast zutil
 LTC_SRCS := stream/chacha/chacha_crypt stream/chacha/chacha_ivctr32 stream/chacha/chacha_keystream \
@@ -28,7 +32,7 @@ ifeq ($(TARGET),host)
 CC      := cc
 ARCH    := -O1 -g
 DEFS    := -DTLS_VERIFY
-TFLAGS  := $(ARCH) -w -std=gnu99 -D_DEFAULT_SOURCE $(DEFS)
+TFLAGS  := $(ARCH) -w -std=gnu99 -D_DEFAULT_SOURCE $(DEFS) -I$(CORE)/mail/engine/cal
 LTCFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTC)/headers -DLTC_SOURCE
 LTMFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTM)
 OUT     := $(O)/psimail-host
@@ -46,10 +50,10 @@ CC      := arm-pe-gcc
 ARCH    := -s -fomit-frame-pointer -O2 -fno-strict-aliasing -nostdinc -mcpu=arm710 -mapcs-32 -mshort-load-bytes -msoft-float
 DEFS    := -D__SYMBIAN32__ -D__PSISOFT32__ -D__GCC32__ -D__EPOC32__ -D__MARM__ -D__EXE__ -DNDEBUG -DTLS_VERIFY
 LIBC    := -I$(CORE)/web/compat -I$(E)/include/libc -I$(E)/include
-TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w $(LIBC) -include $(CORE)/mail/compat/pmcompat.h
+TFLAGS  := $(ARCH) $(DEFS) -std=gnu99 -fno-builtin -w $(LIBC) -include $(CORE)/mail/compat/pmcompat.h -I$(CORE)/mail/engine/cal
 LTCFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTC)/headers -DLTC_SOURCE
 LTMFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTM)
-CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc -I$(E)/include
+CXXFLAGS := $(ARCH) $(DEFS) -Wno-ctor-dtor-privacy -fcheck-new -fvtable-thunks -w -I$(MAIL) -I$(CORE)/ssh -I$(CORE)/mail/engine/cal -I$(E)/include/libc -I$(E)/include
 OUT     := $(REL)/psimail.exe
 PLAT    := $(O)/pmepoc.o $(O)/psiglue.o $(O)/nsprintf.o
 V4BX_DIR := $(O)
@@ -57,11 +61,11 @@ include $(CORE)/tools/v4bx.mk
 SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(REL)/esock.lib $(REL)/insock.lib $(REL)/nifman.lib $(LIBGCC)
 endif
 
-ENG_OBJS := $(addprefix $(O)/,$(ENGINE:=.o)) $(addprefix $(O)/img/,$(IMG_SRCS:=.o)) $(addprefix $(O)/zlib/,$(Z_SRCS:=.o))
+ENG_OBJS := $(addprefix $(O)/,$(ENGINE:=.o)) $(addprefix $(O)/cal/,$(CAL_SRCS:=.o)) $(O)/certcheck.o $(O)/pmrsa.o $(addprefix $(O)/img/,$(IMG_SRCS:=.o)) $(addprefix $(O)/zlib/,$(Z_SRCS:=.o))
 TLS_OBJS := $(O)/tls13.o $(O)/x25519.o $(O)/pmrandom.o
 LTC_OBJS := $(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_OBJS := $(addprefix $(O)/ltm/,$(LTM_SRCS:=.o))
-HDRS    := $(MAIL)/psimail.h $(MAIL)/engine/pm.h $(MAIL)/engine/invite.h $(CORE)/ssh/psishared.h
+HDRS    := $(MAIL)/psimail.h $(MAIL)/engine/pm.h $(MAIL)/engine/invite.h $(CORE)/ssh/psishared.h $(CAL)/calport.h $(CAL)/cal.h $(CAL)/calacct.h
 
 all: $(OUT)
 
@@ -78,13 +82,16 @@ $(O)/img/%.o: $(IMG)/%.c $(IMG)/pmimg.h
 $(O)/zlib/%.o: $(CORE)/ssh/zlib/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(ARCH) $(if $(filter host,$(TARGET)),,$(DEFS) -fno-builtin $(LIBC)) -w $< -o $@
-$(O)/certcheck.o: engine/certcheck.c engine/roots.h $(HDRS)
+$(O)/cal/%.o: $(CAL)/%.c $(HDRS)
+	@mkdir -p $(dir $@)
+	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
+$(O)/certcheck.o: $(TLSV)/certcheck.c $(TLSV)/roots.h $(HDRS)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh $< -o $@
 $(O)/pmupdate.o: engine/pmupdate.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) $(if $(filter host,$(TARGET)),-DPM_TEST_KEY) -I$(CORE)/ssh $< -o $@
-$(O)/pmrsa.o: engine/pmrsa.c
+$(O)/pmrsa.o: $(TLSV)/pmrsa.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTMFLAGS) $< -o $@
 $(O)/tls13.o: $(CORE)/ssh/tls13.c tls/includes.h
@@ -137,7 +144,7 @@ ifneq ($(TARGET),host)
 EMU_OBJS := $(ENG_OBJS) $(TLS_OBJS) $(LTC_OBJS) $(O)/nsprintf.o $(O)/emu/emu_rt.o $(O)/emu/emu_hc.o $(O)/emu/emu_mail.o $(O)/libltm.a
 $(O)/emu/%.o: emu/%.c
 	@mkdir -p $(dir $@)
-	$(CC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(MAIL) -I$(CORE)/ssh -I$(E)/include/libc $< -o $@
+	$(CC) -c $(ARCH) -O2 -fno-builtin -w -D__EPOC32__ -I$(MAIL) -I$(CORE)/ssh -I$(CORE)/mail/engine/cal -I$(E)/include/libc $< -o $@
 $(O)/psimail-emu.pe: $(EMU_OBJS) $(LIBGCC)
 	arm-pe-ld -o $@ -e main -Map $(O)/psimail-emu.map $(EMU_OBJS) $(LIBGCC)
 emu: $(O)/psimail-emu.pe

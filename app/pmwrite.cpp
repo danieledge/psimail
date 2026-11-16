@@ -95,7 +95,7 @@ void CPmView::NewEventL()
 	CDesC8ArrayFlat* ids = new(ELeave) CDesC8ArrayFlat(4);
 	CleanupStack::PushL(ids);
 	TInt def = -1;
-	TRAPD(err, CPmCalSync::CalendarsL(dir, *names, *ids, def));
+	TRAPD(err, CPmCalSync::CalendarsL(CEikonEnv::Static()->FsSession(), dir, *names, *ids, def));
 	if (!iCal->iCal.enabled)
 		note = _L("Added to the Agenda");
 	else if (def >= 0 && def < names->Count())
@@ -119,7 +119,7 @@ void CPmView::NewEventL()
 		start += TTimeIntervalMinutes(MinuteOf(ev.iStart));
 		end += TTimeIntervalMinutes(MinuteOf(ev.iEnd));
 		}
-	TRAP(err, CPmCalSync::AddToAgendaL(iCal->iAgendaFile, ev.iTitle, ev.iWhere, start, end,
+	TRAP(err, CPmCalSync::AddToAgendaL(CEikonEnv::Static()->FsSession(), iCal->iAgendaFile, ev.iTitle, ev.iWhere, start, end,
 		ev.iAllDay, KAlarmMinutes[ev.iAlarm]));
 	if (err != KErrNone)
 		{

@@ -15,36 +15,9 @@
 
 /* ---------------------------------------------------------------- helpers */
 
-void pm_copy(char *dst, const char *src, int max)
-{
-	int i = 0;
-	if (max <= 0) return;
-	if (src) while (src[i] && i < max - 1) { dst[i] = src[i]; i++; }
-	dst[i] = 0;
-}
-
-static int lc(int c) { return (c >= 'A' && c <= 'Z') ? c + 32 : c; }
-
-int pm_strcasecmp(const char *a, const char *b)
-{
-	while (*a && lc((unsigned char)*a) == lc((unsigned char)*b)) { a++; b++; }
-	return lc((unsigned char)*a) - lc((unsigned char)*b);
-}
-
-int pm_strncasecmp(const char *a, const char *b, int n)
-{
-	while (n > 0 && *a && lc((unsigned char)*a) == lc((unsigned char)*b)) { a++; b++; n--; }
-	if (n == 0) return 0;
-	return lc((unsigned char)*a) - lc((unsigned char)*b);
-}
-
-const char *pm_stristr(const char *hay, const char *needle)
-{
-	int n = (int)strlen(needle);
-	if (!n) return hay;
-	for (; *hay; hay++) if (!pm_strncasecmp(hay, needle, n)) return hay;
-	return 0;
-}
+/* pm_copy, pm_strcasecmp, pm_strncasecmp, pm_stristr and pm_fclose are
+   psion-core's (core/mail/engine/cal/calutil.c), shared with the calendar
+   engine */
 
 /* while a message is downloaded ahead, everything the engine says starts
    "Ahead (3 of 10): " so it can't be taken for the message being opened */
@@ -75,15 +48,6 @@ int pm_cancelled(void)
 }
 
 /* ------------------------------------------------------------------ files */
-
-/* fclose() alone can say 0 after a write failed earlier (the failed flush
-   set the error flag; the final one had nothing left to write) */
-int pm_fclose(FILE *f)
-{
-	int bad = ferror(f) != 0;
-	if (fclose(f) != 0) bad = 1;
-	return bad ? -1 : 0;
-}
 
 /* set by pm_replace (pmepoc.cpp) when the last failure was the file being
    in use - the app reading it - rather than the card: said as such below,

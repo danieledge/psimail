@@ -45,7 +45,7 @@ calendar pane), and one file per feature:
 
 | Feature | Files |
 |---|---|
-| Calendar | `pmcal.cpp`, `pmcalview.cpp`, `pmwrite.cpp` |
+| Calendar | `pmcalview.cpp`, `pmwrite.cpp`; the Agenda half is core's `core/mail/agenda/pmcal.cpp` (shared with PsiSync) |
 | Contacts | `pmcontacts.cpp` |
 | Undo | `pmundo.cpp` |
 | Print | `pmprint.cpp` |
@@ -73,10 +73,12 @@ one gets the preview, a taller compose and Help (`docs/netbook-review.md`).
 
 **Engine** (`engine/`): `pmmain.c` (the command loop); `imap.c`,
 `imapparse.c`; `smtp.c`, `compose.c`; `mime.c`, `charset.c`, `html.c` (HTML
-becomes the reader's line format); `store.c` (the local store); `caldav.c`,
-`ics.c`, `caltz.c`, `xmlscan.c`; `pictures.c` (on `core/mail/engine/img`,
+becomes the reader's line format); `store.c` (the local store); the
+calendar engine is core's `core/mail/engine/cal/` (`caldav.c`, `http.c`,
+`ics.c`, `caltz.c`, `xmlscan.c`, `cp1252.c`, shared with PsiSync), given
+PsiMail's settings by `pmcalport.c`; `pictures.c` (on `core/mail/engine/img`,
 producing 16-grey `.pmi` files); `webpics.c`, `http.c`; `invite.c` (iTIP);
-`undo.c`; `pmupdate.c`; `certcheck.c`, `pmrsa.c`; `pmnet.c`; `pmepoc.cpp`
+`undo.c`; `pmupdate.c`; the certificate check is core's `core/mail/engine/tlsv/`; `pmnet.c`; `pmepoc.cpp`
 (the EPOC side). `tls/` configures core's TLS for PsiMail (`includes.h`,
 `options.h`, `x25519.c`). `host/pmhost.c` is the PC build of the engine, on
 `core/mail/host/pgnet_host.c`.

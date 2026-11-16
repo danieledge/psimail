@@ -34,7 +34,7 @@ echo "== PsiMail.app"
 export PATH=/usr/bin:/bin:$PSION_SDK/gcc-3.0-psion-98r2-9/bin:$EPOCROOT/epoc32/tools
 export TMP=$EPOCROOT/tmp WINEDEBUG=-all
 mkdir -p "$TMP" "$EPOCROOT/ptproj"
-for l in psimail:$HERE/app psimailinc:$HERE psitermssh:$CORE/ssh psimailbtn:$HERE/button; do
+for l in psimail:$HERE/app psimailinc:$HERE psitermssh:$CORE/ssh psimailbtn:$HERE/button psicoreagenda:$CORE/mail/agenda psicorecal:$CORE/mail/engine/cal; do
 	name=${l%%:*}; dir=${l#*:}
 	if [ -e "$EPOCROOT/ptproj/$name" ] && [ ! -L "$EPOCROOT/ptproj/$name" ]; then
 		echo "$EPOCROOT/ptproj/$name exists and is not a link - move it away"; exit 1

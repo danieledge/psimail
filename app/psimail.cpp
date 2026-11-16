@@ -4173,7 +4173,7 @@ void CPmAppUi::EditCalendarL()
 	TBool turnedOn = c.iCal.enabled && !iCalSettings.iCal.enabled;
 	TBuf<128> oldFile(iCalSettings.iAgendaFile);
 	if (c.iAgendaFile.CompareF(oldFile) != 0)
-		CPmCalSync::ForgetL(dir);            // another file: start the links again
+		CPmCalSync::ForgetL(iCoeEnv->FsSession(), dir);            // another file: start the links again
 	// (a new time zone needs nothing: the engine fetches everything again
 	// and the entries are corrected like any other server change)
 	if (turnedOn)
@@ -4216,7 +4216,7 @@ void CPmCalDialog::PreLayoutDynInitL()
 	CleanupStack::PushL(names);
 	iIds = new(ELeave) CDesC8ArrayFlat(4);
 	TInt def = 0;
-	CPmCalSync::CalendarsL(iStoreDir, *names, *iIds, def);
+	CPmCalSync::CalendarsL(CEikonEnv::Static()->FsSession(), iStoreDir, *names, *iIds, def);
 	if (names->Count() > 0)
 		{
 		CEikChoiceList* cl = (CEikChoiceList*)Control(EPmDlgCalDefault);
@@ -4289,7 +4289,7 @@ TBool CPmCalDialog::OkToExitL(TInt /*aButtonId*/)
 		{
 		TInt k = ChoiceListCurrentItem(EPmDlgCalDefault);
 		if (k >= 0 && k < iIds->Count())
-			CPmCalSync::SetDefaultCalendarL(iStoreDir, (*iIds)[k]);
+			CPmCalSync::SetDefaultCalendarL(CEikonEnv::Static()->FsSession(), iStoreDir, (*iIds)[k]);
 		}
 	return ETrue;
 	}

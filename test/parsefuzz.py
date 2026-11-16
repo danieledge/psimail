@@ -13,6 +13,8 @@ import os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = os.path.dirname(HERE)
+CORE = os.environ.get("PSION_CORE") or os.path.join(TOP, "core")
+CAL = os.path.join(CORE, "mail/engine/cal")
 rounds, seeds = 3000, 4
 args = sys.argv[1:]
 while args:
@@ -23,16 +25,17 @@ out = os.path.join(TOP, "build", "parsefuzz")
 os.makedirs(out, exist_ok=True)
 exe = os.path.join(out, "parsefuzz-asan")
 srcs = [os.path.join(HERE, "parsefuzz.c")] + \
-    [os.path.join(TOP, "engine", f) for f in ("imapparse.c", "mime.c", "html.c", "xmlscan.c", "ics.c", "caltz.c", "charset.c", "invite.c")]
+    [os.path.join(TOP, "engine", f) for f in ("imapparse.c", "mime.c", "html.c", "charset.c", "invite.c")] + \
+    [os.path.join(CAL, f) for f in ("xmlscan.c", "ics.c", "caltz.c", "cp1252.c", "calutil.c")]
 cmd = ["gcc", "-g", "-O1", "-std=gnu99", "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
-       "-fno-sanitize-recover=undefined", "-I", os.path.join(TOP, "core/ssh"), "-o", exe] + srcs
+       "-fno-sanitize-recover=undefined", "-I", os.path.join(CORE, "ssh"), "-I", CAL, "-o", exe] + srcs
 print("building", exe)
 subprocess.check_call(cmd)
 env = dict(os.environ, ASAN_OPTIONS="detect_leaks=1:abort_on_error=1", UBSAN_OPTIONS="print_stacktrace=1")
 exes = [exe]
 exe32 = os.path.join(out, "parsefuzz-ubsan32")
 cmd32 = ["gcc", "-m32", "-g", "-O1", "-std=gnu99", "-fsanitize=undefined", "-fno-sanitize-recover=undefined",
-         "-I", os.path.join(TOP, "core/ssh"), "-o", exe32] + srcs
+         "-I", os.path.join(CORE, "ssh"), "-I", CAL, "-o", exe32] + srcs
 if subprocess.run(cmd32).returncode == 0:
     exes.append(exe32)
 else:

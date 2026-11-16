@@ -172,9 +172,10 @@ birthday, a cancelled event. Then
 
 writes `/tmp/pmcal/cal/events.txt`; the same in the emulator
 (`emu/run_psimail.py cal`) must give the same file. Changes to send go in
-`cal/push.txt` (formats at the top of `engine/caldav.c`). `PM_CAL_ZONE`
+`cal/push.txt` (formats at the top of `core/mail/engine/cal/caldav.c`). `PM_CAL_ZONE`
 picks the time zone (1 = London, 2 = Paris...). The Agenda side
-(`app/pmcal.cpp`) needs a real Psion.
+(`core/mail/agenda/pmcal.cpp`) needs a Psion or the emulator. The tests
+build core's files from `core/`, or from `$PSION_CORE` if it is set.
 
 Against Fastmail: `caldav.fastmail.com`'s chain (`../tools/fastmail-caldav-chain.pem`,
 Let's Encrypt YR2 via ISRG Root YR, cross-signed by ISRG Root X1) passes
