@@ -491,7 +491,7 @@ RESOURCE DIALOG r_pm_update_progress
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; id=EPmDlgUpdText;
-			control=EDWIN { width=40; lines=7; maxlength=2000;
+			control=EDWIN { width=30; lines=7; maxlength=2000;
 				flags=EEikEdwinReadOnly|EEikEdwinNoAutoSelection; }; }
 		};
 	}
