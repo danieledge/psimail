@@ -182,7 +182,9 @@ enum TPmDialogControls
 	EPmDlgAutoSend,          // Send waiting mail when connected
 	EPmDlgWebPictures,       // Preferences: Web pictures (0.75: Ask / Always / Never)
 	EPmDlgDetailed,          // Show detailed progress (0.75)
-	EPmDlgWebProxy           // Preferences: Web pictures via proxy (0.84: No / Yes)
+	EPmDlgWebProxy,          // Preferences: Web pictures via proxy (0.84: No / Yes)
+	EPmDlgInfo7,             // (0.98) About: zlib and Dropbear
+	EPmDlgInfo8              // (0.98) About: the Symbian C library notice
 	};
 
 enum TPmButtons
