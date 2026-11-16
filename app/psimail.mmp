@@ -18,7 +18,7 @@ SOURCE        pmquote.cpp pmcalmodel.cpp
 SUBPROJECT    psitermssh
 SOURCE        pglinktest.cpp psigreyui.cpp
 SUBPROJECT    psicoreagenda
-SOURCE        pmcal.cpp
+SOURCE        pmcal.cpp pmcalc.cpp
 SUBPROJECT    psimail
 RESOURCE      psimail.rss
 

@@ -2418,6 +2418,33 @@ void CPmView::HandleResultL(const PmCmd& aCmd)
 		}
 	}
 
+// (0.99) PsiSync, when it is installed and on for this Agenda file, keeps the
+// Agenda in step with the calendar itself (its server, in the background):
+// PsiMail then fetches the calendar for its own views only, so the Agenda
+// is not written by two programs. Its settings file
+// (C:\System\Data\PsiSync\PsiSync.ini): 'PSY1', the size, then int enabled,
+// int account, a PmCalendar, char agenda[128] ...
+static TBool KeptByPsiSync(RFs& aFs, const TDesC& aAgendaFile)
+	{
+	RFile f;
+	if (f.Open(aFs, _L("C:\\System\\Data\\PsiSync\\PsiSync.ini"), EFileRead | EFileShareReadersOnly) != KErrNone)
+		return EFalse;
+	TBuf8<16 + sizeof(PmCalendar) + 128> b;
+	TInt r = f.Read(b);
+	f.Close();
+	const TInt at = 8 + 8 + sizeof(PmCalendar);
+	if (r != KErrNone || b.Length() < at + 128 || b[0] != 'P' || b[1] != 'S' || b[2] != 'Y' || b[3] != '1')
+		return EFalse;
+	if (!(b[8] | b[9] | b[10] | b[11]))
+		return EFalse;                         // sync off
+	TPtrC8 file = b.Mid(at, 128);
+	TInt n = file.Locate(0);
+	if (n < 0) return EFalse;
+	TBuf<128> name;
+	name.Copy(file.Left(n));
+	return name.CompareF(aAgendaFile) == 0;
+	}
+
 void CPmView::HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg)
 	{
 	TBool list = aCmd.arg[0] == 'l';
@@ -2430,9 +2457,24 @@ void CPmView::HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg)
 			return;
 			}
 		iStatus.Zero();
+		if (KeptByPsiSync(iEikonEnv->FsSession(), iCal->iAgendaFile))
+			{
+			// the views are up to date; the Agenda is PsiSync's
+			iCalSecond = EFalse;
+			Toast(_L("Calendar fetched - the Agenda is kept by Control panel > Sync"));
+			TRAPD(err, LoadCalendarL());
+			Render();
+			return;
+			}
 		TBuf<100> dir;
 		StoreDir(dir);
 		iCalSync->StartL(dir, *iCal);
+		return;
+		}
+	if (aRes == PM_RES_OFFLINE && !list && KeptByPsiSync(iEikonEnv->FsSession(), iCal->iAgendaFile))
+		{
+		iCalSecond = EFalse;
+		Toast(aMsg);
 		return;
 		}
 	if (aRes == PM_RES_OFFLINE && !list)
