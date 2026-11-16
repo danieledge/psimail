@@ -37,6 +37,7 @@
 // first are tried again after Yes (they go after the TRUST command), and
 // are not asked about again (UntrustedL).
 
+#include <eiklabel.h>
 #include "pmapp.h"
 
 _LIT(KNotLoggedIn, "Not logged in - change the account in Tools > Accounts > Settings");
@@ -80,8 +81,13 @@ static TBool SeqUpTo(TUint aSeq, TUint aUpto)
 void CPmLoginDialog::PreLayoutDynInitL()
 	{
 	SetTitleL(iTitle);
-	SetLabelL(EPmDlgInfo1, iWhat);
-	SetLabelL(EPmDlgInfo2, iWhy);
+	// the server's words: a fixed width, shortened with "..."
+	TBuf<160> t(iWhat.Left(iWhat.Length() < 159 ? iWhat.Length() : 159));
+	PmFitText(t, *((CEikLabel*)Control(EPmDlgInfo1))->Font(), KPmDlgTextPx);
+	SetLabelL(EPmDlgInfo1, t);
+	t = iWhy.Left(iWhy.Length() < 159 ? iWhy.Length() : 159);
+	PmFitText(t, *((CEikLabel*)Control(EPmDlgInfo2))->Font(), KPmDlgTextPx);
+	SetLabelL(EPmDlgInfo2, t);
 	SetLabelL(EPmDlgInfo3, iNeedPass ? _L("The password is kept on this Psion")
 		: _L("Leave the password blank to keep the saved one"));
 	SetEdwinTextL(EPmDlgUser, &iUser);

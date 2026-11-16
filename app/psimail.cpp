@@ -112,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.96");          // also pkg/psimail.pkg
+_LIT(KVersion, "0.97");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -2741,13 +2741,57 @@ void CPmView::ViewAsWebPageL()
 // Dialogs
 // ============================================================================
 
+// aText shortened to aWidth pixels with "..." (0x85, one character in the
+// Psion's fonts)
+void PmFitText(TDes& aText, const CFont& aFont, TInt aWidth)
+	{
+	if (aFont.TextWidthInPixels(aText) <= aWidth)
+		return;
+	const TText KEllipsis = 0x85;
+	TInt n = aFont.TextCount(aText, aWidth - aFont.CharWidthInPixels(KEllipsis));
+	if (n < 0)
+		n = 0;
+	aText.SetLength(n);
+	while (aText.Length() && aText[aText.Length() - 1] == ' ')
+		aText.SetLength(aText.Length() - 1);
+	aText.Append(KEllipsis);
+	}
+
+void PmFitArrayL(CDesCArray& aItems, const CFont& aFont, TInt aWidth)
+	{
+	for (TInt i = 0; i < aItems.Count(); i++)
+		{
+		if (aFont.TextWidthInPixels(aItems[i]) <= aWidth)
+			continue;
+		TBuf<256> t(aItems[i].Left(aItems[i].Length() < 255 ? aItems[i].Length() : 255));
+		PmFitText(t, aFont, aWidth);
+		aItems.Delete(i);
+		aItems.InsertL(i, t);
+		}
+	}
+
+// a choice list of names (maxdisplaychar KPmDlgChoiceChars in the resource,
+// so its width is fixed): the names that would not fit shortened
+void PmFitChoiceListL(CEikChoiceList& /*aList*/, CDesCArray& aItems)
+	{
+	// (its font, the normal one: CEikChoiceListBase::Font() is protected)
+	const CFont* font = CEikonEnv::Static()->NormalFont();
+	PmFitArrayL(aItems, *font, KPmDlgChoiceChars * font->MaxNormalCharWidthInPixels());
+	}
+
 void CPmInfoDialog::PreLayoutDynInitL()
 	{
-	SetTitleL(iTitle);
+	TBuf<80> title(iTitle.Left(iTitle.Length() < 79 ? iTitle.Length() : 79));
+	PmFitText(title, *iEikonEnv->TitleFont(), KPmDlgTextPx);
+	SetTitleL(title);
 	for (TInt i = 0; i < 6; i++)
 		{
 		if (i < iCount)
-			SetLabelL(EPmDlgInfo1 + i, iLines[i]);
+			{
+			TBuf<256> t(iLines[i].Left(iLines[i].Length() < 255 ? iLines[i].Length() : 255));
+			PmFitText(t, *((CEikLabel*)Control(EPmDlgInfo1 + i))->Font(), KPmDlgTextPx);
+			SetLabelL(EPmDlgInfo1 + i, t);
+			}
 		else
 			MakeLineVisible(EPmDlgInfo1 + i, EFalse);
 		}
@@ -2783,6 +2827,7 @@ void CPmChoiceDialog::PreLayoutDynInitL()
 	if (iPrompt.Length())
 		SetControlCaptionL(EPmDlgChoice, iPrompt);
 	CEikChoiceList* cl = (CEikChoiceList*)Control(EPmDlgChoice);
+	PmFitChoiceListL(*cl, *iItems);
 	cl->SetArrayL(iItems);              // it owns the array now
 	cl->SetCurrentItem(iChoice >= 0 && iChoice < iItems->Count() ? iChoice : 0);
 	iItems = NULL;
@@ -4175,6 +4220,7 @@ void CPmCalDialog::PreLayoutDynInitL()
 	if (names->Count() > 0)
 		{
 		CEikChoiceList* cl = (CEikChoiceList*)Control(EPmDlgCalDefault);
+		PmFitChoiceListL(*cl, *names);
 		CleanupStack::Pop();                 // names: the list owns it now
 		cl->SetArrayL(names);
 		cl->SetCurrentItem(def >= 0 ? def : 0);
@@ -5062,6 +5108,7 @@ void CPmFolderDialog::PreLayoutDynInitL()
 	if (iParents)
 		{
 		CEikChoiceList* cl = (CEikChoiceList*)Control(EPmDlgFolderParent);
+		PmFitChoiceListL(*cl, *iParents);
 		cl->SetArrayL(iParents);            // it owns the array now
 		cl->SetCurrentItem(iParent >= 0 && iParent < iParents->Count() ? iParent : 0);
 		iParents = NULL;
@@ -5176,7 +5223,8 @@ void CPmAboutDialog::PreLayoutDynInitL()
 	title.Append(KVersion);
 	SetLabelL(EPmDlgInfo1, title);
 	((CEikLabel*)Control(EPmDlgInfo1))->SetFont(iEikonEnv->TitleFont());   // as PsiTerm's and PsiWeb's
-	TBuf<80> who(_L("Email & calendar for the Psion 5mx, netBook & Series 7 - "));
+	// (two lines: one would be wider than Psion's own dialogs)
+	TBuf<80> who(_L("Email & calendar for the Psion 5mx, netBook & Series 7\n"));
 	who.Append(TChar(0xa9));                  // (c), as the Psion's fonts have it
 	who.Append(_L(" 2026 Dan Edge"));
 	SetLabelL(EPmDlgInfo2, who);

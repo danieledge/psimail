@@ -32,6 +32,7 @@ class CEikColumnListBox;
 class CEikRichTextEditor;
 class CEikScrollBar;
 class CEikLabel;
+class CEikChoiceList;
 class CPmFolderListBox;
 class CPmMsgListBox;
 class CPmContacts;
@@ -705,6 +706,15 @@ const TInt VCF_FAX = 8;
 const TInt VCF_PAGER = 16;
 const TInt VCF_LINES = 8;
 void PmWhenText(TDes& aOut, const TTime& aStart, const TTime& aEnd, TBool aAllDay);   // "Wed 7 Oct 2026, 10:00-11:30" (pminvite.cpp)
+
+// Dialogs keep a fixed size, as Psion's own do (about 370 to 560 pixels of
+// the 640): text that is not ours (names, addresses, a server's words) is
+// shortened to a fixed width with "..." (psimail.cpp)
+const TInt KPmDlgTextPx = 400;           // an information line
+const TInt KPmDlgChoiceChars = 18;       // a choice list of names (its maxdisplaychar)
+void PmFitText(TDes& aText, const CFont& aFont, TInt aWidth);
+void PmFitArrayL(CDesCArray& aItems, const CFont& aFont, TInt aWidth);
+void PmFitChoiceListL(CEikChoiceList& aList, CDesCArray& aItems);
 
 class CPmInfoDialog : public CEikDialog
 	{

@@ -460,7 +460,7 @@ RESOURCE DIALOG r_pm_text_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Search for"; id=EPmDlgWords;
-			control=EDWIN { width=24; maxlength=60; }; }
+			control=EDWIN { width=20; maxlength=60; }; }
 		};
 	}
 
@@ -567,7 +567,7 @@ RESOURCE DIALOG r_pm_choice_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Choose"; id=EPmDlgChoice;
-			control=CHOICELIST { array_id=r_pm_empty_array; }; }
+			control=CHOICELIST { maxdisplaychar=18; array_id=r_pm_empty_array; }; }
 		};
 	}
 
@@ -596,9 +596,9 @@ RESOURCE DIALOG r_pm_folder_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Name"; id=EPmDlgFolderName;
-			control=EDWIN { width=24; maxlength=60; }; },
+			control=EDWIN { width=20; maxlength=60; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="In"; id=EPmDlgFolderParent;
-			control=CHOICELIST { array_id=r_pm_empty_array; }; }
+			control=CHOICELIST { maxdisplaychar=18; array_id=r_pm_empty_array; }; }
 		};
 	}
 
@@ -611,7 +611,7 @@ RESOURCE DIALOG r_pm_rename_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Name"; id=EPmDlgFolderName;
-			control=EDWIN { width=24; maxlength=60; }; }
+			control=EDWIN { width=20; maxlength=60; }; }
 		};
 	}
 
@@ -1081,7 +1081,7 @@ RESOURCE ARRAY r_pm_cal_server_lines
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1;
 			control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Leave it blank to use the mail account's password"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="New entries go to"; id=EPmDlgCalDefault;
-			control=CHOICELIST { array_id=r_pm_cal_none_array; }; }
+			control=CHOICELIST { maxdisplaychar=18; array_id=r_pm_cal_none_array; }; }
 		};
 	}
 
