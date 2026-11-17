@@ -1031,7 +1031,8 @@ RESOURCE DIALOG r_pm_about_dialog
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="LibTomCrypt, LibTomMath, TweetNaCl, picojpeg, stb_image - public domain"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo7; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="zlib (c) Gailly and Adler; random numbers from Dropbear (c) Matt Johnston - MIT"; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="github.com/danieledge/psimail - MIT licence"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; }
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; },
+		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Support: buymeacoffee.com/danedge"; }; }
 		};
 	}
 
