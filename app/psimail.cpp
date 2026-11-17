@@ -3943,7 +3943,18 @@ static void UrlDecode(TDes& aOut, const TDesC& aIn, TBool aPlusIsSpace)
 const TInt KPmMailtoMax = 4096;
 
 // mailto:someone@example.com?subject=Hello&cc=...&body=...
-void CPmAppUi::MailtoL(const TDesC& aUrl)
+// a decoded address or subject is one line: a %0A in the link would write
+// header lines of its own into the Outbox file ("Attach: ..." among them)
+static void OneLine(TDes& aText)
+	{
+	for (TInt i = 0; i < aText.Length(); i++)
+		if (aText[i] < ' ')
+			aText[i] = ' ';
+	}
+
+// aFiles: its attach= files are taken (not from a link in a message, which
+// could name any file on the Psion to be sent back to its writer)
+void CPmAppUi::MailtoL(const TDesC& aUrl, TBool aFiles)
 	{
 	TPtrC u = aUrl;
 	if (Clip(u, 7).CompareF(_L("mailto:")) == 0)
@@ -3954,7 +3965,7 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 	TPtrC to = q >= 0 ? u.Left(q) : u;
 	TPtrC rest = q >= 0 ? u.Mid(q + 1) : TPtrC();
 	UrlDecode(d->iTo, to, EFalse);
-	HBufC* body = HBufC::NewL(4096);
+	HBufC* body = HBufC::NewLC(4096);
 	TPtr bp = body->Des();
 	while (rest.Length())
 		{
@@ -3971,7 +3982,8 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 		else if (key.CompareF(_L("bcc")) == 0) UrlDecode(d->iBcc, val, EFalse);
 		else if (key.CompareF(_L("to")) == 0)
 			{
-			if (d->iTo.Length()) d->iTo.Append(_L(", "));
+			// (only with room for it: a full To line used to panic here)
+			if (d->iTo.Length() && d->iTo.Length() + 2 <= d->iTo.MaxLength()) d->iTo.Append(_L(", "));
 			UrlDecode(d->iTo, val, EFalse);
 			}
 		else if (key.CompareF(_L("body")) == 0) UrlDecode(bp, val, ETrue);
@@ -3979,7 +3991,7 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 		// icon sends "mailto:?attach=C%3A%5CDocuments%5CReport.docx&attach=..."
 		// (not part of RFC 6068: other programs' links never carry it, and a
 		// name that is not a file is left out)
-		else if (key.CompareF(_L("attach")) == 0)
+		else if (key.CompareF(_L("attach")) == 0 && aFiles)
 			{
 			TFileName f;
 			UrlDecode(f, val, EFalse);
@@ -3988,7 +4000,11 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 				d->iAttach->AppendL(f);
 			}
 		}
-	if (bp.Length() == 0 || bp[bp.Length() - 1] != '\n')
+	OneLine(d->iTo);
+	OneLine(d->iCc);
+	OneLine(d->iBcc);
+	OneLine(d->iSubject);
+	if (bp.Length() < bp.MaxLength() && (bp.Length() == 0 || bp[bp.Length() - 1] != '\n'))
 		bp.Append('\n');
 	// (0.99) files sent with no subject: the first one's name
 	if (!d->iSubject.Length() && d->iAttach->Count())
@@ -3999,7 +4015,7 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 	AddSignature(*d, bp);
 	delete d->iBody;
 	d->iBody = body;
-	CleanupStack::Pop();                      // d
+	CleanupStack::Pop(2);                     // body, d
 	ComposeL(d, _L("New message"));
 	}
 

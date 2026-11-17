@@ -1155,7 +1155,7 @@ void CPmView::UpdateReaderL()
 					TInt m = body.Locate(0x02);
 					TPtrC marker = m > 1 ? body.Mid(1, m - 1) : TPtrC(_L("\x95"));
 					body.Set(m >= 0 ? body.Mid(m + 1) : body.Mid(body.Length() ? 1 : 0));
-					t.Append(marker);
+					t.Append(Clip(marker, 16));
 					t.Append(' ');
 					break;
 					}
@@ -1265,7 +1265,10 @@ void CPmView::UpdateReaderL()
 					link = -1;
 					break;
 				default:
-					if (c >= 0x20 || c == '\t')
+					// (never past the end: the buffer is the text and 4096
+					// more, and a message of many rules - 24 characters for
+					// 3 - then one long line used to overrun it: USER 11)
+					if ((c >= 0x20 || c == '\t') && t.Length() < t.MaxLength() - 8)
 						t.Append(c);
 					break;
 					}
@@ -1907,7 +1910,7 @@ void CPmView::NativeActivateLinkL()
 		return;
 	if (Clip(url, 7).CompareF(_L("mailto:")) == 0)
 		{
-		((CPmAppUi*)iEikonEnv->EikAppUi())->MailtoL(url);   // write to them
+		((CPmAppUi*)iEikonEnv->EikAppUi())->MailtoL(url, EFalse);   // write to them (never with files a message names)
 		return;
 		}
 	OpenWebL(url);

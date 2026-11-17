@@ -1042,7 +1042,7 @@ public:
 	void SetTool4L(TBool aClose);
 	CCoeControl* ToolBarButton(TInt aId);          // (NULL when the toolbar is hidden)
 	CPmContacts* Contacts();                       // the Psion's Contacts (pmcontacts.cpp), made when first asked for
-	void MailtoL(const TDesC& aUrl);               // a mailto: link: compose, filled in
+	void MailtoL(const TDesC& aUrl, TBool aFiles = ETrue);   // a mailto: link: compose, filled in (aFiles: with its attach= files)
 	void MailtoOrSayL(const TDesC& aUrl);           // (0.99) MailtoL, or why not (no account)
 	void ForwardReadyL(TUint aUid, CDesCArray& aFiles);   // the attachments are here: compose the forward
 	CPmMbm* Mbm() { return iMbm; }                 // PsiMail.mbm (NULL if it couldn't be read)
