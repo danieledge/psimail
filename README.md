@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.00](#whats-new-in-100) (and [0.96](#whats-new-in-096))
+- [What's new in 1.01](#whats-new-in-101) (and [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,28 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.00
+## What's new in 1.01
+
+The netBook and Series 7's 480 lines put to use. The Series 5mx looks and
+works as in 0.99 (its screens compared pixel for pixel again).
+
+- The preview shows the message's pictures that are on the Psion already
+  (inline ones in their places, attached ones after the text). It still
+  fetches nothing: open the message for the rest.
+- Under the preview, Reply, Reply to all, Forward, Archive and Flag act on
+  the message shown. They are the same commands as in the menus, with the
+  same shortcuts.
+- "Today" under the folders: what is left of today in the calendar, three
+  events at most, each with its calendar's colour. A tap goes to the
+  calendar.
+- The calendar's week is a time grid: the hours down the side, a column a
+  day, each event a block in its calendar's colour (side by side where they
+  overlap), all-day events in a bar at the top, today's column tinted and a
+  red line at the time now. One tap chooses an event, a second opens it.
+  View > Switch view (Ctrl+Q goes round) has Week, Month and Day list; the
+  day list is the week as the 5mx shows it.
+
+### 1.00
 
 The colour pass, for the netBook and Series 7's colour screens. The Series
 5mx looks and works exactly as in 0.99: its 78 screens in the emulator are
@@ -61,10 +82,12 @@ compared pixel for pixel with 0.99's (`test/emu/golden.py`).
   offline or not connected, amber connecting, green online, red when the
   account has no security), the route (Modem or Psion TCP/IP), who does the
   TLS (here, or the Atom modem), whether web pictures come direct or by a
-  helper, and when the mail was last checked. A tap opens Status information.
+  helper, and when the mail was last checked ("Last 09:41"). A tap opens
+  Status information.
 - Server certificates: ECDSA ones on P-256 and P-384 are checked too (Gmail's
   IMAP has one), and five more roots (psion-core 33c3eeb).
 
+### 0.96
 
 On the netBook and Series 7:
 

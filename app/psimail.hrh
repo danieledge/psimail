@@ -99,7 +99,8 @@ enum TPmCommands
 	EPmCmdWebPictures,       // Message > Web > Show web pictures (pmwebpic.cpp)
 	EPmCmdKeepLog,           // Tools > Troubleshooting > Keep a log (0.93)
 	EPmCmdShowMenu,          // View > Show (a cascade, 0.96)
-	EPmCmdTogglePreview      // View > Show > Preview (0.96: tall screens)
+	EPmCmdTogglePreview,     // View > Show > Preview (0.96: tall screens)
+	EPmCmdDayListView        // (1.00) the calendar's View > Switch view > Day list (tall screens: added in DynInitMenuPaneL)
 	};
 
 enum TPmDialogControls

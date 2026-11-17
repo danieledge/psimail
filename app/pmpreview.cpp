@@ -17,6 +17,7 @@
 
 #include "pmapp.h"
 #include "pmicons.h"
+#include "pmpict.h"
 #include <eikrted.h>
 #include <eiktxtut.h>
 #include <txtrich.h>
@@ -42,8 +43,10 @@ void CPmView::CreatePreviewL()
 	{
 	iPrevUid = 0;
 	iPrevPen = EFalse;
+	iPrevStripDown = -1;
 	if (!PmTall())
 		return;                                // (the 5mx: none, and nothing of it is made)
+	iPrevPictures = CPmPictures::NewL();     // (1.00) its pictures, apart from the reader's
 	iPreview = new(ELeave) CEikRichTextEditor(TEikBorder(TEikBorder::ENone));
 	iPreview->SetContainerWindowL(*this);
 	iPreview->ConstructL(this, 0, 0, CEikEdwin::EReadOnly | CEikEdwin::ENoAutoSelection);
@@ -79,11 +82,67 @@ void CPmView::LayoutPreview(const TRect& aArea)
 	iPrevRect = aArea;
 	TInt hh = iBoldFont->HeightInPixels() + iListFont->HeightInPixels() + 9;
 	iPrevHead = TRect(aArea.iTl.iX, aArea.iTl.iY + 2, aArea.iBr.iX, aArea.iTl.iY + 2 + hh);
-	TRect text(aArea.iTl.iX + 5, iPrevHead.iBr.iY + 3, aArea.iBr.iX - 4, aArea.iBr.iY);
+	// (1.00) the actions under it: Reply, Reply to all, Forward, Archive, Flag
+	TInt sh = iSmallFont->HeightInPixels() + 10;
+	if (sh < 22) sh = 22;
+	iPrevStrip = TRect(aArea.iTl.iX, aArea.iBr.iY - sh, aArea.iBr.iX, aArea.iBr.iY);
+	TRect text(aArea.iTl.iX + 5, iPrevHead.iBr.iY + 3, aArea.iBr.iX - 4, iPrevStrip.iTl.iY - 1);
 	if (text.Height() < 20)
 		text.iBr.iY = text.iTl.iY + 20;
 	TRAPD(err, iPreview->SetRectL(text));
 	(void)err;
+	}
+
+// (1.00) the actions under the preview: in-view controls, as the
+// calendar's Week and Month buttons are, each also a menu command with a
+// shortcut. A tap acts on the message shown
+static const TInt KStripCmds[5] = { EPmCmdReply, EPmCmdReplyAll, EPmCmdForward, EPmCmdArchive, EPmCmdFlag };
+static const TText* const KStripText[5] = { _S("Reply"), _S("Reply to all"), _S("Forward"), _S("Archive"), _S("Flag") };
+
+TInt CPmView::PreviewStripButton(TInt aIndex, TRect& aRect) const
+	{
+	if (iPrevStrip.IsEmpty() || aIndex < 0 || aIndex >= 5)
+		return EFalse;
+	TInt x = iPrevStrip.iTl.iX + 5;
+	for (TInt i = 0; i <= aIndex; i++)
+		{
+		TPtrC t(KStripText[i]);
+		TInt w = iSmallFont->TextWidthInPixels(t) + 16;
+		if (i == aIndex)
+			{
+			aRect = TRect(x, iPrevStrip.iTl.iY + 3, x + w, iPrevStrip.iBr.iY - 3);
+			return aRect.iBr.iX <= iPrevStrip.iBr.iX - 2;
+			}
+		x += w + 6;
+		}
+	return EFalse;
+	}
+
+void CPmView::DrawPreviewStrip(CWindowGc& gc) const
+	{
+	if (iPrevStrip.IsEmpty())
+		return;
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(PmColour() ? PmBandColour() : PmFace());
+	gc.DrawRect(iPrevStrip);
+	gc.SetPenStyle(CGraphicsContext::ESolidPen);
+	gc.SetPenColor(PmColour() ? TRgb(153, 153, 153) : PmText());
+	gc.DrawLine(iPrevStrip.iTl, TPoint(iPrevStrip.iBr.iX, iPrevStrip.iTl.iY));
+	TBool any = iRows->Count() && iSel >= 0 && iSel < iRows->Count();
+	gc.UseFont(iSmallFont);
+	for (TInt i = 0; i < 5; i++)
+		{
+		TRect b;
+		if (!PreviewStripButton(i, b))
+			break;
+		PmDrawButtonFace(gc, b, iPrevStripDown == i);
+		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+		gc.SetPenColor(any ? PmFaceText() : KPmDarkGrey);
+		TPtrC t(KStripText[i]);
+		gc.DrawText(t, TPoint(b.iTl.iX + 8, b.iTl.iY + (b.Height() - iSmallFont->HeightInPixels()) / 2 + iSmallFont->AscentInPixels()));
+		}
+	gc.DiscardFont();
 	}
 
 void CPmView::DrawPreviewHead(CWindowGc& gc) const
@@ -179,6 +238,7 @@ void CPmView::DrawPreviewHead(CWindowGc& gc) const
 		gc.DrawLine(TPoint(iPrevRect.iTl.iX, iPrevHead.iBr.iY + 1), TPoint(iPrevRect.iBr.iX, iPrevHead.iBr.iY + 1));
 	else
 		gc.DrawLine(TPoint(x, iPrevHead.iBr.iY), TPoint(right, iPrevHead.iBr.iY));
+	DrawPreviewStrip(gc);
 	}
 
 static void PvSpanL(CArrayFixFlat<TInt>& aSpans, TInt aPos, TInt aLen, TInt aKind, TInt aArg = 0)
@@ -249,10 +309,26 @@ void CPmView::PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC
 				}
 			else if (kind == 'i')
 				{
-				// a picture: its words (the reader shows the picture)
+				// a picture: shown when the engine has decoded it already
+				// (1.00; the preview asks for nothing), else its words
 				TInt sep = body.Locate(0x02);
 				TPtrC alt = sep >= 0 ? body.Left(sep) : body;
 				while (alt.Length() && alt[0] == ' ') alt.Set(alt.Mid(1));
+				TPtrC src = sep >= 0 ? body.Mid(sep + 1) : TPtrC();
+				TInt sep2 = src.Locate(0x02);
+				if (sep2 >= 0) src.Set(src.Left(sep2));
+				TInt e = -1;
+				if (iPrevPictures && PicturesPref() == 0 && src.Length() > 4 && src.Left(4).CompareF(_L("cid:")) == 0)
+					e = iPrevPictures->FindCid(src.Mid(4));
+				if (e >= 0 && iPrevPictures->At(e).iState == TPmPicEntry::EReady && iPrevPictures->At(e).iBitmap &&
+					aText.Length() < aText.MaxLength() - 4)
+					{
+					iPrevPictures->AddPlaceL(e, aText.Length());
+					aText.Append(' ');
+					aText.Append(KPara);
+					lastEmpty = EFalse;
+					continue;
+					}
 				aText.Append(_L("[Picture"));
 				if (alt.Length()) aText.Append(_L(": "));
 				body.Set(alt);
@@ -420,6 +496,19 @@ void CPmView::PreviewSyncL()
 	iPrevHave = have;
 	PreviewAttachmentsL(row.iUid);
 
+	// (1.00) the last message's pictures go with its text, before their bitmaps
+	iPreview->RichText()->Reset();
+	iPrevPictures->ClearPlaces();
+	{
+	TFileName dir;
+	FolderDir(iFolder, dir);
+	iPrevPictures->LoadIndexL(iCoeEnv->FsSession(), dir, row.iUid);
+	for (TInt k = 0; k < iPrevPictures->Count(); k++)
+		{
+		TRAPD(le, iPrevPictures->LoadReadyL(iCoeEnv->FsSession(), k));
+		(void)le;
+		}
+	}
 	HBufC* file = NULL;
 	if (have)
 		ReadFileL(path, file, KPreviewFile);
@@ -444,6 +533,20 @@ void CPmView::PreviewSyncL()
 		t.Append(iSettings->iOffline ? _L("Not downloaded - you are working offline")
 			: _L("Not downloaded yet - press Enter to get it"));
 		PvSpanL(*spans, 0, t.Length(), EPvItalic);
+		t.Append(TChar(CEditableText::EParagraphDelimiter));
+		}
+	// (1.01) attached pictures the engine has decoded already go after the
+	// text, as the reader puts them
+	for (TInt pe = 0; file && pe < iPrevPictures->Count() && t.Length() < t.MaxLength() - 4; pe++)
+		{
+		TPmPicEntry& en = iPrevPictures->At(pe);
+		TBool placed = EFalse;
+		for (TInt pl = 0; pl < iPrevPictures->PlaceCount(); pl++)
+			if (iPrevPictures->Place(pl).iEntry == pe) placed = ETrue;
+		if (placed || en.iWeb || en.iState != TPmPicEntry::EReady || !en.iBitmap || PicturesPref() == 2)
+			continue;
+		iPrevPictures->AddPlaceL(pe, t.Length());
+		t.Append(' ');
 		t.Append(TChar(CEditableText::EParagraphDelimiter));
 		}
 
@@ -511,6 +614,27 @@ void CPmView::PreviewSyncL()
 		rt->ApplyCharFormatL(cf, cm, pos, len);
 		}
 	CleanupStack::PopAndDestroy(3);            // spans, buf, file
+	// (1.00) the pictures in their places: as wide as the preview, and no
+	// more than two thirds of its height, so the text round them shows
+	TSize room(iPreview->Rect().Width() - 8, iPreview->Rect().Height() * 2 / 3);
+	if (room.iWidth > PM_PIC_MAX_W) room.iWidth = PM_PIC_MAX_W;
+	for (TInt pl = 0; pl < iPrevPictures->PlaceCount(); pl++)
+		{
+		TPmPicPlace& place = iPrevPictures->Place(pl);
+		if (place.iDocPos < 0 || place.iDocPos >= rt->DocumentLength())
+			continue;
+		CPmPicture* pic = new(ELeave) CPmPicture(*iPrevPictures, iSmallFont);
+		CleanupStack::PushL(pic);
+		PmPictureLook(*pic, iPrevPictures->At(place.iEntry), iSmallFont, room, iSettings->iOffline, iCoeEnv->ScreenDevice());
+		TPictureHeader h;
+		h.iPicture = pic;
+		h.iPictureType = KUidPmPicture;
+		pic->GetOriginalSizeInTwips(h.iSize);
+		rt->DeleteL(place.iDocPos, 1);
+		rt->InsertL(place.iDocPos, h);         // (the text owns it now)
+		CleanupStack::Pop();                   // pic
+		place.iPicture = pic;
+		}
 	iPreview->HandleTextChangedL();
 	iPreview->SetCursorPosL(0, EFalse);
 	if (iPreview->TextView())
@@ -522,6 +646,15 @@ void CPmView::PreviewSyncL()
 		DeactivateGc();
 		iPreview->DrawNow();
 		}
+	}
+
+void CPmView::DrawPreviewStripNow()
+	{
+	if (!IsReadyToDraw() || iPrevStrip.IsEmpty())
+		return;
+	ActivateGc();
+	DrawPreviewStrip(SystemGc());
+	DeactivateGc();
 	}
 
 void CPmView::PreviewPageL(TBool aDown)
@@ -541,6 +674,40 @@ TBool CPmView::PreviewPointerL(const TPointerEvent& aEvent)
 		return EFalse;
 		}
 	TBool inside = iPrevRect.Contains(aEvent.iPosition);
+	// (1.00) the action strip: the button pressed, then its command when
+	// the pen lifts on it
+	if (aEvent.iType == TPointerEvent::EButton1Down && iPrevStrip.Contains(aEvent.iPosition))
+		{
+		iPrevStripDown = -1;
+		for (TInt i = 0; i < 5; i++)
+			{
+			TRect b;
+			if (PreviewStripButton(i, b) && b.Contains(aEvent.iPosition))
+				iPrevStripDown = i;
+			}
+		iPrevPen = EFalse;
+		DrawPreviewStripNow();
+		return ETrue;
+		}
+	if (iPrevStripDown >= 0)
+		{
+		if (aEvent.iType != TPointerEvent::EButton1Up)
+			return ETrue;
+		TInt was = iPrevStripDown;
+		iPrevStripDown = -1;
+		DrawPreviewStripNow();
+		TRect b;
+		if (PreviewStripButton(was, b) && b.Contains(aEvent.iPosition))
+			{
+			if (!iRows->Count())
+				iEikonEnv->InfoMsg(_L("No message selected"));
+			else
+				((CPmAppUi*)iEikonEnv->EikAppUi())->CommandL(KStripCmds[was]);
+			}
+		return ETrue;
+		}
+	if (iPrevStrip.Contains(aEvent.iPosition))
+		return ETrue;
 	if (aEvent.iType == TPointerEvent::EButton1Down)
 		{
 		iPrevPen = inside;

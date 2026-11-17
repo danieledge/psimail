@@ -614,6 +614,8 @@ void CPmView::DestroyNative()
 	iReader = NULL;
 	delete iPreview;
 	iPreview = NULL;
+	delete iPrevPictures;                        // (after the preview: its pictures point in)
+	iPrevPictures = NULL;
 	delete iPictures;
 	iPictures = NULL;
 	CWsScreenDevice* dev = iCoeEnv->ScreenDevice();
@@ -746,11 +748,20 @@ void CPmView::LayoutNative()
 	// folders, with their colours (CalLegend*), when there is room
 	TInt foldersH = r.iBr.iY - listTop;
 	iLegendRect = TRect();
-	if (folders && PmTall() && iMode == ECalendar && iCalModel.ncal > 0)
+	// ... and in the mail, the rest of today's events ("Today", CalToday*)
+	if (folders && PmTall() && iMode == EList && iCal && iCal->iCal.enabled && !iCalLoaded)
+		{
+		TRAPD(ce, LoadCalendarL());
+		(void)ce;
+		}
+	TInt panelRows = iMode == ECalendar ? iCalModel.ncal : (iMode == EList && iCal && iCal->iCal.enabled && iCalLoaded) ? 3 : 0;
+	TInt folderRows = iFolderList->Model()->NumberOfItems();
+	iLegendFor = folderRows;
+	if (folders && PmTall() && panelRows > 0 && folderRows > 0)
 		{
 		TInt ih = iFolderList->ItemHeight();
-		TInt need = iFolderList->Model()->NumberOfItems() * ih + 4;
-		TInt legend = (iCalModel.ncal + 1) * ih + 10;
+		TInt need = folderRows * ih + 4;
+		TInt legend = (panelRows + 1) * ih + 10;
 		if (listTop + need + legend <= r.iBr.iY)
 			{
 			foldersH = need;
@@ -763,6 +774,7 @@ void CPmView::LayoutNative()
 	// little under half the height
 	TRect listRect(TPoint(msgX, listTop), r.iBr);
 	iPrevRect = TRect();
+	iPrevStrip = TRect();
 	if (PreviewOn())
 		{
 		TInt rh = RowHeight();
@@ -968,6 +980,12 @@ void CPmView::UpdateFolderListL()
 		for (TInt k = 0; k < fresh->Count(); k++)
 			items->AppendL((*fresh)[k]);
 		iFolderList->HandleItemAdditionL();
+		// (1.01) the panel under the folders follows their number
+		if (PmTall() && iLegendFor != items->Count())
+			{
+			LayoutNative();
+			DrawNow();
+			}
 		ListScrollBar(iFolderList, iNativeShown && iFolderList->IsVisible());
 		}
 	CleanupStack::PopAndDestroy();          // fresh
@@ -1608,7 +1626,7 @@ void CPmView::UpdateReaderL()
 // what a picture shows: its bitmap, shrunk to fit the room across and down
 // the reader (a line taller than the reader cannot be scrolled into view),
 // or a frame with a word on the way there
-static void PictureLook(CPmPicture& aPic, const TPmPicEntry& aEntry, const CFont* aFont, const TSize& aRoom,
+void PmPictureLook(CPmPicture& aPic, const TPmPicEntry& aEntry, const CFont* aFont, const TSize& aRoom,
 	TBool aOffline, MGraphicsDeviceMap* aMap)
 	{
 	if (aEntry.iState == TPmPicEntry::EReady && aEntry.iBitmap)
@@ -1690,7 +1708,7 @@ void CPmView::PlacePictureL(TInt aPlace)
 		return;
 	CPmPicture* pic = new(ELeave) CPmPicture(*iPictures, iSmallFont);
 	CleanupStack::PushL(pic);
-	PictureLook(*pic, e, iSmallFont, PictureRoom(iReader), iSettings->iOffline, iZoomFactor);
+	PmPictureLook(*pic, e, iSmallFont, PictureRoom(iReader), iSettings->iOffline, iZoomFactor);
 	TPictureHeader h;
 	h.iPicture = pic;
 	h.iPictureType = KUidPmPicture;
@@ -2351,6 +2369,8 @@ void CPmView::DrawNative(const TRect& /*aRect*/) const
 		DrawCalendar(gc);
 		DrawCalLegend(gc);
 		}
+	else if (iMode == EList)
+		DrawCalToday(gc);
 	if (PreviewOn())
 		DrawPreviewHead(gc);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
@@ -2865,7 +2885,7 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 // colour; a tap shows or hides that calendar's events (cal\hidden.txt)
 TInt CPmView::CalLegendRow(TInt aRow, TRect& aRect) const
 	{
-	if (iLegendRect.IsEmpty() || aRow < 0 || aRow >= iCalModel.ncal)
+	if (iLegendRect.IsEmpty() || aRow < 0 || aRow >= (iMode == ECalendar ? iCalModel.ncal : 3))
 		return EFalse;
 	TInt ih = iFolderList ? iFolderList->ItemHeight() : 20;
 	TInt y = iLegendRect.iTl.iY + 6 + (aRow + 1) * ih;
@@ -2919,8 +2939,81 @@ void CPmView::DrawCalLegend(CWindowGc& gc) const
 	gc.DiscardFont();
 	}
 
+// (1.00) under the folders in the mail (tall screens, the calendar on):
+// what is left of today, three events at most; a tap goes to the calendar
+void CPmView::DrawCalToday(CWindowGc& gc) const
+	{
+	if (iLegendRect.IsEmpty() || iMode != EList)
+		return;
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(PmBack());
+	gc.DrawRect(iLegendRect);
+	TInt ih = iFolderList ? iFolderList->ItemHeight() : 20;
+	TInt x = iLegendRect.iTl.iX + 6;
+	gc.SetPenStyle(CGraphicsContext::ESolidPen);
+	gc.SetPenColor(PmColour() ? TRgb(153, 153, 153) : PmText());
+	gc.DrawLine(TPoint(x, iLegendRect.iTl.iY + 2), TPoint(iLegendRect.iBr.iX - 6, iLegendRect.iTl.iY + 2));
+	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+	gc.UseFont(iBoldFont);
+	gc.SetPenColor(PmText());
+	TInt hy = iLegendRect.iTl.iY + 6;
+	gc.DrawText(_L("Today"), TPoint(x, hy + (ih - iBoldFont->HeightInPixels()) / 2 + iBoldFont->AscentInPixels()));
+	gc.DiscardFont();
+	CPmView* self = (CPmView*)this;
+	self->CalendarToday();
+	PmUiEvent evs[12];
+	TInt got = calm_day(&iCalModel, iCalToday, evs, 12);
+	TInt shown = 0;
+	gc.UseFont(iSmallFont);
+	for (TInt e = 0; e < got && shown < 3; e++)
+		{
+		if (!evs[e].allday && evs[e].end <= iCalNow && evs[e].start < 1440)
+			continue;                              // (over already)
+		TRect row;
+		if (!CalLegendRow(shown, row))
+			break;
+		shown++;
+		TBuf<80> t;
+		if (evs[e].allday || evs[e].start < 0)
+			t = _L("All day ");
+		else
+			t.Format(_L("%02d:%02d "), evs[e].start / 60, evs[e].start % 60);
+		TBuf<60> title;
+		for (TInt c = 0; c < evs[e].tlen && c < 58; c++) title.Append((TUint8)evs[e].title[c]);
+		if (!title.Length()) title = _L("(no name)");
+		t.Append(title);
+		// the calendar's colour as a bar, then the time and the title
+		gc.SetPenStyle(CGraphicsContext::ENullPen);
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(PmColour() ? PmCalColour(evs[e].shade) : PmText());
+		gc.DrawRect(TRect(x, row.iTl.iY + 3, x + 3, row.iBr.iY - 3));
+		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		TextUtils::ClipToFit(t, *iSmallFont, row.iBr.iX - x - 10 - 4);
+		gc.SetPenColor(PmText());
+		gc.DrawText(t, TPoint(x + 8, row.iTl.iY + (ih - iSmallFont->HeightInPixels()) / 2 + iSmallFont->AscentInPixels()));
+		}
+	if (!shown)
+		{
+		TRect row;
+		if (CalLegendRow(0, row))
+			{
+			gc.SetPenColor(KPmDarkGrey);
+			gc.DrawText(_L("Nothing more today"), TPoint(x + 8, row.iTl.iY + (ih - iSmallFont->HeightInPixels()) / 2 + iSmallFont->AscentInPixels()));
+			}
+		}
+	gc.DiscardFont();
+	}
+
 TBool CPmView::CalLegendPointerL(const TPointerEvent& aEvent)
 	{
+	if (!iLegendRect.IsEmpty() && iMode == EList && iLegendRect.Contains(aEvent.iPosition))
+		{
+		if (aEvent.iType == TPointerEvent::EButton1Up)
+			ShowCalendarL();                       // ("Today": to the calendar)
+		return ETrue;
+		}
 	if (iLegendRect.IsEmpty() || iMode != ECalendar || !iLegendRect.Contains(aEvent.iPosition))
 		return EFalse;
 	if (aEvent.iType != TPointerEvent::EButton1Up)

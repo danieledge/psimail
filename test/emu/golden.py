@@ -98,6 +98,11 @@ def tours(kind):
                             'shot:list2 enter +4 shot:reader-flagged').split()),
             ('D2', S, ST + ('^^n +5 shot:cal-week down down +1 shot:cal-week2 enter +2 shot:cal-event esc ^q +12 shot:cal-month '
                             'right +10 shot:cal-month2 ^n +4 shot:cal-new esc +1 menu right right +1 shot:cal-menu-event').split()),
+            # (1.01) the week's time grid, and Ctrl+Q round the views to the day list
+            ('W', S, ST + ('^^n +5 shot:cal-grid right +2 shot:cal-grid2 left down +2 shot:cal-grid3 ^q +10 ^q +4 '
+                           'shot:cal-daylist').split()),
+            # (1.01) the preview's actions: Reply from the strip
+            ('R', S, ST + 'tap:200,466 +4 shot:strip-reply esc +2 esc +1'.split()),
         ]
     out = []
     for name, card, steps in t:

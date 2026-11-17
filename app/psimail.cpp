@@ -112,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.00");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.01");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -5470,8 +5470,28 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 	else if (aMenuId == R_PM_SWITCH_VIEW_MENU)
 		{
 		TBool month = iView->MonthShown();
-		aMenuPane->SetItemButtonState(EPmCmdWeekView, month ? 0 : EEikMenuItemSymbolOn);
-		aMenuPane->SetItemButtonState(EPmCmdMonthView, month ? EEikMenuItemSymbolOn : 0);
+		if (iTall)
+			{
+			// (1.00) a tall screen: the week's time grid, the month, and the
+			// day list (the 5mx's week), one radio group of three
+			TBool list = !month && (iSettings.iView & KPmViewDayList);
+			CEikMenuPane::TItem::SData d;
+			d.iCommandId = EPmCmdDayListView;
+			d.iCascadeId = 0;
+			d.iFlags = EEikMenuItemRadioEnd;
+			d.iText = _L("Day list");
+			d.iExtraText.Zero();
+			aMenuPane->AddMenuItemL(d);
+			aMenuPane->ItemData(EPmCmdMonthView).iFlags &= ~EEikMenuItemRadioEnd;
+			aMenuPane->SetItemButtonState(EPmCmdWeekView, month || list ? 0 : EEikMenuItemSymbolOn);
+			aMenuPane->SetItemButtonState(EPmCmdMonthView, month ? EEikMenuItemSymbolOn : 0);
+			aMenuPane->SetItemButtonState(EPmCmdDayListView, list ? EEikMenuItemSymbolOn : 0);
+			}
+		else
+			{
+			aMenuPane->SetItemButtonState(EPmCmdWeekView, month ? 0 : EEikMenuItemSymbolOn);
+			aMenuPane->SetItemButtonState(EPmCmdMonthView, month ? EEikMenuItemSymbolOn : 0);
+			}
 		}
 	else if (aMenuId == R_PM_VIEW_MENU)
 		aMenuPane->SetItemDimmed(EPmCmdSort, m != CPmView::EList);   // (only the mail's View has Sort)
@@ -5753,7 +5773,11 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		iView->ToggleMonthL();
 		break;
 	case EPmCmdWeekView:
-		iView->ShowMonthL(EFalse);
+		if (iTall) iView->ShowDayListL(EFalse);   // (1.00: the time grid)
+		else iView->ShowMonthL(EFalse);
+		break;
+	case EPmCmdDayListView:
+		iView->ShowDayListL(ETrue);
 		break;
 	case EPmCmdMonthView:
 		iView->ShowMonthL(ETrue);

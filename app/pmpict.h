@@ -116,4 +116,9 @@ private:
 
 const TUid KUidPmPicture = { 0x01000A7E };
 
+// how a picture shows: its bitmap at a size that fits aRoom, or a frame
+// with a word or two (pmnative.cpp; the reader's and, 1.00, the preview's)
+void PmPictureLook(CPmPicture& aPic, const TPmPicEntry& aEntry, const CFont* aFont, const TSize& aRoom,
+	TBool aOffline, MGraphicsDeviceMap* aMap);
+
 #endif

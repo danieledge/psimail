@@ -24,7 +24,7 @@ static const TText* const KDayName[7] = { _S("Monday"), _S("Tuesday"), _S("Wedne
 
 // the pen on the pane: what it touched (CalHit)
 enum { ECalHitNone, ECalHitPrev, ECalHitToday, ECalHitNext, ECalHitWeek, ECalHitMonth, ECalHitDay,
-	ECalHitRow, ECalHitBar, ECalHitCell };
+	ECalHitRow, ECalHitBar, ECalHitCell, ECalHitGrid };
 
 static void Copy8(TDes& aOut, const char* aText, TInt aLen)
 	{
@@ -171,7 +171,48 @@ void CPmView::ToggleMonthL()
 		ShowCalendarL();
 		return;
 		}
+	// (1.00) a tall screen: the week's grid, the month, the day list, round
+	if (PmTall())
+		{
+		if (iCalMonth)
+			{
+			iCalMonth = EFalse;
+			iSettings->iView |= KPmViewDayList;
+			}
+		else if (iSettings->iView & KPmViewDayList)
+			iSettings->iView &= ~KPmViewDayList;
+		else
+			iCalMonth = ETrue;
+		((CPmAppUi*)iEikonEnv->EikAppUi())->SaveSettings();
+		iSidebar = EFalse;
+		Render();
+		return;
+		}
 	iCalMonth = !iCalMonth;
+	iSidebar = EFalse;
+	Render();
+	}
+
+// (1.00) View > Switch view > Week or Day list on a tall screen: the week
+// as a time grid, or as the 5mx shows it (the chosen day's list)
+void CPmView::ShowDayListL(TBool aDayList)
+	{
+	if (iMode != ECalendar)
+		{
+		ShowCalendarL();
+		if (iMode != ECalendar)
+			return;
+		}
+	TBool now = !iCalMonth && ((iSettings->iView & KPmViewDayList) != 0) == aDayList;
+	if (now && !iSidebar)
+		{
+		iEikonEnv->InfoMsg(aDayList ? _L("The day list is already shown") : _L("The week is already shown"));
+		return;
+		}
+	if (aDayList) iSettings->iView |= KPmViewDayList;
+	else iSettings->iView &= ~KPmViewDayList;
+	((CPmAppUi*)iEikonEnv->EikAppUi())->SaveSettings();
+	iCalMonth = EFalse;
 	iSidebar = EFalse;
 	Render();
 	}
@@ -500,11 +541,239 @@ void CPmView::DrawCalEvent(CWindowGc& gc, const PmUiEvent& e, const TRect& aRect
 		}
 	}
 
+// (1.00) the week as a time grid (tall screens, unless View > Switch view
+// > Day list is chosen): the hours down the side, a column a day
+TBool CPmView::CalGridOn() const
+	{
+	return PmTall() && !iCalMonth && !(iSettings->iView & KPmViewDayList);
+	}
+
+// the week strip's columns (with the grid, an hour column at the left)
+void CPmView::WeekCols(TInt& aX0, TInt& aCw, TInt& aHw) const
+	{
+	TRect strip = CalStripRect();
+	aHw = CalGridOn() ? iSmallFont->TextWidthInPixels(_L("00:00")) + 8 : 0;
+	aCw = (strip.Width() - aHw) / 7;
+	aX0 = strip.iTl.iX + aHw + (strip.Width() - aHw - 7 * aCw) / 2;
+	}
+
+// the grid's hours: 08:00 to 20:00, or wider for the week's events
+void CPmView::GridHours(const PmUiCalendar& k, TInt& aFirst, TInt& aLast, TBool& aAllDay) const
+	{
+	aFirst = 8;
+	aLast = 20;
+	aAllDay = EFalse;
+	long day0 = (long)iCalDay - k.daySel;
+	for (TInt i = 0; i < 7; i++)
+		{
+		PmUiEvent evs[12];
+		TInt got = calm_day(&iCalModel, day0 + i, evs, 12);
+		for (TInt e = 0; e < got; e++)
+			{
+			if (evs[e].allday || evs[e].days > 1) { aAllDay = ETrue; continue; }
+			TInt s = evs[e].start < 0 ? 0 : evs[e].start / 60;
+			TInt en = evs[e].end > 1440 ? 24 : (evs[e].end + 59) / 60;
+			if (s < aFirst) aFirst = s;
+			if (en > aLast) aLast = en;
+			}
+		}
+	if (aFirst < 0) aFirst = 0;
+	if (aLast > 24) aLast = 24;
+	if (aLast <= aFirst) aLast = aFirst + 1;
+	}
+
+TRect CPmView::GridRect() const
+	{
+	TRect strip = CalStripRect();
+	return TRect(strip.iTl.iX, strip.iBr.iY + 1, strip.iBr.iX, CalRect().iBr.iY);
+	}
+
+// where an event of day aDay (0..6) sits in the grid; aLane of aLanes side by side
+TRect CPmView::GridBlock(const PmUiCalendar& k, TInt aDay, const PmUiEvent& aEv, TInt aLane, TInt aLanes) const
+	{
+	TInt x0, cw, hw;
+	WeekCols(x0, cw, hw);
+	TInt first, last;
+	TBool allDay;
+	GridHours(k, first, last, allDay);
+	TRect g = GridRect();
+	TInt barH = allDay ? iSmallFont->HeightInPixels() + 4 : 0;
+	TInt top = g.iTl.iY + barH;
+	TInt hh = (g.iBr.iY - top) / (last - first);
+	if (hh < 1) hh = 1;
+	TInt cx = x0 + aDay * cw;
+	if (aEv.allday || aEv.days > 1)
+		return TRect(cx + 1, g.iTl.iY + 1, cx + cw - 1, g.iTl.iY + barH - 1);
+	TInt s = aEv.start < first * 60 ? first * 60 : aEv.start;
+	TInt e = aEv.end > last * 60 ? last * 60 : aEv.end;
+	TInt y0 = top + (s - first * 60) * hh / 60;
+	TInt y1 = top + (e - first * 60) * hh / 60;
+	if (y1 < y0 + iSmallFont->HeightInPixels() + 2) y1 = y0 + iSmallFont->HeightInPixels() + 2;
+	TInt lw = (cw - 2) / (aLanes > 0 ? aLanes : 1);
+	return TRect(cx + 1 + aLane * lw, y0 + 1, cx + 1 + (aLane + 1) * lw, y1);
+	}
+
+// the lanes of a day's timed events: side by side where they overlap
+static void GridLanes(const PmUiEvent* aEv, TInt aN, TInt* aLane, TInt* aLanes)
+	{
+	for (TInt i = 0; i < aN; i++)
+		{
+		aLane[i] = 0;
+		aLanes[i] = 1;
+		if (aEv[i].allday || aEv[i].days > 1)
+			continue;
+		TBool used[4] = { EFalse, EFalse, EFalse, EFalse };
+		for (TInt j = 0; j < i; j++)
+			if (!aEv[j].allday && aEv[j].days <= 1 && aEv[j].start < aEv[i].end && aEv[i].start < aEv[j].end)
+				used[aLane[j] & 3] = ETrue;
+		while (aLane[i] < 3 && used[aLane[i]]) aLane[i]++;
+		}
+	for (TInt i = 0; i < aN; i++)
+		for (TInt j = 0; j < aN; j++)
+			if (!aEv[i].allday && !aEv[j].allday && aEv[i].days <= 1 && aEv[j].days <= 1 &&
+				aEv[j].start < aEv[i].end && aEv[i].start < aEv[j].end && aLane[j] + 1 > aLanes[i])
+				aLanes[i] = aLane[j] + 1;
+	}
+
+void CPmView::DrawCalGrid(CWindowGc& gc, const PmUiCalendar& k) const
+	{
+	TInt x0, cw, hw;
+	WeekCols(x0, cw, hw);
+	TInt first, last;
+	TBool allDay;
+	GridHours(k, first, last, allDay);
+	TRect g = GridRect();
+	TInt barH = allDay ? iSmallFont->HeightInPixels() + 4 : 0;
+	TInt top = g.iTl.iY + barH;
+	TInt hh = (g.iBr.iY - top) / (last - first);
+	if (hh < 1) hh = 1;
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(PmBack());
+	gc.DrawRect(g);
+	long day0 = (long)iCalDay - k.daySel;
+	// the weekend's columns and today's, tinted (colour screens)
+	for (TInt i = 0; i < 7; i++)
+		if (PmColour() && (k.days[i].today || i >= 5))
+			{
+			gc.SetBrushColor(k.days[i].today ? PmTodayTint() : PmWeekendTint());
+			gc.DrawRect(TRect(x0 + i * cw, g.iTl.iY, x0 + (i + 1) * cw, g.iBr.iY));
+			}
+	// the hours
+	gc.SetPenStyle(CGraphicsContext::ESolidPen);
+	gc.UseFont(iSmallFont);
+	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+	TRgb rule = PmColour() ? TRgb(204, 204, 204) : KPmDarkGrey;
+	for (TInt h = first; h <= last; h++)
+		{
+		TInt y = top + (h - first) * hh;
+		gc.SetPenColor(rule);
+		gc.DrawLine(TPoint(x0, y), TPoint(x0 + 7 * cw, y));
+		if (h < last)
+			{
+			TBuf<8> t;
+			t.Format(_L("%02d:00"), h);
+			gc.SetPenColor(PmText());
+			gc.DrawText(t, TPoint(g.iTl.iX + 3, y + 2 + iSmallFont->AscentInPixels()));
+			}
+		}
+	gc.SetPenColor(PmColour() ? TRgb(153, 153, 153) : PmText());
+	for (TInt i = 0; i <= 7; i++)
+		gc.DrawLine(TPoint(x0 + i * cw, g.iTl.iY), TPoint(x0 + i * cw, g.iBr.iY));
+	if (barH)
+		gc.DrawLine(TPoint(x0, top - 1), TPoint(x0 + 7 * cw, top - 1));
+	// the events, in their calendar's colour; the chosen one highlighted
+	for (TInt i = 0; i < 7; i++)
+		{
+		PmUiEvent evs[12];
+		TInt got = calm_day(&iCalModel, day0 + i, evs, 12);
+		TInt lane[12], lanes[12];
+		GridLanes(evs, got, lane, lanes);
+		for (TInt e = 0; e < got; e++)
+			{
+			TRect b = GridBlock(k, i, evs[e], lane[e], lanes[e]);
+			TBool sel = i == k.daySel && e == k.sel && !iSidebar;
+			TRgb c = PmColour() ? PmCalColour(evs[e].shade) : PmText();
+			gc.SetPenStyle(CGraphicsContext::ESolidPen);
+			gc.SetPenColor(c);
+			gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+			gc.SetBrushColor(sel ? PmHighlight() : PmColour() ? PmMix(c, KRgbWhite) : PmBack());
+			if (PmColour() && !sel)
+				gc.SetBrushColor(PmMix(PmMix(c, KRgbWhite), KRgbWhite));
+			gc.DrawRect(b);
+			// a bar of the colour down its left
+			gc.SetPenStyle(CGraphicsContext::ENullPen);
+			gc.SetBrushColor(c);
+			gc.DrawRect(TRect(b.iTl.iX, b.iTl.iY, b.iTl.iX + 3, b.iBr.iY));
+			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+			gc.SetPenStyle(CGraphicsContext::ESolidPen);
+			TBuf<60> t;
+			Copy8(t, evs[e].title, evs[e].tlen);
+			if (!t.Length()) t = _L("(no name)");
+			Fit(iSmallFont, t, b.Width() - 7);
+			gc.SetPenColor(sel ? PmHighlightText() : PmText());
+			TRect clip(b);
+			clip.Shrink(1, 1);
+			gc.SetClippingRect(clip);
+			gc.DrawText(t, TPoint(b.iTl.iX + 5, b.iTl.iY + 1 + iSmallFont->AscentInPixels()));
+			gc.SetClippingRect(CalRect());
+			}
+		}
+	gc.DiscardFont();
+	// now: a red line across today's column
+	for (TInt i = 0; i < 7; i++)
+		if (k.days[i].today)
+			{
+			CPmView* self = (CPmView*)this;
+			self->CalendarToday();
+			TInt now = iCalNow;
+			if (now >= first * 60 && now <= last * 60)
+				{
+				TInt y = top + (now - first * 60) * hh / 60;
+				gc.SetPenColor(PmColour() ? PmFlagColour() : PmText());
+				gc.DrawLine(TPoint(x0 + i * cw, y), TPoint(x0 + (i + 1) * cw, y));
+				gc.DrawLine(TPoint(x0 + i * cw, y + 1), TPoint(x0 + (i + 1) * cw, y + 1));
+				}
+			}
+	}
+
+// the grid under the pen: the day (0..6), and the event there (-1 none)
+TBool CPmView::GridHit(const TPoint& aPos, TInt& aDay, TInt& aEvent) const
+	{
+	aDay = -1;
+	aEvent = -1;
+	if (!GridRect().Contains(aPos))
+		return EFalse;
+	PmUiCalendar k;
+	FillCalendar(k);
+	TInt x0, cw, hw;
+	WeekCols(x0, cw, hw);
+	if (cw < 1 || aPos.iX < x0)
+		return EFalse;
+	aDay = (aPos.iX - x0) / cw;
+	if (aDay > 6) aDay = 6;
+	PmUiEvent evs[12];
+	TInt got = calm_day(&iCalModel, (long)iCalDay - k.daySel + aDay, evs, 12);
+	TInt lane[12], lanes[12];
+	GridLanes(evs, got, lane, lanes);
+	for (TInt e = 0; e < got; e++)
+		if (GridBlock(k, aDay, evs[e], lane[e], lanes[e]).Contains(aPos))
+			aEvent = e;
+	return ETrue;
+	}
+
 void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 	{
 	TRect strip = CalStripRect();
-	TInt cw = strip.Width() / 7;
-	TInt x0 = strip.iTl.iX + (strip.Width() - 7 * cw) / 2;
+	TInt cw, x0, hw;
+	WeekCols(x0, cw, hw);
+	if (hw)
+		{
+		gc.SetPenStyle(CGraphicsContext::ENullPen);
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(PmBack());
+		gc.DrawRect(TRect(strip.iTl.iX, strip.iTl.iY, x0, strip.iBr.iY));
+		}
 	TInt smallH = iSmallFont->HeightInPixels();
 	for (TInt i = 0; i < 7; i++)
 		{
@@ -548,6 +817,11 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
 	gc.SetPenColor(PmText());
 	gc.DrawLine(TPoint(strip.iTl.iX, strip.iBr.iY), TPoint(strip.iBr.iX, strip.iBr.iY));
+	if (CalGridOn())
+		{
+		DrawCalGrid(gc, k);
+		return;
+		}
 
 	// the day's name on a heading band, and how much is on
 	TRect day = CalDayRect();
@@ -812,6 +1086,7 @@ void CPmView::DrawCalendar(CWindowGc& gc) const
 	}
 
 
+
 // ----- keys ---------------------------------------------------------------------------
 
 TKeyResponse CPmView::CalendarKeyL(TUint aCode)
@@ -917,13 +1192,21 @@ TInt CPmView::CalHit(const TPoint& aPos, TInt& aIndex) const
 	TRect strip = CalStripRect();
 	if (strip.Contains(aPos))
 		{
-		TInt cw = strip.Width() / 7;
-		TInt x0 = strip.iTl.iX + (strip.Width() - 7 * cw) / 2;
+		TInt cw, x0, hw;
+		WeekCols(x0, cw, hw);
 		TInt i = cw > 0 ? (aPos.iX - x0) / cw : 0;
 		if (i < 0) i = 0;
 		if (i > 6) i = 6;
 		aIndex = i;
 		return ECalHitDay;
+		}
+	if (CalGridOn())
+		{
+		TInt day, ev;
+		if (!GridHit(aPos, day, ev))
+			return ECalHitNone;
+		aIndex = day * 16 + (ev < 0 ? 15 : ev);
+		return ECalHitGrid;
 		}
 	TRect list = CalListRect();
 	if (!list.Contains(aPos))
@@ -1015,6 +1298,24 @@ TBool CPmView::CalendarPointerL(const TPointerEvent& aEvent)
 			if (index == iCalSel) { Render(); EventDetailsL(); }
 			else { iCalSel = index; Render(); }
 			break;
+		case ECalHitGrid:
+			{
+			// (1.00) the time grid: a tap on an event chooses it (and its
+			// day), a second tap opens it; on an empty part, the day
+			PmUiCalendar k;
+			FillCalendar(k);
+			TInt day = index / 16, ev = index % 16;
+			if (ev == 15) ev = -1;
+			if (day != k.daySel)
+				{
+				CalGoTo(day - k.daySel);
+				if (ev >= 0) { iCalSel = ev; Render(); }
+				}
+			else if (ev >= 0 && ev == iCalSel) { Render(); EventDetailsL(); }
+			else if (ev >= 0) { iCalSel = ev; Render(); }
+			else Render();
+			break;
+			}
 			}
 		return ETrue;
 		}

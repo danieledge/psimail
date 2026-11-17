@@ -77,6 +77,13 @@ const TInt KPmViewReading = 0x100000;
 // selected message under the list on a tall screen (the netBook and Series
 // 7's 480 lines); the 5mx's 240 lines have no room for it (pmpreview.cpp)
 const TInt KPmViewNoPreview = 0x200000;
+// bit 23 (1.00): View > Switch view > Day list on a tall screen. Zero (the
+// standard) shows the week as a time grid there; set, as the 5mx shows it
+// (the week strip and the chosen day's list). The 5mx ignores it.
+const TInt KPmViewDayList = 0x800000;
+// Free, as far as 1.00 goes (nothing in app/ reads them): iView bits 3 to 7,
+// 10, 11, 22 and 24 to 31; iSpare[0] bits 5 to 7 and 10 to 31. Take new
+// options from these, and mark them here and in the comment by TPmSettings.
 
 // TPmSettings::iSpare[0] bit 2 (0.84): web pictures fetched through the
 // "psiproxy" HTTP proxy (pmwebpic.cpp, engine/webpics.c)
@@ -114,6 +121,7 @@ struct TPmSettings
 	                       // 0x80000: show detailed progress (0.75)
 	                       // 0x100000: Reading mode (0.81)
 	                       // 0x200000: no preview under the list (0.96, tall screens)
+	                       // 0x800000: the day list instead of the week's time grid (1.00, tall screens)
 	TInt iSpare[2];        // (TPmSettings is saved whole: keep its size)
 	                       // iSpare[0]: pictures in messages - 0 shown, 1 only attached files, 2 none (pmnative.cpp);
 	                       //   bits 8-9 (0x300, 0.75): pictures from the web - 0 ask, 1 always, 2 never (pmwebpic.cpp)
@@ -207,6 +215,7 @@ public:
 	void ShowCalendarL();                    // the calendar screen
 	void ToggleMonthL();                     // View > Switch view (Ctrl+Q): the week or the month, round and round
 	void ShowMonthL(TBool aMonth);           // View > Switch view > Week / Month
+	void ShowDayListL(TBool aDayList);       // (1.00) ... > Week (the time grid) / Day list, on a tall screen
 	TBool MonthShown() const { return iMode == ECalendar && iCalMonth; }
 	void CalendarTodayL();                   // Event > Go to today
 	void NewEventL();                        // the Create new event dialog: into the Agenda (then synced)
@@ -350,6 +359,15 @@ private:
 	void DrawCalMonth(CBitmapContext& aGc, const PmUiCalendar& k) const;
 	TInt CalLegendRow(TInt aRow, TRect& aRect) const;   // (1.00) the calendars under the folders (tall screens)
 	void DrawCalLegend(CWindowGc& aGc) const;
+	TBool CalGridOn() const;                  // (1.00) the week as a time grid (tall screens)
+	void WeekCols(TInt& aX0, TInt& aCw, TInt& aHw) const;
+	void GridHours(const PmUiCalendar& k, TInt& aFirst, TInt& aLast, TBool& aAllDay) const;
+	TRect GridRect() const;
+	TRect GridBlock(const PmUiCalendar& k, TInt aDay, const PmUiEvent& aEv, TInt aLane, TInt aLanes) const;
+	void DrawCalGrid(CWindowGc& aGc, const PmUiCalendar& k) const;
+	TBool GridHit(const TPoint& aPos, TInt& aDay, TInt& aEvent) const;
+
+	void DrawCalToday(CWindowGc& aGc) const;
 	TBool CalLegendPointerL(const TPointerEvent& aEvent);
 	void ToggleCalendarL(TInt aIndex);
 	void DrawCalEvent(CWindowGc& aGc, const PmUiEvent& e, const TRect& aRect, TBool aSel) const;
@@ -368,6 +386,9 @@ private:
 	void LayoutPreview(const TRect& aArea);  // the part of the list's room it takes (LayoutNative)
 	void PreviewSyncL();                     // the selected message into it, if it isn't there already
 	void PreviewAttachmentsL(TUint aUid);
+	TInt PreviewStripButton(TInt aIndex, TRect& aRect) const;
+	void DrawPreviewStrip(CWindowGc& aGc) const;
+	void DrawPreviewStripNow();
 	void PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC& aFile);
 	void DrawPreviewHead(CWindowGc& aGc) const;
 	void PreviewPageL(TBool aDown);          // Space and Shift+Space
@@ -376,6 +397,9 @@ private:
 	TRect iPrevRect;                         // all of it: the rule, the heading, the text (empty: none)
 	TRect iPrevHead;                         // its heading: subject, sender, date
 	TUint iPrevUid;                          // what it shows (0 nothing)
+	CPmPictures* iPrevPictures;              // (1.00) its pictures (those decoded already)
+	TRect iPrevStrip;                        // (1.00) the actions under it
+	TInt iPrevStripDown;                     // the one the pen is on (-1 none)
 	TInt iPrevAttN;                          // (1.00) its attachments: how many,
 	TBuf<64> iPrevAttName;                   // the first one's name
 	TBuf<16> iPrevAttSize;                   // and size (colour screens: a box in the heading)
@@ -507,6 +531,7 @@ private:
 	PmCalModel iCalModel;
 	TBool iCalLoaded;
 	TRect iLegendRect;                       // (1.00) the calendars' legend (empty: none)
+	TInt iLegendFor;                         // (1.01) the folder rows it was laid out under
 	TBool iSplashDone;               // the start-up screen has gone
 	TBool iStartPending;             // FinishStartL is still to run (from the first tick)
 	TBool iFirstFetch;               // a new account's first fetch waits for the engine
@@ -1090,6 +1115,7 @@ public:
 	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
+	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }   // (1.00) a command from the view's own controls (the preview's actions)
 	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
 	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7
