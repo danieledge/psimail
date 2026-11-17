@@ -378,7 +378,8 @@ RESOURCE MENU_PANE r_pm_show_menu
 		MENU_ITEM { command=EPmCmdToggleToolbar; txt="Toolbar"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPmCmdToggleTitle; txt="Title bar"; flags=EEikMenuItemCheckBox; },
 		MENU_ITEM { command=EPmCmdToggleFolders; txt="List of folders"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdTogglePreview; txt="Preview"; flags=EEikMenuItemCheckBox; }
+		MENU_ITEM { command=EPmCmdTogglePreview; txt="Preview"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdToggleThreads; txt="Conversations"; flags=EEikMenuItemCheckBox; }
 		};
 	}
 
@@ -564,6 +565,28 @@ RESOURCE DIALOG r_pm_text_dialog
 		};
 	}
 
+// (1.05) Edit > Find: the words, and where to look - the server, or the
+// mail downloaded to this Psion (engine/local.c). Working offline, the
+// second line is dimmed at "On this Psion"
+RESOURCE DIALOG r_pm_find_dialog
+	{
+	title="Find in this folder";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; prompt="Search for"; id=EPmDlgWords;
+			control=EDWIN { width=20; maxlength=60; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Look"; id=EPmDlgChoice;
+			control=CHOICELIST { array_id=r_pm_find_where; }; }
+		};
+	}
+
+RESOURCE ARRAY r_pm_find_where
+	{
+	items= { LBUF { txt="On the server"; }, LBUF { txt="On this Psion"; } };
+	}
+
 // Update: where to fetch PsiMail-version.txt and PsiMail.sis from (the same
 // dialog in PsiTerm and PsiWeb). The Local server and Port lines are dimmed
 // unless "Local server" is chosen (CPmUpdateDialog)
@@ -650,6 +673,32 @@ RESOURCE DIALOG r_pm_login_dialog
 		DLG_LINE { type=EEikCtSecretEd; prompt="Password"; id=EPmDlgPass;
 			control=SECRETED { num_letters=32; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3;
+			control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=50; txt="-"; }; }
+		};
+	}
+
+// (1.05) a tap on the sender in a message: their name and address, then
+// Write to them or Add to Contacts (Edit > Add to Contacts > Sender)
+RESOURCE DLG_BUTTONS r_pm_sender_buttons
+	{
+	buttons=
+		{
+		DLG_BUTTON { id=EPmBidWrite; button=CMBUT { txt="Write"; }; hotkey='W'; flags=0; },
+		DLG_BUTTON { id=EPmBidAddContact; button=CMBUT { txt="Add to\nContacts"; }; hotkey='A'; flags=0; },
+		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; }
+		};
+	}
+
+RESOURCE DIALOG r_pm_sender_dialog
+	{
+	title="Sender";
+	flags=EEikDialogFlagWait|EEikDialogFlagButtonsRight;
+	buttons=r_pm_sender_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1;
+			control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=40; txt="-"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2;
 			control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; reserve_length=50; txt="-"; }; }
 		};
 	}

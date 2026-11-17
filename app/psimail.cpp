@@ -113,7 +113,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.04");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.05");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -223,6 +223,7 @@ CPmDraft::~CPmDraft()
 	{
 	delete iAttach;
 	delete iBody;
+	delete iQuote;
 	}
 
 // ============================================================================
@@ -280,6 +281,8 @@ CPmView::~CPmView()
 	delete iWatcher;
 	delete iFolders;
 	delete iRows;
+	delete iThreadUids;
+	delete iBatch;
 	delete iText;
 	delete iAttNames;
 	delete iAttSizes;
@@ -304,6 +307,9 @@ void CPmView::ConstructL(const TRect& aRect, TPmSettings& aSettings, TPmCalSetti
 	EnableDragEvents();
 	iFolders = new(ELeave) CArrayFixFlat<TPmFolder>(16);
 	iRows = new(ELeave) CArrayFixFlat<TPmRow>(32);
+	iThreadUids = new(ELeave) CArrayFixFlat<TUint>(16);
+	iBatch = new(ELeave) CArrayFixFlat<TUint>(16);
+	iMarkFrom = iMarkLo = iMarkHi = -1;
 	iAttNames = new(ELeave) CDesCArrayFlat(4);
 	iAttSizes = new(ELeave) CDesCArrayFlat(4);
 	iAttParts = new(ELeave) CDesC8ArrayFlat(4);
@@ -1084,10 +1090,38 @@ void CPmView::FolderChangedL(const PmCmd& aCmd)
 	ReloadL();
 	}
 
+// (1.05) a Message-ID or In-Reply-To as a number to compare: the id
+// between < and >, its case ignored (FNV-1a); 0 for none
+static TUint MsgIdHash(const TDesC& aId)
+	{
+	TPtrC id = aId;
+	TInt lt = id.Locate('<');
+	if (lt >= 0)
+		{
+		id.Set(id.Mid(lt + 1));
+		TInt gt = id.Locate('>');
+		if (gt >= 0) id.Set(id.Left(gt));
+		}
+	TUint h = 2166136261u;
+	TInt n = 0;
+	for (TInt i = 0; i < id.Length(); i++)
+		{
+		TUint c = id[i];
+		if (c <= ' ')
+			continue;
+		if (c >= 'A' && c <= 'Z') c += 32;
+		h = (h ^ c) * 16777619u;
+		n++;
+		}
+	return n ? (h ? h : 1) : 0;
+	}
+
 void CPmView::LoadListL()
 	{
 	TUint keep = (iSel >= 0 && iSel < iRows->Count()) ? (*iRows)[iSel].iUid : 0;
 	iRows->Reset();
+	iThreadUids->Reset();
+	ClearMark();
 	TBuf<140> path;
 	FolderDir(iFolder, path);
 	path.Append(iSearch ? _L("search.txt") : _L("index.txt"));
@@ -1111,6 +1145,17 @@ void CPmView::LoadListL()
 			row.iDate = ToInt(NextField(l));
 			row.iSize = ToInt(NextField(l));
 			TPtrC from = NextField(l);
+			// (1.05) the fields after: subject, to, message-id, in-reply-to
+			TPtrC more = l;
+			{
+			TPtrC m = more;
+			NextField(m);
+			NextField(m);
+			row.iIdHash = MsgIdHash(NextField(m));
+			row.iReplyHash = MsgIdHash(NextField(m));
+			row.iRoot = 0;
+			row.iDepth = row.iThread = row.iThreadUnread = 0;
+			}
 			if (iFolders && CurrentFolder() && (CurrentFolder()->iKind == 'S' || CurrentFolder()->iKind == 'D'))
 				{
 				// in Sent and Drafts, show who it went to
@@ -1151,6 +1196,7 @@ void CPmView::LoadListL()
 	iSel = 0;
 	for (TInt i = 0; i < iRows->Count(); i++)
 		if ((*iRows)[i].iUid == keep) { iSel = i; break; }
+	ThreadRowsL(keep);                         // (1.05: sets iSel if the conversation is folded)
 	EnsureVisible();
 	}
 
@@ -1538,6 +1584,12 @@ void CPmView::DeleteCurrentL()
 	if (!row || (iMode != EList && iMode != EMessage))
 		return;
 	TUint uid = row->iUid;                    // (the list may reload during the query)
+	if (iMode == EList && (MarkedCount() > 1 || row->iThread > 1))
+		{
+		// (1.05) several chosen, or a folded conversation: all of them
+		BatchMoveL(KNullDesC8, ETrue);
+		return;
+		}
 	const TPmFolder* f = CurrentFolder();
 	TBool forGood = f && f->iKind == 'T';
 	if (forGood && !iEikonEnv->QueryWinL(_L("It is in the Trash already"), _L("Delete this message for good?")))
@@ -1576,6 +1628,8 @@ TBool CPmView::MoveCurrentL(const TDesC8& aDest)
 		Toast(_L("It is in that folder already"));
 		return EFalse;
 		}
+	if (iMode == EList && (MarkedCount() > 1 || row->iThread > 1))
+		return BatchMoveL(aDest, EFalse);      // (1.05) several, or a folded conversation
 	Cmd(PM_CMD_MOVE, iFolder, row->iUid, aDest);
 	NoteUndoL(row->iUid);                     // (Edit > Undo: pmundo.cpp)
 	iRows->Delete(iSel);
@@ -1603,6 +1657,34 @@ void CPmView::ToggleFlagL(TChar aFlag)
 	TBuf8<4> op;
 	op.Append(at >= 0 ? '-' : '+');
 	op.Append(aFlag);
+	if (iMode == EList && (MarkedCount() > 1 || row.iThread > 1))
+		{
+		// (1.05) several, or a folded conversation: all of them the same way
+		CArrayFixFlat<TUint>* uids = new(ELeave) CArrayFixFlat<TUint>(16);
+		CleanupStack::PushL(uids);
+		MarkedUidsL(*uids);
+		TInt n = uids->Count();
+		BatchL(PM_CMD_FLAG, op, *uids);
+		CleanupStack::PopAndDestroy();
+		// the rows as they will be (the engine's index follows)
+		for (TInt i = 0; i < iRows->Count(); i++)
+			{
+			TBool in = (iMarkLo >= 0 && i >= iMarkLo && i <= iMarkHi) || i == iSel;
+			if (!in) continue;
+			TPmRow& r = (*iRows)[i];
+			TInt a = r.iFlags.Locate(aFlag);
+			if (at >= 0 && a >= 0) r.iFlags.Delete(a, 1);
+			else if (at < 0 && a < 0 && r.iFlags.Length() < r.iFlags.MaxLength()) r.iFlags.Append(aFlag);
+			if (aFlag == 'S' && r.iThread > 1) r.iThreadUnread = at >= 0 ? r.iThread : 0;
+			}
+		TBuf<60> t;
+		if (aFlag == 'S') t.Format(at >= 0 ? _L("%d marked unread") : _L("%d marked read"), n);
+		else t.Format(at >= 0 ? _L("%d flags removed") : _L("%d flagged"), n);
+		Toast(t);
+		iMsgListSum = 0;
+		Render();
+		return;
+		}
 	if (at >= 0)
 		row.iFlags.Delete(at, 1);
 	else
@@ -1637,7 +1719,7 @@ void CPmView::SearchL(const TDesC& aWords)
 	{
 	if (iMode == EOutbox || iMode == ENoAccount)
 		iFolder = _L8("INBOX");
-	SafeCopy(iSearchWords, aWords);
+	SafeCopy(iSearchWords, aWords.Length() > 2 && aWords[0] == 1 ? aWords.Mid(2) : TPtrC(aWords));
 	TBuf8<PM_ARG_MAX> w;
 	SafeCopy(w, aWords);
 	Cmd(PM_CMD_SEARCH, iFolder, 0, w);
@@ -2329,6 +2411,18 @@ void CPmView::TakeResultsL()
 
 void CPmView::HandleResultL(const PmCmd& aCmd)
 	{
+	// (1.05) one of several messages' commands done: the next ones in
+	if ((aCmd.op == PM_CMD_MOVE || aCmd.op == PM_CMD_FLAG) && iBatchQuiet > 0)
+		{
+		iBatchQuiet--;
+		PumpBatchL();
+		if (iShared && iShared->last_res != PM_RES_FAILED && iShared->last_res != PM_RES_LOGIN_FAILED)
+			{
+			if (iMode == EList && !iBatchQuiet)
+				ReloadL();
+			return;
+			}
+		}
 	// (1.00) when the mail was last checked (the toolbar's connection panel)
 	if ((aCmd.op == PM_CMD_SYNC || aCmd.op == PM_CMD_SENDRECV) && iShared && iShared->last_res == PM_RES_OK)
 		iLastChecked.HomeTime();
@@ -2946,6 +3040,28 @@ TBool CPmTextDialog::OkToExitL(TInt /*aButtonId*/)
 	return ETrue;
 	}
 
+void CPmFindDialog::PreLayoutDynInitL()
+	{
+	SetEdwinTextL(EPmDlgWords, &iText);
+	CEikChoiceList* c = (CEikChoiceList*)Control(EPmDlgChoice);
+	c->SetCurrentItem(iOffline ? 1 : iWhere);
+	SetLineDimmedNow(EPmDlgChoice, iOffline);
+	}
+
+TBool CPmFindDialog::OkToExitL(TInt /*aButtonId*/)
+	{
+	GetEdwinText(iText, EPmDlgWords);
+	iText.Trim();
+	if (!iText.Length())
+		{
+		iEikonEnv->InfoMsg(_L("No words entered"));
+		TryChangeFocusToL(EPmDlgWords);
+		return EFalse;
+		}
+	iWhere = iOffline ? 1 : ((CEikChoiceList*)Control(EPmDlgChoice))->CurrentItem();
+	return ETrue;
+	}
+
 void CPmPasswordDialog::PreLayoutDynInitL()
 	{
 	SetLabelL(EPmDlgInfo1, iPrompt);
@@ -2992,11 +3108,16 @@ void CPmComposeDialog::PreLayoutDynInitL()
 	SetEdwinTextL(EPmDlgSubject, &iDraft.iSubject);
 	// the text, with its bold / italic / underline marks (see the engine's
 	// compose.c) turned back into the editor's formatting
-	HBufC* b = HBufC::NewLC(iDraft.iBody->Length() + 1);
+	HBufC* b = HBufC::NewLC(iDraft.iBody->Length() + 100);
 	TPtr p = b->Des();
 	CArrayFixFlat<TInt>* spans = new(ELeave) CArrayFixFlat<TInt>(16);   // start, length, style
 	CleanupStack::PushL(spans);
 	TInt start[3] = { -1, -1, -1 };
+	{
+	// (1.05) a reply's quote folded to one line (Ctrl+Q unfolds it)
+	TPtr body = iDraft.iBody->Des();
+	FoldQuote(body);
+	}
 	const TPtrC src = *iDraft.iBody;
 	for (TInt i = 0; i < src.Length(); i++)
 		{
@@ -3068,6 +3189,68 @@ void CPmComposeDialog::PreLayoutDynInitL()
 	(void)lerr;
 	}
 
+// (1.05) a reply's quote is shown as one line, "[Frank wrote: 23 lines -
+// Ctrl+Q shows them]", so the reply starts with room to write. The quote is
+// kept aside and put back where that line is when the message is sent or
+// saved (Collect); Ctrl+Q puts it in the text to edit. Deleting the line
+// leaves the quote out. Short quotes (3 lines or fewer) are not folded.
+void CPmComposeDialog::FoldQuote(TDes& aBody)
+	{
+	if (iDraft.iQuoteLen <= 0 || iDraft.iQuote || iDraft.iQuoteStart < 0 ||
+		iDraft.iQuoteStart + iDraft.iQuoteLen > aBody.Length())
+		return;
+	TPtrC q = aBody.Mid(iDraft.iQuoteStart, iDraft.iQuoteLen);
+	TInt lines = 0;
+	for (TInt i = 0; i < q.Length(); i++)
+		if (q[i] == '\n') lines++;
+	iDraft.iQuoteLen = 0;
+	if (lines <= 4)                          // ("wrote:" and 3 lines)
+		return;
+	iDraft.iQuote = q.Alloc();
+	if (!iDraft.iQuote)
+		return;
+	TBuf<40> n;
+	n.Format(_L("%d lines - Ctrl+Q shows them]"), lines - 1);
+	iDraft.iFoldLine.Append(n.Left(Min(n.Length(), iDraft.iFoldLine.MaxLength() - iDraft.iFoldLine.Length())));
+	TBuf<82> line(iDraft.iFoldLine);
+	line.Append('\n');
+	aBody.Replace(iDraft.iQuoteStart, q.Length(), line);
+	}
+
+TBool CPmComposeDialog::UnfoldQuoteL()
+	{
+	if (!iDraft.iQuote)
+		return EFalse;
+	CEikRichTextEditor* ed = (CEikRichTextEditor*)Control(EPmDlgBody);
+	CRichText* rt = ed->RichText();
+	TInt len = rt->DocumentLength();
+	HBufC* all = HBufC::NewLC(len);
+	TPtr a = all->Des();
+	rt->Extract(a, 0, len);
+	TInt at = a.Find(iDraft.iFoldLine);
+	CleanupStack::PopAndDestroy();           // all
+	if (at < 0)
+		{
+		iEikonEnv->InfoMsg(_L("The quote has been deleted"));
+		return EFalse;
+		}
+	HBufC* q = iDraft.iQuote->AllocLC();
+	TPtr qp = q->Des();
+	for (TInt i = 0; i < qp.Length(); i++)
+		if (qp[i] == '\n') qp[i] = CEditableText::EParagraphDelimiter;
+	// (the quote's last line break stands for the fold line's own)
+	if (qp.Length() && qp[qp.Length() - 1] == CEditableText::EParagraphDelimiter)
+		qp.SetLength(qp.Length() - 1);
+	rt->DeleteL(at, iDraft.iFoldLine.Length());
+	rt->InsertL(at, qp);
+	CleanupStack::PopAndDestroy();           // q
+	delete iDraft.iQuote;
+	iDraft.iQuote = NULL;
+	ed->HandleTextChangedL();
+	ed->SetCursorPosL(at, EFalse);
+	return ETrue;
+	}
+
 // Ctrl+B, Ctrl+I, Ctrl+U: bold, italic, underline in the text (EIKON's
 // standard shortcuts for them)
 TKeyResponse CPmComposeDialog::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType)
@@ -3080,6 +3263,7 @@ TKeyResponse CPmComposeDialog::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEvent
 		if (k == 4 || k == 'd' || k == 'D') { TryExitL(EPmBidSave); return EKeyWasConsumed; }
 		if (k == 1 || k == 'a' || k == 'A') { TryExitL(EPmBidAttach); return EKeyWasConsumed; }
 		if (k == 12 || k == 'l' || k == 'L') { TryExitL(EPmBidContacts); return EKeyWasConsumed; }
+		if ((k == 17 || k == 'q' || k == 'Q') && iDraft.iQuote) { UnfoldQuoteL(); return EKeyWasConsumed; }
 		}
 	// Tab in an address line: complete the name from Contacts
 	if (aType == EEventKey && aKeyEvent.iCode == EKeyTab && !(aKeyEvent.iModifiers & EModifierCtrl) &&
@@ -3255,6 +3439,26 @@ void CPmComposeDialog::Collect()
 			if (it) out.Append(0x14);
 			if (b) out.Append(0x12);
 			body->Des().SetLength(out.Length());   // (written through its own pointer)
+			if (iDraft.iQuote)
+				{
+				// (1.05) the folded quote back where its line is (a deleted line: left out)
+				TInt at = body->Find(iDraft.iFoldLine);
+				if (at >= 0)
+					{
+					TInt end = at + iDraft.iFoldLine.Length();
+					if (end < body->Length() && (*body)[end] == '\n') end++;
+					HBufC* whole = HBufC::New(body->Length() + iDraft.iQuote->Length());
+					if (whole)
+						{
+						TPtr w = whole->Des();
+						w.Append(body->Left(at));
+						w.Append(*iDraft.iQuote);
+						w.Append(body->Mid(end));
+						delete body;
+						body = whole;
+						}
+					}
+				}
 			delete iDraft.iBody;
 			iDraft.iBody = body;
 			}
@@ -4738,12 +4942,18 @@ CPmDraft* CPmAppUi::ReplyDraftL(TBool aAll)
 	TBuf<120> who;
 	DisplayName(who, h->iFrom);
 	p.Append('\n');
+	d->iQuoteStart = p.Length();
 	p.Append(_L("On "));
 	p.Append(Clip(h->iDate, 40));
 	p.Append(_L(", "));
 	p.Append(Clip(who, 60));
 	p.Append(_L(" wrote:\n"));
 	iView->PlainBodyL(p, ETrue);
+	d->iQuoteLen = p.Length() - d->iQuoteStart;
+	// (1.05) shown folded to one line in the editor (CPmComposeDialog::FoldQuote)
+	d->iFoldLine = _L("[");
+	d->iFoldLine.Append(Clip(who, 30));
+	d->iFoldLine.Append(_L(" wrote: "));
 	if (below)
 		AddSignature(*d, p, ETrue);           // (1.02: under the quote)
 	delete d->iBody;
@@ -5392,12 +5602,27 @@ TBool CPmFolderDialog::OkToExitL(TInt /*aButtonId*/)
 	return ETrue;
 	}
 
+// (1.05) with a choice of where to look: the server (as before), or the
+// mail on this Psion while online too (offline it is the only choice).
+// The choice is kept until PsiMail closes.
 void CPmAppUi::SearchL()
 	{
 	TBuf<60> words;
-	CPmTextDialog* dlg = new(ELeave) CPmTextDialog(_L("Find in this folder"), _L("Search for"), words);
-	if (dlg->ExecuteLD(R_PM_TEXT_DIALOG) && words.Length())
-		iView->SearchL(words);
+	CPmFindDialog* dlg = new(ELeave) CPmFindDialog(words, iFindWhere, iSettings.iOffline != 0);
+	if (dlg->ExecuteLD(R_PM_FIND_DIALOG) && words.Length())
+		{
+		if (iFindWhere == 1 && !iSettings.iOffline)
+			{
+			// "\x01L" before the words: the engine looks at the downloaded mail
+			TBuf<62> w;
+			w.Append(TChar(1));
+			w.Append('L');
+			w.Append(words.Left(Min(words.Length(), w.MaxLength() - 2)));
+			iView->SearchL(w);
+			}
+		else
+			iView->SearchL(words);
+		}
 	}
 
 void CPmAppUi::SwitchAccountL()
@@ -5633,6 +5858,9 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		// (0.96) the preview: only a tall screen has the room
 		aMenuPane->SetItemButtonState(EPmCmdTogglePreview, iView->PreviewWanted() ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemDimmed(EPmCmdTogglePreview, !PmTall());
+		// (1.05) conversations: the mail's list only
+		aMenuPane->SetItemButtonState(EPmCmdToggleThreads, (iSettings.iView & KPmViewThreads) ? EEikMenuItemSymbolOn : 0);
+		aMenuPane->SetItemDimmed(EPmCmdToggleThreads, m != CPmView::EList && m != CPmView::EMessage);
 		}
 	else if (aMenuId == R_PM_GOTO_MENU)
 		{
@@ -5815,6 +6043,9 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPmCmdTogglePreview:
 		iView->TogglePreviewL();
+		break;
+	case EPmCmdToggleThreads:
+		iView->ToggleThreadsL();
 		break;
 	case EPmCmdStatusInfo:
 		iView->StatusInfoL();

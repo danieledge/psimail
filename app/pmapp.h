@@ -81,8 +81,13 @@ const TInt KPmViewNoPreview = 0x200000;
 // standard) shows the week as a time grid there; set, as the 5mx shows it
 // (the week strip and the chosen day's list). The 5mx ignores it.
 const TInt KPmViewDayList = 0x800000;
-// Free, as far as 1.02 goes (nothing in app/ reads them): iView bits 3 to 7,
-// 10, 11, 22 and 24 to 31; iSpare[0] bits 6, 7 and 10 to 31. Take new
+// bit 24 (1.05): View > Show > Conversations. Set: messages that answer one
+// another (In-Reply-To and Message-ID) are grouped, folded to one row with
+// how many there are; Right or Enter unfolds, Left folds. Only while the
+// list is in date order (View > Sort: newest or oldest first).
+const TInt KPmViewThreads = 0x1000000;
+// Free, as far as 1.05 goes (nothing in app/ reads them): iView bits 3 to 7,
+// 10, 11, 22 and 25 to 31; iSpare[0] bits 6, 7 and 10 to 31. Take new
 // options from these, and mark them here and in the comment by TPmSettings.
 
 // TPmSettings::iSpare[0] bit 2 (0.84): web pictures fetched through the
@@ -145,6 +150,8 @@ struct TPmFolder
 	TInt iTotal;
 	};
 
+struct TPmSpan;            // the reader's styles (pmnative.cpp)
+
 struct TPmRow
 	{
 	TUint iUid;            // (outbox: the file's number)
@@ -153,6 +160,13 @@ struct TPmRow
 	TInt iSize;
 	TBuf<64> iFrom;        // shown: the name, or the address
 	TBuf<100> iSubject;
+	// (1.05) conversations (View > Show > Conversations): not stored
+	TUint iIdHash;         // its Message-ID, hashed (0 none)
+	TUint iReplyHash;      // its In-Reply-To, hashed (0 none)
+	TUint iRoot;           // the uid of its conversation's first message (0: on its own)
+	TInt iDepth;           // 1: a reply, shown indented under the first
+	TInt iThread;          // a folded conversation's row: how many messages (0 otherwise)
+	TInt iThreadUnread;    // ... and how many of them unread
 	};
 
 // a message being written
@@ -172,6 +186,10 @@ public:
 	TBuf8<128> iReplyFolder;
 	TUint iReplyUid;
 	TInt iFileNo;              // outbox file it came from, or 0
+	TInt iQuoteStart;          // (1.05) a reply: where the quote ("On ... wrote:" and the
+	TInt iQuoteLen;            //   "> " lines) is in iBody, to show folded; 0 none
+	HBufC* iQuote;             // the quote while it is folded in the editor (compose)
+	TBuf<80> iFoldLine;        // the line that stands in for it there
 	};
 
 class CPmView;
@@ -279,6 +297,15 @@ public:
 	void DeleteCurrentL();
 	TBool MoveCurrentL(const TDesC8& aDest);
 	void ToggleFlagL(TChar aFlag);
+	// (1.05) several messages at once: Shift+arrows choose a run of them
+	// (iMarkFrom to iSel); a folded conversation's row stands for all of
+	// its messages. Delete, Move, Archive and the flags act on all of them,
+	// one engine command each, sent as the queue has room (PumpBatchL)
+	TInt MarkedCount() const;
+	void ClearMark();
+	TBool DropOnFolderL(const TPoint& aPos, TInt aRow); // a message (row aRow) dragged onto a folder: moved there
+	TUint iUnfoldTick;                       // (1.05) a tap unfolded a conversation: its second event is not an open
+	TInt iMarkLo, iMarkHi;                   // the chosen run, for the list's drawer (-1: none)
 	void RefreshL();
 	void OlderL();
 	void SearchL(const TDesC& aWords);
@@ -324,6 +351,7 @@ private:
 	void UpdateFolderListL();
 	void UpdateMessageListL();
 	void UpdateReaderL();
+	void PictureHelpLinkL(TInt aEntry, TDes& aText, CArrayFixFlat<TPmSpan>& aSpans);   // (1.05)
 	void UpdateStatusLine();
 	void SyncSelectionFromLists();
 	TKeyResponse NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType);
@@ -350,6 +378,13 @@ private:
 	void PlacePictureL(TInt aPlace);         // a CPmPicture into the rich text where it goes
 	void RelayoutReaderL();                  // the text again, with what was at the top kept there
 	void SortRows();
+	void ThreadRowsL(TUint aKeep);            // (1.05) conversations grouped and folded
+	TBool ThreadsOn() const;
+	void CountRows(TInt& aTotal, TInt& aUnread) const;   // messages in the list (folded ones too)
+public:
+	TBool ThreadKeyL(TBool aOpen);           // (1.05) Right / Left on a conversation: unfold / fold
+	void ToggleThreadsL();                   // View > Show > Conversations
+private:
 	TInt RowHeight() const;                  // a list row at this zoom
 	// the calendar, drawn with EIKON's fonts and colours beside the folder
 	// tree (pmcalview.cpp)
@@ -496,6 +531,19 @@ private:
 	TBuf8<128> iFolder;              // IMAP name of the open folder
 	CArrayFixFlat<TPmFolder>* iFolders;
 	CArrayFixFlat<TPmRow>* iRows;    // newest first
+	TUint iOpenThread[16];           // (1.05) conversations unfolded (their first messages' uids)
+	TInt iOpenThreads;
+	CArrayFixFlat<TUint>* iThreadUids;   // (1.05) pairs: a folded conversation's root uid, a member's uid
+	TInt iMarkFrom;                  // (1.05) where Shift+arrows began (-1 none)
+	CArrayFixFlat<TUint>* iBatch;    // (1.05) messages still to send a command for
+	TInt iBatchOp;
+	TBuf8<128> iBatchFolder;
+	TBuf8<128> iBatchArg;
+	TInt iBatchQuiet;                // results of the batch's commands still to come (no infoprint each)
+	void MarkedUidsL(CArrayFixFlat<TUint>& aUids) const;
+	TBool BatchL(TInt aOp, const TDesC8& aArg, CArrayFixFlat<TUint>& aUids);
+	void PumpBatchL();
+	TBool BatchMoveL(const TDesC8& aDest, TBool aDelete);
 	TInt iSel;
 	// message view
 	TUint iMsgUid;
@@ -739,6 +787,7 @@ private:
 // the links in the reader's header (TPmLinkRange::iLink): above the
 // attachments' range (-1000 - n), below the web links (1 up)
 const TInt KPmLinkHeaderTo = -500;      // "+2 others": show all the recipients
+const TInt KPmLinkHeaderFrom = -501;    // (1.05) the sender's name: Write or Add to Contacts
 
 // the links in the reader's invitation / card box (TPmLinkRange::iLink):
 // Accept, Tentative (-3001) and Decline (-3002); below -2000, the pictures' range
@@ -746,6 +795,8 @@ const TInt KPmLinkAccept = -3000;
 const TInt KPmLinkRemove = -3010;
 const TInt KPmLinkAddCard = -3020;
 const TInt KPmLinkWebPictures = -4000;     // "Pictures from the web are not shown - Show them" (pmwebpic.cpp)
+const TInt KPmLinkPictureHelp = -4001;     // (1.05) under a picture that can't be shown: Help on pictures
+const TInt KPmHelpPictures = 4;            // Help's "Pictures in messages" (pmhelp.cpp)
 // a contact card line's kind bits, as ../engine/invite.h has them
 const TInt VCF_HOME = 1;
 const TInt VCF_WORK = 2;
@@ -834,6 +885,33 @@ private:
 	TPtrC iTitle;
 	TPtrC iPrompt;
 	TDes& iText;
+	};
+
+// (1.05) a tap on the sender in the reader (pmheader.cpp): the name and
+// address, Write or Add to Contacts; ExecuteLD gives the button
+class CPmSenderDialog : public CEikDialog
+	{
+public:
+	CPmSenderDialog(const TDesC& aName, const TDesC& aAddr) : iName(aName), iAddr(aAddr) {}
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	TPtrC iName;
+	TPtrC iAddr;
+	};
+
+// (1.05) Edit > Find: the words, and On the server / On this Psion
+class CPmFindDialog : public CEikDialog
+	{
+public:
+	CPmFindDialog(TDes& aText, TInt& aWhere, TBool aOffline)
+		: iText(aText), iWhere(aWhere), iOffline(aOffline) {}
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	TDes& iText;
+	TInt& iWhere;              // 0 the server, 1 this Psion
+	TBool iOffline;
 	};
 
 // a refused login (pmlogin.cpp): the server's words, the user name and the
@@ -1018,6 +1096,8 @@ private:
 	void ContactsL(TBool aComplete);          // the Contacts button (or Tab: complete what's typed)
 	TInt AddressLine() const;                 // the To, Cc or Bcc line with the focus (To otherwise)
 	TUint StateSum() const;
+	void FoldQuote(TDes& aBody);             // (1.05) the reply's quote as one line
+	TBool UnfoldQuoteL();                    // Ctrl+Q: the quote back in the text
 	CPmDraft& iDraft;
 	TPtrC iTitle;
 	TInt iRuns;                  // formatting runs in the text (Collect)
@@ -1172,6 +1252,7 @@ public:
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
 	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }
+	void HelpTopicL(TInt aTopic) { HelpL(aTopic); }   // (1.05) Help at a topic (a picture's Help on pictures)
 	TBool RunSetupL();                             // (1.03) the setup assistant; ETrue if it saved
 	TBool iFirstStart;                             // (1.03) a new user: no settings of any program yet   // (1.00) a command from the view's own controls (the preview's actions)
 	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
@@ -1238,6 +1319,7 @@ private:
 	CIdle* iSoon;                      // EmailButtonSoon
 	TBool iAccountSetup;               // the first account's dialog is open (ConstructL)
 	TBool iTool4Close;                 // the last toolbar button says Close
+	TInt iFindWhere;                   // (1.05) Edit > Find: 0 the server, 1 this Psion (until PsiMail closes)
 	TPmSettings iSettings;
 	TPmCalSettings iCalSettings;
 	// 0.74: File > Printing (pmprint.cpp)

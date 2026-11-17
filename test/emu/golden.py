@@ -24,8 +24,9 @@ The emulator's clock starts at 17 Nov 2026 09:40 (PSION_RTC_SEED) so that
 the calendar's "today" and the clock stay the same from run to run.
 
 STEP: +N waits N s; esc enter menu up down left right tab del space;
-^X is Ctrl+X, ^^X Shift+Ctrl+X; text:hello; tap:X,Y (LCD coordinates);
-shot:NAME saves a screenshot.
+^X is Ctrl+X, ^^X Shift+Ctrl+X; s:KEY is Shift with a key (s:down);
+text:hello; tap:X,Y and drag:X1,Y1,X2,Y2 (LCD coordinates); shot:NAME saves
+a screenshot.
 """
 import sys, os, subprocess, glob
 from concurrent.futures import ThreadPoolExecutor
@@ -96,6 +97,26 @@ def tours(kind):
                        'right right right down +1 shot:rules-move esc'.split()),
         ('R2', S, ST + 'menu right right right right down down down right up enter +2 shot:signatures esc'.split()),
     ]
+    # (1.04 on) rows chosen with the pen, a wait after each tap (a key at once after a tap was lost)
+    row = lambda n: 'tap:350,%d' % (R1 + 24 * n)
+    T = ['esc', '+2']
+    t += [
+        # (1.04) a message with a picture set out before 1.04 (111_2.PMI, greys) and a GIF set out now
+        ('K', S, T + [row(1), '+2', row(1), '+12', 'shot:reader-diagram'] + ['down'] * 8 + ['+1', 'shot:reader-diagram2', 'esc']),
+        # (1.05) View > Show > Conversations: 106, 108 and 111 answer one another
+        ('V', S, T + [row(1), '+2'] + ('menu right right right down down down down right down down down down +1 shot:menu-show2 '
+                                     'enter +3 shot:threads').split() + [row(1), '+3', 'shot:threads-open', 'down', '+1', 'left',
+                                     '+3', 'shot:threads-fold']),
+        # (1.05) Shift+Down chooses a run; Delete asks about all of them (Esc: not deleted)
+        ('M', S, T + [row(1), '+2'] + 's:down s:down +1 shot:marked del +2 shot:marked-delete esc +2 shot:marked-kept'.split()),
+        # (1.05) a message dragged onto Archive with the pen
+        ('X', S, T + ['drag:350,%d,70,%d' % (R1 + 24, R1 + 48), '+4', 'shot:dragged', 'tap:70,%d' % (R1 + 48), '+4',
+                      'shot:dragged-archive']),
+        # (1.05) a reply's quote folded to a line; Ctrl+Q shows it
+        ('Q', S, T + [row(3), '+2', row(3), '+4'] + '^r +3 shot:reply-folded ^q +2 shot:reply-unfolded esc +1 esc'.split()),
+        # (1.05) a tap on the sender in a message: Write or Add to Contacts
+        ('H', S, T + [row(0), '+2', row(0), '+6', 'tap:20,%d' % (44 if nb else 50), '+3', 'shot:sender', 'esc']),
+    ]
     if nb:
         t += [
             ('A2', S, ST + ('shot:inbox enter +7 shot:reader-pic esc +2 tap:350,112 up +1 shot:preview-gif enter +9 shot:reader-gif '
@@ -128,7 +149,8 @@ def run_tour(kind, name, card, steps, outdir, work):
     for s in steps:
         if s.startswith('+'): t += float(s[1:]); continue
         if s.startswith('shot:'): shots.append((t, s[5:])); t += 1; continue
-        if s.startswith('^^'): key(t, 18, 30); key(t + 0.03, 22, 30); key(t + 0.15, ord(s[2].upper()), 3)
+        if s.startswith('s:'): key(t, 18, 30); key(t + 0.1, K[s[2:]], 3)
+        elif s.startswith('^^'): key(t, 18, 30); key(t + 0.03, 22, 30); key(t + 0.15, ord(s[2].upper()), 3)
         elif s.startswith('^'): key(t, 22, 30); key(t + 0.1, ord(s[1].upper()), 3)
         elif s.startswith('text:'):
             for c in s[5:]: key(t, ord(c.upper()), 4); t += 0.4
@@ -136,6 +158,10 @@ def run_tour(kind, name, card, steps, outdir, work):
             x, yy = s[4:].split(',')
             if kind == 'nb': ev.extend(['--tap-seq', '%.2f' % t, x, yy])
             else: ev.append('%.2f tap %d %s' % (t, int(x) + 45, yy))
+        elif s.startswith('drag:'):
+            x1, y1, x2, y2 = [int(v) for v in s[5:].split(',')]
+            if kind == 'nb': ev.extend(['--drag-seq', '%.2f' % t, str(x1), str(y1), str(x2), str(y2)])
+            else: ev.append('%.2f drag %d %d %d %d' % (t, x1 + 45, y1, x2 + 45, y2))
         else: key(t, K[s])
         t += 1.5
     frames_dir = os.path.join(work, kind, name)
@@ -145,7 +171,11 @@ def run_tour(kind, name, card, steps, outdir, work):
         if not ev: ev = ['%.2f 4 8' % T0]
         # MX_LAUNCH_AT=S (45): open PsiMail from Extras at S s rather than run.sh's
         # 37 s (a bigger card can keep the System screen busy past that)
-        at = os.environ.get('MX_LAUNCH_AT', '45')
+        # (1.05) 40 s for the seeded card: launched at 45 s the 5mx emulator
+        # started psimail.exe with its first code page holding the second
+        # (a KERN-EXEC 3 for "Main" at 55 s, the engine started again; see
+        # test/README.md); the first-run card keeps 45
+        at = os.environ.get('MX_LAUNCH_AT', '45' if card == os.environ.get('CARD0') else '40')
         if at:
             env['EMU_LAUNCH'] = '0'
             ev = ['%.2f tap 670 262' % float(at), '%.2f tap 335 215' % (float(at) + 2)] + ev

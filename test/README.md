@@ -335,3 +335,30 @@ emulator the seed's `111_2.PMI` (a "PMI1") is the same check on the
 netBook: message 111's diagram still shows, in greys, beside its GIF in
 colour. psion-core's own test of the decoders in colour is
 `make -C core/mail/engine/img/test`.
+
+## Conversations, several messages, the sender, Find (1.05)
+
+`calua.sh`: the calendar's requests say `User-Agent: PsiMail/<version>
+(<machine>)` (psion-core's `http_user_agent`; PsiSync, which does not call
+it, sends what it always has). The rest is the app's, so it is seen in the
+emulator: `emu/golden.py`'s tours V (View > Show > Conversations: in the
+seed 108 answers 106 and 111 answers 108, folded to one row "(3)", Right
+unfolds, Left folds), M (Shift+Down twice chooses three messages; Delete
+asks "3 messages chosen - Move them to the Trash?"; Esc keeps them), X (a
+message dragged with the pen onto Archive), Q (a reply's quote folded to
+one line; Ctrl+Q puts it in the text) and H (a tap on the sender: Write or
+Add to Contacts), on both machines. The seed's INDEX.TXT carries the
+In-Reply-To ids (`seedpkg/SEED`; on the 5mx card written in after the
+program). In the tours a key sent at once after a tap was lost, so rows
+are chosen with the pen and a wait.
+
+In 1.05's runs the 5mx emulator, with PsiMail opened at 45 s on the seeded
+card, put up "Program closed - Main - KERN-EXEC 3" at 55 s: the engine's
+process started with the first 4 KB of psimail.exe's code holding its
+second 4 KB (the instruction at the entry point was the file's word at
+code + 0x1000; `PSION_EXC_TRACE=1`). Nothing of PsiMail's had run in that
+process yet, the same binaries ran cleanly when opened at 40 s or 50 s or
+from another card, and the netBook never showed it, so it is taken as the
+emulator's; the app starts the engine again and goes on. `golden.py` opens
+PsiMail at 40 s on the seeded card (45 s on the first-run card) and the
+runs are checked with `PSION_EXC_TRACE=1` for no exceptions.

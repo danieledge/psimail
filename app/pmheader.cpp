@@ -516,6 +516,15 @@ void CPmView::HeaderTextL(TDes& aText, const TPmRow* aRow)
 		{
 		aText.Append(Clip(name, 120));
 		Run(runs, p0, aText.Length() - p0, EHdBold);
+		// (1.05) a tap on the name (or Tab and Enter): Write or Add to Contacts
+		if (addr.Length() || name.Locate('@') >= 0)
+			{
+			TPmLinkRange lr;
+			lr.iPos = p0;
+			lr.iLen = aText.Length() - p0;
+			lr.iLink = KPmLinkHeaderFrom;
+			iLinks->AppendL(lr);
+			}
 		}
 	if (addrFirst)
 		{
@@ -854,8 +863,44 @@ void CPmView::HeaderFormatL(CRichText& aText)
 	}
 
 // a link in the header
+void CPmSenderDialog::PreLayoutDynInitL()
+	{
+	SetLabelL(EPmDlgInfo1, iName.Left(Min(iName.Length(), 60)));
+	SetLabelL(EPmDlgInfo2, iAddr.Left(Min(iAddr.Length(), 80)));
+	}
+
+TBool CPmSenderDialog::OkToExitL(TInt /*aButtonId*/)
+	{
+	return ETrue;
+	}
+
 void CPmView::HeaderLinkL(TInt aLink)
 	{
+	if (aLink == KPmLinkHeaderFrom)
+		{
+		// (1.05) the sender: write to them, or add them to Contacts
+		TBuf<300> from;
+		if (!MessageHeader(_L("From"), from) || !from.Length())
+			return;
+		TPtrC name, addr;
+		SplitAddress(from, name, addr);
+		if (!addr.Length()) { addr.Set(name); name.Set(TPtrC()); }
+		if (!addr.Length())
+			return;
+		TBuf<120> a(addr.Left(Min(addr.Length(), 120)));
+		CPmSenderDialog* dlg = new(ELeave) CPmSenderDialog(name.Length() ? name : addr, addr);
+		TInt b = dlg->ExecuteLD(R_PM_SENDER_DIALOG);
+		CPmAppUi* ui = (CPmAppUi*)iEikonEnv->EikAppUi();
+		if (b == EPmBidWrite)
+			{
+			TBuf<130> url(_L("mailto:"));
+			url.Append(a);
+			ui->MailtoL(url, EFalse);
+			}
+		else if (b == EPmBidAddContact)
+			ui->CommandL(EPmCmdAddSender);
+		return;
+		}
 	if (aLink == KPmLinkHeaderTo)
 		{
 		iHeaderAllTo = ETrue;

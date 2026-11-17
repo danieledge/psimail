@@ -405,8 +405,15 @@ public:
 			(void)err;
 			}
 		}
+	void SetMark(const TInt* aLo, const TInt* aHi) { iMarkLo = aLo; iMarkHi = aHi; }
 	void DrawItemText(TInt aItemIndex, const TRect& aRect, TBool aCurrent, TBool aEmphasized) const
 		{
+		// (1.05) a run chosen with Shift+arrows: each of its rows highlighted
+		if (iMarkLo && iMarkHi && *iMarkLo >= 0 && *iMarkHi > *iMarkLo && aItemIndex >= *iMarkLo && aItemIndex <= *iMarkHi)
+			{
+			aCurrent = ETrue;
+			aEmphasized = ETrue;
+			}
 		TInt v = (iMsgIcons && aItemIndex < iMsgIcons->Count()) ? (*iMsgIcons)[aItemIndex] : 0xff;
 		TBool bold = (v & KMsgUnread) && iBoldFont && iNormal;
 		if (bold)
@@ -467,6 +474,8 @@ public:
 private:
 	CArrayPtr<CFbsBitmap>* iIcons;
 	CArrayFixFlat<TInt>* iMsgIcons;
+	const TInt* iMarkLo;
+	const TInt* iMarkHi;
 	CColumnListBoxData* iColumns;
 	const CFont* iNormal;
 	const CFont* iBoldFont;
@@ -490,6 +499,7 @@ public:
 		{
 		((CPmMsgItemDrawer*)iItemDrawer)->SetData(aIcons, aMsgIcons);
 		}
+	void SetMark(const TInt* aLo, const TInt* aHi) { ((CPmMsgItemDrawer*)iItemDrawer)->SetMark(aLo, aHi); }
 	void SetFonts(const CFont* aFont, const CFont* aBold)
 		{
 		((CPmMsgItemDrawer*)iItemDrawer)->SetFonts(Model()->ColumnData(), aFont, aBold);
@@ -517,10 +527,38 @@ public:
 				}
 			return;
 			}
+		// (1.05) the pen goes down on a message and is dragged out of the
+		// list to the left: a drag to the folders, not the list's own (it
+		// would scroll); let go on a folder, the message is moved there
+		if (aEvent.iType == TPointerEvent::EButton1Down)
+			{
+			iDragging = EFalse;
+			iDownRow = -1;
+			if (View()) View()->XYPosToItemIndex(aEvent.iPosition, iDownRow);
+			}
+		else if (aEvent.iType == TPointerEvent::EDrag && !iDragging && aEvent.iPosition.iX < Rect().iTl.iX - 4)
+			{
+			iDragging = ETrue;
+			CEikonEnv::Static()->BusyMsgL(_L("Moving to a folder..."));
+			}
+		if (iDragging)
+			{
+			if (aEvent.iType == TPointerEvent::EButton1Up)
+				{
+				iDragging = EFalse;
+				CEikonEnv::Static()->BusyMsgCancel();
+				CPmView* v = ((CPmAppUi*)CEikonEnv::Static()->EikAppUi())->View();
+				if (v && !v->DropOnFolderL(aEvent.iPosition, iDownRow))
+					CEikonEnv::Static()->InfoMsg(_L("Not moved - let go on a folder"));
+				}
+			return;
+			}
 		CEikTextListBox::HandlePointerEventL(aEvent);
 		}
 private:
 	TBool iPictureTap;
+	TBool iDragging;
+	TInt iDownRow;
 	};
 
 // ----- zoom -----------------------------------------------------------------------
@@ -618,6 +656,7 @@ void CPmView::CreateNativeL()
 	iMsgList->ScrollBarFrame()->SetScrollBarVisibilityL(CEikScrollBarFrame::EOff, CEikScrollBarFrame::EAuto);
 	iMsgList->SetListBoxObserver(this);
 	iMsgList->SetData(iIcons, iMsgIcons);
+	iMsgList->SetMark(&iMarkLo, &iMarkHi);
 
 	iReader = new(ELeave) CEikRichTextEditor(TEikBorder(TEikBorder::ENone));
 	iReader->SetContainerWindowL(*this);
@@ -1075,6 +1114,7 @@ void CPmView::UpdateMessageListL()
 		{
 		const TPmRow& r = (*iRows)[i];
 		sum = sum * 131 + r.iUid;
+		sum = sum * 7 + r.iThread * 3 + r.iDepth;
 		sum = Checksum(sum, r.iFlags);
 		}
 	sum = Checksum(sum, iFolder);
@@ -1097,10 +1137,22 @@ void CPmView::UpdateMessageListL()
 			// what won't fit its column ends in "...", as the style guide has
 			// it (and EIKON's own lists), in the row's font (bold when unread)
 			const CFont* f = (!(iMode == EOutbox) && r.iFlags.Locate('S') < 0 && iBoldFont) ? iBoldFont : iListFont;
-			TBuf<64> from(Clip(r.iFrom, 60));
+			TBuf<64> from;
+			if (r.iDepth)
+				from = _L("   ");                  // (1.05) a reply in an unfolded conversation
+			from.Append(Clip(r.iFrom, 60 - from.Length()));
 			if (f && iColFromW > 20) TextUtils::ClipToFit(from, *f, iColFromW - 6);
-			TBuf<160> subj(r.iSubject.Length() ? Clip(r.iSubject, 150) : TPtrC(_L("(no subject)")));
-			if (f && iColSubjW > 20) TextUtils::ClipToFit(subj, *f, iColSubjW - 6);
+			TBuf<160> subj(r.iSubject.Length() ? Clip(r.iSubject, 140) : TPtrC(_L("(no subject)")));
+			TBuf<12> count;
+			if (r.iThread > 1)
+				count.Format(_L(" (%d)"), r.iThread);   // (1.05) a folded conversation
+			if (f && iColSubjW > 20 && count.Length())
+				{
+				TInt cw = f->TextWidthInPixels(count);
+				if (iColSubjW - 6 - cw > 20) TextUtils::ClipToFit(subj, *f, iColSubjW - 6 - cw);
+				}
+			else if (f && iColSubjW > 20) TextUtils::ClipToFit(subj, *f, iColSubjW - 6);
+			subj.Append(count);
 			line = _L("\t\t");
 			line.Append(from);
 			line.Append(_L("\t\t"));
@@ -1188,6 +1240,411 @@ void CPmView::SortL(TInt aMode)
 		}
 	}
 
+// ----- (1.05) conversations ------------------------------------------------------------
+
+// View > Show > Conversations, in a folder's list (not Find's results, not
+// the Outbox) while it is in date order
+TBool CPmView::ThreadsOn() const
+	{
+	return (iSettings->iView & KPmViewThreads) && iMode != EOutbox && !iSearch &&
+		(iSettings->iSort == 0 || iSettings->iSort == 1);
+	}
+
+// how many messages the list holds, and how many unread, a folded
+// conversation's hidden ones too
+void CPmView::CountRows(TInt& aTotal, TInt& aUnread) const
+	{
+	aTotal = aUnread = 0;
+	for (TInt i = 0; i < iRows->Count(); i++)
+		{
+		const TPmRow& r = (*iRows)[i];
+		if (r.iThread > 1)
+			{
+			aTotal += r.iThread;
+			aUnread += r.iThreadUnread;
+			}
+		else
+			{
+			aTotal++;
+			if (r.iFlags.Locate('S') < 0) aUnread++;
+			}
+		}
+	}
+
+static void ShellSortHash(TUint* aKey, TInt* aIdx, TInt aN)
+	{
+	for (TInt gap = aN / 2; gap > 0; gap /= 2)
+		for (TInt i = gap; i < aN; i++)
+			{
+			TUint k = aKey[i];
+			TInt x = aIdx[i];
+			TInt j = i;
+			for (; j >= gap && aKey[j - gap] > k; j -= gap)
+				{
+				aKey[j] = aKey[j - gap];
+				aIdx[j] = aIdx[j - gap];
+				}
+			aKey[j] = k;
+			aIdx[j] = x;
+			}
+	}
+
+// The rows in date order become conversations: a message whose
+// In-Reply-To is another's Message-ID goes under that one, and each goes
+// with the first message of its chain. A conversation stands where its
+// newest message (oldest, in oldest-first order) would be. Folded (the
+// standard), it is one row - its newest message's, with how many there are
+// and bold if any is unread; unfolded (Right or Enter), the first message
+// and then the replies, oldest first, indented. aKeep: the message to keep
+// selected (its conversation's row, if that is folded).
+void CPmView::ThreadRowsL(TUint aKeep)
+	{
+	TInt n = iRows->Count();
+	if (!ThreadsOn() || n < 2)
+		return;
+	TInt* parent = (TInt*)User::AllocLC(n * 5 * sizeof(TInt));
+	TInt* root = parent + n;
+	TInt* size = root + n;
+	TInt* idx = size + n;
+	TUint* key = (TUint*)(idx + n);
+	TInt i;
+	for (i = 0; i < n; i++)
+		{
+		key[i] = (*iRows)[i].iIdHash;
+		idx[i] = i;
+		parent[i] = -1;
+		size[i] = 0;
+		}
+	ShellSortHash(key, idx, n);
+	for (i = 0; i < n; i++)
+		{
+		TUint h = (*iRows)[i].iReplyHash;
+		if (!h)
+			continue;
+		TInt lo = 0, hi = n - 1;
+		while (lo < hi)
+			{
+			TInt mid = (lo + hi) / 2;
+			if (key[mid] < h) lo = mid + 1; else hi = mid;
+			}
+		if (key[lo] == h && idx[lo] != i)
+			parent[i] = idx[lo];
+		}
+	TBool any = EFalse;
+	for (i = 0; i < n; i++)
+		{
+		TInt r = i;
+		for (TInt step = 0; step < 64 && parent[r] >= 0; step++)
+			r = parent[r];                     // (a loop of replies stops after 64)
+		root[i] = r;
+		size[r]++;
+		if (r != i) any = ETrue;
+		}
+	if (!any)
+		{
+		CleanupStack::PopAndDestroy();          // parent
+		return;
+		}
+	CArrayFixFlat<TPmRow>* out = new(ELeave) CArrayFixFlat<TPmRow>(n);
+	CleanupStack::PushL(out);
+	TInt keepAt = -1;
+	for (i = 0; i < n; i++)
+		{
+		TInt r = root[i];
+		if (size[r] < 0)
+			continue;                           // that conversation is out already
+		if (size[r] == 1)
+			{
+			out->AppendL((*iRows)[i]);
+			if ((*iRows)[i].iUid == aKeep) keepAt = out->Count() - 1;
+			continue;
+			}
+		TUint rootUid = (*iRows)[r].iUid;
+		TBool open = EFalse;
+		for (TInt o = 0; o < iOpenThreads; o++)
+			if (iOpenThread[o] == rootUid) open = ETrue;
+		if (!open)
+			{
+			// one row: this conversation's first in the list's order (its
+			// newest, newest first), with the count and the others' marks
+			TPmRow row = (*iRows)[i];
+			TInt unread = 0;
+			TBool flag = EFalse, att = EFalse, hasKeep = EFalse;
+			for (TInt k = 0; k < n; k++)
+				if (root[k] == r)
+					{
+					const TPmRow& m = (*iRows)[k];
+					if (m.iFlags.Locate('S') < 0) unread++;
+					if (m.iFlags.Locate('F') >= 0) flag = ETrue;
+					if (m.iFlags.Locate('T') >= 0) att = ETrue;
+					if (m.iUid == aKeep) hasKeep = ETrue;
+					iThreadUids->AppendL(rootUid);   // (what the row stands for: Delete, Move...)
+					iThreadUids->AppendL(m.iUid);
+					}
+			TInt s = row.iFlags.Locate('S');
+			if (unread && s >= 0) row.iFlags.Delete(s, 1);
+			if (!unread && s < 0 && row.iFlags.Length() < row.iFlags.MaxLength()) row.iFlags.Append('S');
+			if (flag && row.iFlags.Locate('F') < 0 && row.iFlags.Length() < row.iFlags.MaxLength()) row.iFlags.Append('F');
+			if (att && row.iFlags.Locate('T') < 0 && row.iFlags.Length() < row.iFlags.MaxLength()) row.iFlags.Append('T');
+			row.iRoot = rootUid;
+			row.iDepth = 0;
+			row.iThread = size[r];
+			row.iThreadUnread = unread;
+			out->AppendL(row);
+			if (hasKeep) keepAt = out->Count() - 1;
+			}
+		else
+			{
+			// the first message, then the replies oldest first (the list
+			// is newest first or oldest first: walk it the right way)
+			TPmRow first = (*iRows)[r];
+			first.iRoot = rootUid;
+			first.iDepth = 0;
+			out->AppendL(first);
+			if (first.iUid == aKeep) keepAt = out->Count() - 1;
+			TBool newestFirst = iSettings->iSort == 0;
+			for (TInt k = 0; k < n; k++)
+				{
+				TInt kk = newestFirst ? n - 1 - k : k;
+				if (root[kk] != r || kk == r)
+					continue;
+				TPmRow m = (*iRows)[kk];
+				m.iRoot = rootUid;
+				m.iDepth = 1;
+				out->AppendL(m);
+				if (m.iUid == aKeep) keepAt = out->Count() - 1;
+				}
+			}
+		size[r] = -1;
+		}
+	iRows->Reset();
+	for (i = 0; i < out->Count(); i++)
+		iRows->AppendL((*out)[i]);
+	CleanupStack::PopAndDestroy(2);            // out, parent
+	iSel = keepAt >= 0 ? keepAt : 0;
+	}
+
+// Right (or Enter, or a second tap) on a folded conversation unfolds it;
+// Left on one of an unfolded conversation's messages folds it. EFalse:
+// not a conversation, the key does what it did
+TBool CPmView::ThreadKeyL(TBool aOpen)
+	{
+	if (!ThreadsOn() || iSidebar || iSel < 0 || iSel >= iRows->Count())
+		return EFalse;
+	const TPmRow& r = (*iRows)[iSel];
+	if (!r.iRoot)
+		return EFalse;
+	TUint root = r.iRoot;
+	TInt at = -1;
+	for (TInt o = 0; o < iOpenThreads; o++)
+		if (iOpenThread[o] == root) at = o;
+	if (aOpen)
+		{
+		if (r.iThread <= 1)
+			return EFalse;                     // unfolded already: Right opens the message
+		if (iOpenThreads == 16)
+			{
+			for (TInt o = 1; o < 16; o++) iOpenThread[o - 1] = iOpenThread[o];
+			iOpenThreads--;
+			}
+		iOpenThread[iOpenThreads++] = root;
+		}
+	else
+		{
+		if (at < 0)
+			return EFalse;                     // folded: Left goes to the folders
+		for (TInt o = at + 1; o < iOpenThreads; o++) iOpenThread[o - 1] = iOpenThread[o];
+		iOpenThreads--;
+		}
+	// unfolded: the first message selected; folded: the conversation's row
+	TUint keep = aOpen ? root : r.iUid;
+	if (aOpen)
+		(*iRows)[iSel].iUid = root;            // (so LoadListL keeps the first one)
+	else
+		(*iRows)[iSel].iUid = keep;
+	LoadListL();
+	iMsgListSum = 0;
+	Render();
+	PreviewSyncL();
+	return ETrue;
+	}
+
+void CPmView::ToggleThreadsL()
+	{
+	iSettings->iView ^= KPmViewThreads;
+	((CPmAppUi*)iEikonEnv->EikAppUi())->SaveSettings();
+	if (iMode != EList)
+		return;
+	iOpenThreads = 0;
+	LoadListL();
+	iMsgListSum = 0;
+	Render();
+	if (iNativeShown)
+		{
+		ActivateGc();
+		DrawHeaders(SystemGc());
+		DeactivateGc();
+		}
+	if ((iSettings->iView & KPmViewThreads) && !ThreadsOn())
+		Toast(_L("Conversations show when the list is in date order (View > Sort)"));
+	}
+
+// ----- (1.05) several messages at once ----------------------------------------------
+
+TInt CPmView::MarkedCount() const
+	{
+	return iMarkLo >= 0 && iMarkHi > iMarkLo ? iMarkHi - iMarkLo + 1 : 1;
+	}
+
+void CPmView::ClearMark()
+	{
+	TBool was = iMarkLo >= 0;
+	iMarkFrom = iMarkLo = iMarkHi = -1;
+	if (was && iMsgList && iNativeShown && iMsgList->IsVisible())
+		iMsgList->DrawDeferred();
+	}
+
+// the messages chosen (the selected one if no run), a folded
+// conversation's row as all of its messages
+void CPmView::MarkedUidsL(CArrayFixFlat<TUint>& aUids) const
+	{
+	TInt lo = iSel, hi = iSel;
+	if (iMarkLo >= 0 && iMarkHi > iMarkLo) { lo = iMarkLo; hi = iMarkHi; }
+	for (TInt i = lo; i <= hi && i >= 0 && i < iRows->Count(); i++)
+		{
+		const TPmRow& r = (*iRows)[i];
+		if (r.iThread > 1)
+			{
+			for (TInt k = 0; k + 1 < iThreadUids->Count(); k += 2)
+				if ((*iThreadUids)[k] == r.iRoot)
+					aUids.AppendL((*iThreadUids)[k + 1]);
+			}
+		else
+			aUids.AppendL(r.iUid);
+		}
+	}
+
+// one command for each of aUids (PM_CMD_MOVE or PM_CMD_FLAG), in the open
+// folder; sent as the engine's queue has room
+TBool CPmView::BatchL(TInt aOp, const TDesC8& aArg, CArrayFixFlat<TUint>& aUids)
+	{
+	if (iBatch->Count())
+		{
+		Toast(_L("Not available at this time"));   // (the last lot is still going)
+		return EFalse;
+		}
+	iBatchOp = aOp;
+	iBatchFolder = iFolder;
+	iBatchArg = aArg.Left(Min(aArg.Length(), iBatchArg.MaxLength()));
+	for (TInt i = 0; i < aUids.Count(); i++)
+		iBatch->AppendL(aUids[i]);
+	PumpBatchL();
+	return ETrue;
+	}
+
+void CPmView::PumpBatchL()
+	{
+	while (iBatch->Count() && iShared && iShared->cmd_head - iShared->cmd_tail < PM_CMDQ - 2)
+		{
+		TUint uid = (*iBatch)[0];
+		iBatch->Delete(0);
+		iBatchQuiet++;
+		Cmd(iBatchOp, iBatchFolder, uid, iBatchArg);
+		}
+	}
+
+// Delete (aDelete: to the Trash, or for good from the Trash) or Move of
+// the messages chosen
+TBool CPmView::BatchMoveL(const TDesC8& aDest, TBool aDelete)
+	{
+	CArrayFixFlat<TUint>* uids = new(ELeave) CArrayFixFlat<TUint>(16);
+	CleanupStack::PushL(uids);
+	MarkedUidsL(*uids);
+	TInt n = uids->Count();
+	if (!n)
+		{
+		CleanupStack::PopAndDestroy();
+		return EFalse;
+		}
+	const TPmFolder* f = CurrentFolder();
+	TBool forGood = aDelete && f && f->iKind == 'T';
+	TBuf<40> fact;
+	fact.Format(_L("%d messages chosen"), n);
+	if (aDelete && !iEikonEnv->QueryWinL(fact, forGood ? _L("Delete them for good?") : _L("Move them to the Trash?")))
+		{
+		CleanupStack::PopAndDestroy();
+		return EFalse;
+		}
+	if (!BatchL(PM_CMD_MOVE, aDest, *uids))
+		{
+		CleanupStack::PopAndDestroy();
+		return EFalse;
+		}
+	if (!forGood)
+		NoteUndoL((*uids)[n - 1]);              // (Edit > Undo puts back the last of them)
+	CleanupStack::PopAndDestroy();             // uids
+	// the rows go now (the engine's index follows)
+	TInt lo = iSel, hi = iSel;
+	if (iMarkLo >= 0 && iMarkHi > iMarkLo) { lo = iMarkLo; hi = iMarkHi; }
+	if (lo >= 0 && hi < iRows->Count())
+		iRows->Delete(lo, hi - lo + 1);
+	ClearMark();
+	iSel = lo;
+	if (iSel >= iRows->Count()) iSel = iRows->Count() - 1;
+	if (iSel < 0) iSel = 0;
+	TBuf<60> t;
+	if (aDelete) t.Format(forGood ? _L("%d deleted") : _L("%d moved to the Trash"), n);
+	else t.Format(_L("%d moved"), n);
+	Toast(t);
+	EnsureVisible();
+	iMsgListSum = 0;
+	Render();
+	return ETrue;
+	}
+
+// (1.05) a message (or the ones chosen) dragged from the list and let go
+// on a folder in the tree: moved there. EFalse: not over a folder
+TBool CPmView::DropOnFolderL(const TPoint& aPos, TInt aRow)
+	{
+	if (iMode != EList || !iFolderList || !iFolderList->IsVisible() || !iFolderList->Rect().Contains(aPos))
+		return EFalse;
+	// the message the pen went down on (the run chosen, if it is one of them)
+	if (aRow >= 0 && aRow < iRows->Count() && !(iMarkLo >= 0 && aRow >= iMarkLo && aRow <= iMarkHi))
+		{
+		ClearMark();
+		iSel = aRow;
+		iMsgList->SetCurrentItemIndex(aRow);
+		}
+	TInt idx = -1;
+	if (!iFolderList->View() || !iFolderList->View()->XYPosToItemIndex(aPos, idx) || idx <= 0)
+		return EFalse;
+	TInt fi = idx - 1;                         // (row 0 is the account)
+	if (fi >= iFolders->Count())
+		{
+		Toast(_L("Messages can be moved to a folder only"));
+		return ETrue;
+		}
+	const TPmFolder& f = (*iFolders)[fi];
+	if (f.iKind == 'N')
+		{
+		Toast(_L("That folder holds only other folders"));
+		return ETrue;
+		}
+	TBuf<64> name(f.iName);
+	TBuf8<128> dest(f.iImap);
+	TBool several = MarkedCount() > 1 || (iSel >= 0 && iSel < iRows->Count() && (*iRows)[iSel].iThread > 1);
+	if (MoveCurrentL(dest) && !several)
+		{
+		TInt last = -1;
+		for (TInt j = 0; j < name.Length(); j++)
+			if (name[j] == '/') last = j;
+		TBuf<80> t(_L("Moved to "));
+		t.Append(Clip(name.Mid(last + 1), 60));
+		Toast(t);
+		}
+	return ETrue;
+	}
+
 // ----- the reader -------------------------------------------------------------------
 
 // character and paragraph styles collected while the text is put together
@@ -1203,6 +1660,25 @@ static void AddSpan(CArrayFixFlat<TPmSpan>& aSpans, TInt aPos, TInt aLen, TInt a
 	s.iPos = aPos; s.iLen = aLen; s.iKind = aKind; s.iArg = aArg;
 	TRAPD(err, aSpans.AppendL(s));
 	(void)err;
+	}
+
+// (1.05) under a picture that can't be shown (its frame says why): a line
+// "Help on pictures", a link to the Help topic that says what PsiMail
+// reads and what can show the rest
+void CPmView::PictureHelpLinkL(TInt aEntry, TDes& aText, CArrayFixFlat<TPmSpan>& aSpans)
+	{
+	const TPmPicEntry& pe = iPictures->At(aEntry);
+	if (pe.iState != TPmPicEntry::EFailed || pe.iWhy == _L("spacer") || aText.Length() > aText.MaxLength() - 40)
+		return;
+	TPmLinkRange lr;
+	lr.iPos = aText.Length();
+	aText.Append(_L("Help on pictures"));
+	lr.iLen = aText.Length() - lr.iPos;
+	lr.iLink = KPmLinkPictureHelp;
+	iLinks->AppendL(lr);
+	AddSpan(aSpans, lr.iPos, lr.iLen, ESpanUnder);
+	AddSpan(aSpans, lr.iPos, lr.iLen, ESpanBig, 850);
+	aText.Append(TChar(CEditableText::EParagraphDelimiter));
 	}
 
 void CPmView::UpdateReaderL()
@@ -1396,6 +1872,7 @@ void CPmView::UpdateReaderL()
 						iPictures->AddPlaceL(e, t.Length());
 						t.Append(' ');
 						t.Append(KPara);
+						PictureHelpLinkL(e, t, *spans);
 						continue;
 						}
 					t.Append(_L("[Picture"));
@@ -1510,6 +1987,7 @@ void CPmView::UpdateReaderL()
 				AddSpan(*spans, p0, t.Length() - p0, ESpanItalic);
 				AddSpan(*spans, p0, t.Length() - p0, ESpanBig, 850);
 				t.Append(KPara);
+				PictureHelpLinkL(e, t, *spans);
 				}
 			else
 				{
@@ -2046,6 +2524,11 @@ void CPmView::NativeActivateLinkL()
 		ShowWebPicturesL();                   // "Show them" (pmwebpic.cpp)
 		return;
 		}
+	if (link == KPmLinkPictureHelp)
+		{
+		((CPmAppUi*)iEikonEnv->EikAppUi())->HelpTopicL(KPmHelpPictures);
+		return;
+		}
 	if (link <= -3000)
 		{
 		InviteLinkL(link);                    // the invitation's or card's box (pminvite.cpp)
@@ -2300,10 +2783,8 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 		}
 	else if (iMode == EList)
 		{
-		TInt unread = 0;
-		for (TInt i = 0; i < iRows->Count(); i++)
-			if ((*iRows)[i].iFlags.Locate('S') < 0) unread++;
-		TInt n = iRows->Count();
+		TInt unread = 0, n = 0;
+		CountRows(n, unread);                  // (1.05: folded conversations' messages too)
 		if (iSearch) mid.Format(_L("%d found"), n);
 		else if (n == 0) mid = _L("No messages");
 		else if (n == 1) mid = unread ? _L("1 message (new)") : _L("1 message");
@@ -2806,10 +3287,9 @@ void CPmView::StatusInfoL()
 	}
 	if (iMode == EList)
 		{
-		TInt unread = 0;
-		for (TInt i = 0; i < iRows->Count(); i++)
-			if ((*iRows)[i].iFlags.Locate('S') < 0) unread++;
-		lines[4].Format(_L("This folder: %d messages here, %d unread"), iRows->Count(), unread);
+		TInt unread = 0, total = 0;
+		CountRows(total, unread);
+		lines[4].Format(_L("This folder: %d messages here, %d unread"), total, unread);
 		}
 	else
 		lines[4] = _L("This folder: -");
@@ -2890,11 +3370,26 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 		{
 		if (IsListKey(code))
 			{
+			// (1.05) Shift with Up, Down, Page up/down, Home or End chooses
+			// a run of messages; without it the run is let go
+			TBool shift = (aKeyEvent.iModifiers & EModifierShift) && !iSidebar && iMode == EList && iRows->Count();
+			if (shift && iMarkFrom < 0)
+				iMarkFrom = iSel;
+			else if (!shift && iMarkFrom >= 0)
+				ClearMark();
+			TKeyEvent k = aKeyEvent;
+			k.iModifiers &= ~EModifierShift;
 			if (iSidebar)
-				iFolderList->OfferKeyEventL(aKeyEvent, aType);
+				iFolderList->OfferKeyEventL(k, aType);
 			else if (iRows->Count())
-				iMsgList->OfferKeyEventL(aKeyEvent, aType);
+				iMsgList->OfferKeyEventL(k, aType);
 			SyncSelectionFromLists();
+			if (shift)
+				{
+				iMarkLo = Min(iMarkFrom, iSel);
+				iMarkHi = Max(iMarkFrom, iSel);
+				if (iMsgList->IsVisible()) iMsgList->DrawNow();
+				}
 			UpdateStatusLine();
 			PreviewSyncL();
 			return EKeyWasConsumed;
@@ -2915,6 +3410,8 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 				return EKeyWasConsumed;
 				}
 			SyncSelectionFromLists();
+			if (iMode == EList && ThreadKeyL(ETrue))
+				return EKeyWasConsumed;          // (1.05) a folded conversation: unfolded
 			OpenCurrentL();
 			return EKeyWasConsumed;
 		case EKeyTab:
@@ -2922,6 +3419,9 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 			if (iSidebar) OpenCurrentL(); else if (canFolders) FocusFoldersL();
 			return EKeyWasConsumed;
 		case EKeyLeftArrow:
+			SyncSelectionFromLists();
+			if (iMode == EList && ThreadKeyL(EFalse))
+				return EKeyWasConsumed;          // (1.05) an unfolded conversation: folded
 			if (!iSidebar && canFolders) FocusFoldersL();
 			return EKeyWasConsumed;
 		case EKeyEscape:
@@ -3221,9 +3721,23 @@ void CPmView::HandleListBoxEventL(CEikListBox* aListBox, TListBoxEvent aEventTyp
 		TInt was = iSel;
 		iSidebar = EFalse;
 		iSel = iMsgList->CurrentItemIndex();
+		if (iMarkLo >= 0 && (iSel < iMarkLo || iSel > iMarkHi))
+			ClearMark();                       // (1.05) a tap outside the run lets it go
+		if (iUnfoldTick && User::TickCount() - iUnfoldTick < 32)
+			{
+			iUnfoldTick = 0;                       // (1.05) the same tap's second event: not an open
+			return;
+			}
+		iUnfoldTick = 0;
 		if (aEventType == EEventEnterKeyPressed || aEventType == EEventItemDoubleClicked ||
 			(aEventType == EEventItemClicked && !wasSide && iSel == was))
 			{
+			if (iMode == EList && ThreadKeyL(ETrue))
+				{
+				iUnfoldTick = User::TickCount();    // (1.05) a folded conversation: unfolded
+				if (!iUnfoldTick) iUnfoldTick = 1;
+				return;
+				}
 			OpenCurrentL();
 			return;
 			}

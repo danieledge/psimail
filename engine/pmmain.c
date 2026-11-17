@@ -480,7 +480,14 @@ static int run(PmCmd *c, char *why, int whymax)
 		return PM_RES_OK;
 	}
 	if (c->op == PM_CMD_PUTLOG) return pm_send_log(why, whymax);
-	if (c->op == PM_CMD_CALSYNC) return cal_sync(!strcmp(c->arg, "list"), why, whymax);
+	if (c->op == PM_CMD_CALSYNC) {
+		/* (1.05) the calendar's User-Agent names the version and the machine,
+		   as mail and web pictures do (psion-core's http_user_agent) */
+		static char ua[80];
+		snprintf(ua, sizeof(ua), "PsiMail/%s (%s)", s->net.version, s->machine[0] ? s->machine : "Psion");
+		http_user_agent(ua);
+		return cal_sync(!strcmp(c->arg, "list"), why, whymax);
+	}
 	if (c->op == PM_CMD_UPDATE) return pm_update(c->arg, c->folder, why, whymax);
 	if (a < 0 || a >= PM_MAX_ACCOUNTS || !s->acct[a].used) { snprintf(why, whymax, "No such account"); return PM_RES_FAILED; }
 	st_check_account(a);

@@ -103,7 +103,8 @@ enum TPmCommands
 	EPmCmdDayListView,       // (1.00) the calendar's View > Switch view > Day list (tall screens: added in DynInitMenuPaneL)
 	EPmCmdNextUnread,        // (1.02) View > Go to > Next unread (Shift+Ctrl+J)
 	EPmCmdRules,             // (1.02) Tools > Accounts > Rules... (pmrules.cpp)
-	EPmCmdSignatures         // (1.02) Tools > Accounts > Signatures... (pmrules.cpp)
+	EPmCmdSignatures,        // (1.02) Tools > Accounts > Signatures... (pmrules.cpp)
+	EPmCmdToggleThreads      // (1.05) View > Show > Conversations
 	};
 
 enum TPmDialogControls
@@ -207,7 +208,9 @@ enum TPmButtons
 	EPmBidSend,
 	EPmBidRemove,
 	EPmBidContacts,          // compose: pick addresses from Contacts
-	EPmBidAccount            // the login dialog: the account's settings
+	EPmBidAccount,           // the login dialog: the account's settings
+	EPmBidWrite,             // (1.05) a tap on the sender: write to them
+	EPmBidAddContact         //   or add them to Contacts
 	};
 
 enum TPmPages

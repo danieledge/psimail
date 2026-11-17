@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.04, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.05, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.04](#whats-new-in-104) (and [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
+- [What's new in 1.05](#whats-new-in-105) (and [1.04](#104), [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,38 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.04
+## What's new in 1.05
+
+On every machine:
+
+- **Conversations.** View > Show > Conversations groups the messages that
+  answer one another (by In-Reply-To and Message-ID) into one row, with how
+  many there are, "Tea? (3)", in bold if any is unread. Right or Enter
+  unfolds it: the first message, then the answers, oldest first, set in a
+  little; Left folds it again. Delete or Move on a folded conversation acts
+  on all of its messages. It shows while the list is in date order.
+- **Several messages at once.** Shift with Up or Down (or Pg Up, Pg Dn,
+  Home, End) chooses a run of messages; Delete, Move, Archive, Unread and
+  Flagged act on all of them (Delete asks first).
+- **Drag to a folder.** With the pen, drag a message (or the ones chosen)
+  out of the list onto a folder on the left: it is moved there.
+- **The sender.** A tap on the sender's name in a message offers Write and
+  Add to Contacts.
+- **Replies start with room to write.** The message you answer is folded
+  to one line, "[Frank wrote: 23 lines - Ctrl+Q shows them]", and sent in
+  full under your reply. Ctrl+Q puts it in the text to edit; deleting the
+  line leaves it out.
+- **Find: On this Psion while online too.** Edit > Find has a second line,
+  Look: On the server or On this Psion (the mail already downloaded, with no
+  connection). Working offline it is On this Psion.
+- **Help on pictures.** A picture that can't be shown has a "Help on
+  pictures" link under it: what PsiMail reads, and what can turn the rest
+  (WebP, AVIF) into a picture it reads.
+- The calendar says which machine and version is asking (User-Agent), as
+  mail and web pictures do since 1.03 (psion-core's `http_user_agent`;
+  PsiSync sends what it did before).
+
+### 1.04
 
 Pictures in colour on the netBook and the Series 7:
 
@@ -231,6 +262,11 @@ PsiMail on the netBook (1.04: the inbox, the pictures in colour and the calendar
 <tr>
 <td><a href="docs/screenshots/netbook-psimail-calendar-month.png"><img src="docs/screenshots/netbook-psimail-calendar-month.png" alt="netBook: the month, with each day's events" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-calendar-month.png"><img src="docs/screenshots/5mx-psimail-calendar-month.png" alt="Series 5mx: the month, with each day's first event" width="400"></a></td>
+</tr>
+<tr><td colspan="2"><b>Conversations (1.05): a message and its answers, unfolded</b></td></tr>
+<tr>
+<td><a href="docs/screenshots/netbook-psimail-conversations.png"><img src="docs/screenshots/netbook-psimail-conversations.png" alt="netBook: a conversation of three messages unfolded in the list, the answers set in" width="400"></a></td>
+<td><a href="docs/screenshots/5mx-psimail-conversations.png"><img src="docs/screenshots/5mx-psimail-conversations.png" alt="Series 5mx: the same conversation unfolded" width="400"></a></td>
 </tr>
 <tr><td colspan="2"><b>Writing a message</b></td></tr>
 <tr>
@@ -543,6 +579,8 @@ lists, anniversaries, more than one calendar account.
 | Tab / Shift+Tab in a message | next / previous link or attachment (Enter opens it) |
 | Tab or Left in the message list | the folder column |
 | Del (and Backspace in a list) | delete |
+| Shift+Up/Down (and Pg Up, Pg Dn, Home, End) | choose several messages: Delete, Move, Archive, Unread and Flagged act on all (1.05) |
+| Right / Left on a conversation | unfold / fold it (View > Show > Conversations, 1.05) |
 | Shift+Ctrl+C / Ctrl+U / Esc | check mail (send & receive) / disconnect / stop |
 | Shift+Ctrl+W | work offline |
 | Ctrl+N / Ctrl+R / Shift+Ctrl+R / Ctrl+W | new / reply / reply to all / forward |
@@ -552,7 +590,7 @@ lists, anniversaries, more than one calendar account.
 | Shift+Ctrl+U / Shift+Ctrl+F | unread / flagged |
 | Ctrl+S | save an attachment (Message > Attachments > Open / Save) |
 | Shift+Ctrl+S | save the open message as a Word file (File > Printing > Save as Word file) |
-| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find (offline: on this Psion) |
+| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find (on the server, or on this Psion) |
 | Shift+Ctrl+J | the next unread message (1.02) |
 | Shift+Ctrl+X / Shift+Ctrl+G | check this folder / get older messages (File > Folder, with Create new / Rename / Delete) |
 | Ctrl+M / Shift+Ctrl+M | zoom in / out (three sizes, going round) |
@@ -574,7 +612,8 @@ right. Ctrl+B, Ctrl+I and Ctrl+U make the text bold, italic or underlined
 want one). Ctrl+S sends, Ctrl+D saves it as a draft (in the Outbox), Ctrl+A
 adds or removes attachments, Ctrl+L adds addresses from Contacts (Tab in an
 address line fills in a match), Esc closes (asking before it throws anything
-away). A new event (Ctrl+N in the calendar) is a standard dialog: the
+away). In a reply the message you answer is folded to one line (1.05):
+Ctrl+Q puts it in the text; left folded, it is sent in full under yours. A new event (Ctrl+N in the calendar) is a standard dialog: the
 event, where, the date, all day or start and end, and an alarm.
 
 ## Updating from the Psion
@@ -762,7 +801,6 @@ it is the user's.
 
 ## Not yet
 
-* IMAP IDLE (push mail); the timed check covers the Inbox while PsiMail runs.
 * Server-side drafts (drafts stay in the Outbox).
 * Repeating entries made on the Psion, to-do lists and anniversaries in the
   calendar sync.
