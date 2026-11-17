@@ -20,7 +20,7 @@ ENGINE  := pmmain imap imapparse smtp compose mime charset html store pmnet \
 # the calendar engine and the certificate check, shared with PsiSync (psion-core)
 CAL     := $(CORE)/mail/engine/cal
 TLSV    := $(CORE)/mail/engine/tlsv
-CAL_SRCS := caldav caltz ics http xmlscan cp1252 calutil calzone
+CAL_SRCS := caldav caltz ics http xmlscan cp1252 calutil calzone calrpt
 IMG_SRCS := pmimg pmjpeg pmjprog pmpng pmgif picojpeg
 Z_SRCS  := adler32 crc32 inflate inftrees inffast zutil
 LTC_SRCS := stream/chacha/chacha_crypt stream/chacha/chacha_ivctr32 stream/chacha/chacha_keystream \

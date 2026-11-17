@@ -2445,6 +2445,16 @@ static TBool KeptByPsiSync(RFs& aFs, const TDesC& aAgendaFile)
 	return name.CompareF(aAgendaFile) == 0;
 	}
 
+// (0.99) the Agenda pass, with an entry's change told by a hash of what it
+// shows (core's KPmCalOptStamp) rather than the Agenda's last-changed date,
+// which counts whole minutes: an edit made in the minute of a sync was missed
+void CPmView::StartAgendaPassL(const TDesC& aDir)
+	{
+	TPmCalSettings s = *iCal;
+	s.iSpare[0] |= KPmCalOptStamp;
+	iCalSync->StartL(aDir, s);
+	}
+
 void CPmView::HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg)
 	{
 	TBool list = aCmd.arg[0] == 'l';
@@ -2468,7 +2478,7 @@ void CPmView::HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg)
 			}
 		TBuf<100> dir;
 		StoreDir(dir);
-		iCalSync->StartL(dir, *iCal);
+		StartAgendaPassL(dir);
 		return;
 		}
 	if (aRes == PM_RES_OFFLINE && !list && KeptByPsiSync(iEikonEnv->FsSession(), iCal->iAgendaFile))
@@ -2485,7 +2495,7 @@ void CPmView::HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg)
 		iCalMsg.Zero();
 		TBuf<100> dir;
 		StoreDir(dir);
-		iCalSync->StartL(dir, *iCal);
+		StartAgendaPassL(dir);
 		return;
 		}
 	iCalSecond = EFalse;

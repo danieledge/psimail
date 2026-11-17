@@ -396,6 +396,7 @@ private:
 	void TickQuiet();
 	static TInt BellCallback(TAny* aSelf);
 	void HandleResultL(const PmCmd& aCmd);
+	void StartAgendaPassL(const TDesC& aDir);
 	void HandleCalResultL(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg);
 	void CalCmd(const TDesC8& aArg);
 	void ReloadL();
