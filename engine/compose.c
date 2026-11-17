@@ -312,7 +312,7 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 {
 	PmAccount *a = &pm_shared()->acct[acct];
 	static char line[1100], to[1100], cc[1100], bcc[1100], subject[400], irt[200], refs[1000];
-	static char attach[8][150];
+	static char attach[8][260];              /* (a full EPOC file name is 256: at 150 a long one was cut and "missing") */
 	static ItipReply itip;
 	int natt = 0, i, rich = 0, blen = 0;
 	char *body;

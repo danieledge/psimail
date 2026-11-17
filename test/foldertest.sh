@@ -4,6 +4,9 @@
 # UTF-7), rename (the local files follow), delete (refused for the Inbox, a
 # standard folder and a folder with children; offline).
 set -u
+# the engine's text is Windows-1252: in a UTF-8 locale grep took the 0xE9 of
+# the non-ASCII name for binary and the test failed with nothing wrong
+export LC_ALL=C
 HERE=$(cd "$(dirname "$0")" && pwd)
 H=${1:-$HERE/../build/mail-host/psimail-host}
 PORT=1179
