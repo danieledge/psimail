@@ -88,11 +88,16 @@ def tours(kind):
                        'right down down down enter +2 shot:no-preview').split()),
         ('N', 'CARD0', ('+2 shot:first-run +1 tap:130,%d +1 shot:first-run-incoming esc +2 shot:first-run-cancelled esc +2 '
                         'shot:empty menu right right right right down enter +2 shot:first-conn' % y(34)).split()),
+        # (1.02) next unread, the rules, the signatures, Check for new mail: At once
+        ('J', S, ST + '^^j +2 shot:next-unread ^^j +2 shot:next-unread2 enter +4 ^^j +4 shot:next-unread-reader esc'.split()),
+        ('R1', S, ST + 'menu right right right right down down down right up up +1 shot:menu-accounts2 enter +2 shot:rules '
+                       'right right right down +1 shot:rules-move esc'.split()),
+        ('R2', S, ST + 'menu right right right right down down down right up enter +2 shot:signatures esc'.split()),
     ]
     if nb:
         t += [
-            ('A2', S, ST + ('shot:inbox enter +7 shot:reader-pic esc tap:350,112 up +1 shot:preview-gif enter +9 shot:reader-gif '
-                            'down down down down down down down down +1 shot:reader-gif2 esc tap:350,136 up +2 shot:preview-news '
+            ('A2', S, ST + ('shot:inbox enter +7 shot:reader-pic esc +2 tap:350,112 up +1 shot:preview-gif enter +9 shot:reader-gif '
+                            'down down down down down down down down +1 shot:reader-gif2 esc +2 tap:350,136 up +2 shot:preview-news '
                             'enter +9 shot:reader-news down down down down down down down down down down +1 shot:reader-news2 '
                             'esc tap:350,160 up +1 shot:preview-quotes enter +4 shot:reader-quotes esc tap:350,208 down down +2 '
                             'shot:list2 enter +4 shot:reader-flagged').split()),

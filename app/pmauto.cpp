@@ -36,6 +36,7 @@ static TInt CheckMinutes(const TPmSettings& aSettings)
 	case 2: return 15;
 	case 3: return 30;
 	case 4: return 60;
+	case 5: return 10;                   // (1.02) at once: IDLE where it can, else every 10 minutes
 	default: return 0;
 		}
 	}
@@ -50,7 +51,7 @@ TBool CPmView::InBackground() const
 void CPmView::NewMailAlertL(const PmCmd& aCmd, TBool aAuto)
 	{
 	TPtrC8 folder((const TUint8*)aCmd.folder);
-	if (aCmd.op != PM_CMD_SENDRECV && !(aCmd.op == PM_CMD_SYNC && folder.CompareF(_L8("INBOX")) == 0))
+	if (aCmd.op != PM_CMD_SENDRECV && aCmd.op != PM_CMD_IDLE && !(aCmd.op == PM_CMD_SYNC && folder.CompareF(_L8("INBOX")) == 0))
 		return;
 	TInt n = iShared->new_mail;
 	TInt alert = (iSettings->iView & KPmViewAlertMask) >> KPmViewAlertShift;
@@ -86,6 +87,7 @@ TInt CPmView::CheckCallback(TAny* aSelf)
 
 void CPmView::AutoSettingsChanged()
 	{
+	iIdleBroken = EFalse;                      // (1.02: tried again)
 	if (!CheckMinutes(*iSettings))
 		{
 		delete iCheckTimer;
@@ -122,9 +124,47 @@ void CPmView::CheckDueL()
 	Cmd(PM_CMD_SYNC, _L8("INBOX"), 0, KNullDesC8);
 	}
 
+// ----- (1.02) new mail at once ---------------------------------------------
+//
+// Preferences > New mail > Check for new mail: At once. On a route that
+// stays connected (Psion TCP/IP: a network card, or a dial-up kept up) and
+// with a connection open, the engine waits on the Inbox (PM_CMD_IDLE, IMAP
+// IDLE, 25 minutes at a time) and brings new mail as it comes; any other
+// command ends the wait within a second. On the modem route the line is
+// dropped after use, so it is a check every 10 minutes instead. A server
+// without IDLE: the same, until the preference is set again.
+
+TBool CPmView::IdleWanted() const
+	{
+	return ((iSettings->iView & KPmViewCheckMask) >> KPmViewCheckShift) == 5 && !iIdleBroken &&
+		iSettings->iNetMode == 1 && !iSettings->iOffline && iRunning && iMode != ENoAccount &&
+		!iLoginHeld && iShared && iShared->online;
+	}
+
+void CPmView::IdleTickL()
+	{
+	if (iIdleCmd || !IdleWanted() || Busy() || iAutoCmd || CalendarBusy())
+		return;
+	iIdleCmd = iShared->cmd_head + 1;          // (done_seq when it is done)
+	Cmd(PM_CMD_IDLE, _L8("INBOX"), 0, _L8("1500"));
+	}
+
 // a timed check's result: quiet, except for new mail
 TBool CPmView::AutoResultL(const PmCmd& aCmd)
 	{
+	if (aCmd.op == PM_CMD_IDLE)
+		{
+		iIdleCmd = 0;
+		TInt res = iShared->last_res;
+		if (res == PM_RES_FAILED)
+			iIdleBroken = ETrue;               // (no IDLE at the server: the 10 minutes)
+		if (res == PM_RES_OK && iShared->new_mail > 0)
+			{
+			ReloadL();
+			NewMailAlertL(aCmd, ETrue);
+			}
+		return ETrue;                          // (quiet: nothing to say when nothing came)
+		}
 	if (!iAutoCmd || iDoneSeen != iAutoCmd || aCmd.op != PM_CMD_SYNC)
 		return EFalse;
 	iAutoCmd = 0;
@@ -224,7 +264,7 @@ void CPmPrefsDialog::NewMailInitL()
 	TInt a = (v & KPmViewAlertMask) >> KPmViewAlertShift;
 	SetChoiceListCurrentItem(EPmDlgAlert, a <= 2 ? a : 0);
 	TInt c = (v & KPmViewCheckMask) >> KPmViewCheckShift;
-	if (c > 4) c = 0;
+	if (c > 5) c = 0;                    // (5: at once, 1.02)
 	SetChoiceListCurrentItem(EPmDlgCheckEvery, c);
 	SetChoiceListCurrentItem(EPmDlgCheckConnect, (v & KPmViewCheckConnect) ? 1 : 0);
 	// (r_pm_yes_no_array is No, Yes - the one order every yes/no list in

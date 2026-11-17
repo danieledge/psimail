@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.00, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.02, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.01](#whats-new-in-101) (and [1.00](#100), [0.96](#096))
+- [What's new in 1.02](#whats-new-in-102) (and [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,32 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.01
+## What's new in 1.02
+
+On every machine:
+
+- **Find on this Psion.** Edit > Find while working offline looks through
+  the mail on the Psion: the sender, the subject and the text of every
+  message downloaded, every word you type. It needs no connection and
+  shows the newest 50 it finds, as the server's search does.
+- **Next unread** (View > Go to > Next unread, Shift+Ctrl+J): the next
+  unread message in the folder, then the next folder with unread mail. In a
+  message, the next unread one is opened.
+- **Rules** (Tools > Accounts > Rules...): up to eight. When the sender or
+  the subject contains some words, new mail in the Inbox is moved to a
+  folder, flagged, marked as read, or comes with no new mail alert. They
+  act as each check brings the mail in, and only on new mail.
+- **Signatures** (Tools > Accounts > Signatures...): a second signature for
+  replies, and whether it goes above the quote (as before) or below it.
+- **A tap on the envelope** of the message already chosen marks it read or
+  unread.
+- **New mail at once**: Preferences > New mail > Check for new mail: At
+  once. On a connection that stays up (Psion TCP/IP: a network card, or a
+  dial-up kept connected) PsiMail waits on the Inbox (IMAP IDLE) and brings
+  new mail as it arrives; anything you do comes first. On the modem route,
+  or with a server that cannot do it, it checks every 10 minutes.
+
+### 1.01
 
 The netBook and Series 7's 480 lines put to use. The Series 5mx looks and
 works as in 0.99 (its screens compared pixel for pixel again).
@@ -471,14 +496,15 @@ lists, anniversaries, more than one calendar account.
 | Shift+Ctrl+U / Shift+Ctrl+F | unread / flagged |
 | Ctrl+S | save an attachment (Message > Attachments > Open / Save) |
 | Shift+Ctrl+S | save the open message as a Word file (File > Printing > Save as Word file) |
-| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find |
+| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find (offline: on this Psion) |
+| Shift+Ctrl+J | the next unread message (1.02) |
 | Shift+Ctrl+X / Shift+Ctrl+G | check this folder / get older messages (File > Folder, with Create new / Rename / Delete) |
 | Ctrl+M / Shift+Ctrl+M | zoom in / out (three sizes, going round) |
 | Ctrl+T / Shift+Ctrl+T / Shift+Ctrl+L | show the toolbar / title bar / folder list |
 | Shift+Ctrl+Q / Shift+Ctrl+B | status information / sort |
 | Ctrl+K | preferences |
 | Shift+Ctrl+H / Shift+Ctrl+A / Ctrl+E | help / about PsiMail / close |
-| Shift+Ctrl+N / Ctrl+Q | the calendar / switch its view (week or month; View > Switch view lists them) |
+| Shift+Ctrl+N / Ctrl+Q | the calendar / switch its view (week or month, and on a tall screen the day list; View > Switch view lists them) |
 | Shift+Ctrl+Y / Shift+Ctrl+D | sync the calendar / go to today |
 | In the calendar: Left/Right, Pg Up/Pg Dn, Home | day, week (month), today |
 | In the calendar: Ctrl+N / Enter | new event / the event in full |

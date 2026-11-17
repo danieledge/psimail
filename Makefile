@@ -16,7 +16,7 @@ LTM     := $(CORE)/ssh/db/libtommath
 IMG     := $(CORE)/mail/engine/img
 
 ENGINE  := pmmain imap imapparse smtp compose mime charset html store pmnet \
-           pmcalport pmupdate pictures undo invite invmsg webpics
+           pmcalport pmupdate pictures undo invite invmsg webpics local
 # the calendar engine and the certificate check, shared with PsiSync (psion-core)
 CAL     := $(CORE)/mail/engine/cal
 TLSV    := $(CORE)/mail/engine/tlsv

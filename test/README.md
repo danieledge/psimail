@@ -298,3 +298,16 @@ Coda images (psion-netbook's `tools/mkimage.mts --smooth-text --font-choice
 
 Two screens change with every release by design: About (the version) and
 Status information (the free memory, which the program's own size moves).
+
+## Find on this Psion, rules and new mail at once (1.02)
+
+`localtest.sh`: a search while offline (or with "\x01L" before its words)
+looks at the mail on the Psion (`engine/local.c`): every word in the
+sender, subject or downloaded text; a text not downloaded is not searched;
+the server is sent nothing. `rulestest.sh`: `rules.txt` (Tools > Accounts >
+Rules) acts on new Inbox mail only, the first matching rule: a subject
+moved to Archive, a sender's mail marked read, a bad line skipped.
+`idletest.sh`: `fakeimap.py --idle-arrive SECS` offers IDLE and sends
+EXISTS SECS into it; the engine's `idle` ends with DONE and syncs the new
+message, waits the whole time when nothing comes, and says "Not available"
+to a server without IDLE.

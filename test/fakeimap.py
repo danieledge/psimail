@@ -3,7 +3,7 @@
 
   fakeimap.py PORT [--drop-at N[,N...]] [--drop-every N] [--slow MS_PER_KB]
               [--mute-noop] [--no-uidplus] [--arrive N[,N...]] [--invite]
-              [--user NAME]
+              [--user NAME] [--idle-arrive SECS]
 
 Serves an INBOX of a few messages: one whose text has "NO CARRIER" on a
 line of its own (as an email about modems would), one of 30 KB (several
@@ -25,6 +25,9 @@ looks like once a router has quietly forgotten it. --invite adds two
 multipart messages: 106, an invitation (text/plain and a base64
 text/calendar METHOD:REQUEST part, as Google sends), and 107 with a vCard
 attached (invite.h).
+--idle-arrive SECS: IDLE (RFC 2177) is in the capabilities; SECS into an
+IDLE a new message arrives and "* N EXISTS" is sent (0: none comes), and
+DONE ends it (idletest.sh).
 --user NAME refuses LOGIN for any other user name, with "NO
 [AUTHENTICATIONFAILED] no such user" (as Proton Bridge answers a user name
 that is not the account's address): see logintest.sh.
@@ -46,6 +49,7 @@ ARRIVE = []
 INVITE = False
 NEWS = None
 USER = None
+IDLE_ARRIVE = None
 args = sys.argv[2:]
 while args:
     a = args.pop(0)
@@ -58,7 +62,8 @@ while args:
     elif a == '--invite': INVITE = True
     elif a == '--news': NEWS = args.pop(0)
     elif a == '--user': USER = args.pop(0)
-CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE')
+    elif a == '--idle-arrive': IDLE_ARRIVE = float(args.pop(0))
+CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE') + (' IDLE' if IDLE_ARRIVE is not None else '')
 
 def msg(uid, subject, text):
     return dict(uid=uid, subject=subject, text=text.replace('\n', '\r\n'), msgid='<%d@example.com>' % uid, deleted=False)
@@ -258,6 +263,27 @@ def handle(conn, addr):
                 else:
                     send('%s OK [CAPABILITY %s] logged in\r\n' % (tag, CAPS))
             elif cmd == 'CAPABILITY': send('* CAPABILITY %s\r\n%s OK done\r\n' % (CAPS, tag))
+            elif cmd == 'IDLE' and IDLE_ARRIVE is not None:
+                send('+ idling\r\n')
+                conn.settimeout(0.2)
+                t0 = time.time(); came = False; done = False; buf = b''
+                while not done:
+                    if IDLE_ARRIVE and not came and time.time() - t0 >= IDLE_ARRIVE:
+                        box_ = BOXES['INBOX']
+                        n = box_['next']; box_['next'] += 1
+                        MSGS.append(msg(n, 'arrived %d' % n, 'This one came while you were idling (%d).\n' % n))
+                        send('* %d EXISTS\r\n' % len(MSGS)); came = True
+                        log('idle: a new message arrived: %d' % n)
+                    try:
+                        b = conn.recv(100)
+                        if not b: break
+                        buf += b
+                        if b'DONE' in buf.upper(): done = True
+                    except socket.timeout:
+                        pass
+                conn.settimeout(None)
+                log('< DONE')
+                send('%s OK idle done\r\n' % tag)
             elif cmd == 'NOOP':
                 if MUTE_NOOP:
                     log('mute: not answering the NOOP, or anything else')

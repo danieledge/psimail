@@ -142,7 +142,8 @@ RESOURCE HOTKEYS r_pm_hotkeys
 		HOTKEY { command=EPmCmdPrintSetup; key='p'; },
 		HOTKEY { command=EPmCmdPrintPreview; key='v'; },
 		HOTKEY { command=EPmCmdSaveWord; key='s'; },
-		HOTKEY { command=EPmCmdRefresh; key='x'; }
+		HOTKEY { command=EPmCmdRefresh; key='x'; },
+		HOTKEY { command=EPmCmdNextUnread; key='j'; }
 		};
 	}
 
@@ -371,6 +372,7 @@ RESOURCE MENU_PANE r_pm_goto_menu
 	{
 	items=
 		{
+		MENU_ITEM { command=EPmCmdNextUnread; txt="Next unread"; },
 		MENU_ITEM { command=EPmCmdInbox; txt="Inbox"; },
 		MENU_ITEM { command=EPmCmdOutbox; txt="Outbox"; },
 		MENU_ITEM { command=EPmCmdShowCalendar; txt="Calendar"; },
@@ -410,7 +412,9 @@ RESOURCE MENU_PANE r_pm_accounts_menu
 		MENU_ITEM { command=EPmCmdEditAccount; txt="Settings..."; },
 		MENU_ITEM { command=EPmCmdSwitchAccount; txt="Switch..."; },
 		MENU_ITEM { command=EPmCmdNewAccount; txt="Add..."; },
-		MENU_ITEM { command=EPmCmdDeleteAccount; txt="Remove"; }
+		MENU_ITEM { command=EPmCmdDeleteAccount; txt="Remove"; },
+		MENU_ITEM { command=EPmCmdRules; txt="Rules..."; },
+		MENU_ITEM { command=EPmCmdSignatures; txt="Signatures..."; }
 		};
 	}
 
@@ -450,6 +454,60 @@ RESOURCE DIALOG r_pm_info_dialog
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; }
 		};
+	}
+
+// (1.02) Tools > Accounts > Rules: eight at most, one shown at a time
+// (pmrules.cpp). Fixed widths: the dialog keeps one size
+RESOURCE DIALOG r_pm_rules_dialog
+	{
+	title="Rules for new mail";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	items=
+		{
+		DLG_LINE { type=EEikCtChoiceList; prompt="Rule"; id=EPmDlgRuleNo; control=CHOICELIST { array_id=r_pm_rule_numbers; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="When the"; id=EPmDlgRuleWhat; control=CHOICELIST { array_id=r_pm_rule_what; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="contains"; id=EPmDlgRuleWords; control=EDWIN { width=20; maxlength=58; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="then"; id=EPmDlgRuleAct; control=CHOICELIST { array_id=r_pm_rule_act; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Folder"; id=EPmDlgRuleFolder; control=CHOICELIST { maxdisplaychar=20; array_id=r_pm_empty_array; }; }
+		};
+	}
+
+RESOURCE ARRAY r_pm_rule_numbers
+	{
+	items= { LBUF { txt="1"; }, LBUF { txt="2"; }, LBUF { txt="3"; }, LBUF { txt="4"; },
+		LBUF { txt="5"; }, LBUF { txt="6"; }, LBUF { txt="7"; }, LBUF { txt="8"; } };
+	}
+
+RESOURCE ARRAY r_pm_rule_what
+	{
+	items= { LBUF { txt="Sender"; }, LBUF { txt="Subject"; } };
+	}
+
+RESOURCE ARRAY r_pm_rule_act
+	{
+	items= { LBUF { txt="No rule"; }, LBUF { txt="Move to folder"; }, LBUF { txt="Flag it"; },
+		LBUF { txt="Mark as read"; }, LBUF { txt="No new mail alert"; } };
+	}
+
+// (1.02) Tools > Accounts > Signatures
+RESOURCE DIALOG r_pm_sig_dialog
+	{
+	title="Signatures";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; prompt="New messages"; id=EPmDlgSigNew; control=EDWIN { width=22; maxlength=159; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Replies"; id=EPmDlgSigReply; control=EDWIN { width=22; maxlength=159; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="In replies"; id=EPmDlgSigWhere; control=CHOICELIST { array_id=r_pm_sig_where; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgSigNote; control=LABEL { txt="/ is a new line - Replies left empty: the same as new messages"; }; }
+		};
+	}
+
+RESOURCE ARRAY r_pm_sig_where
+	{
+	items= { LBUF { txt="Above the quote"; }, LBUF { txt="Below the quote"; } };
 	}
 
 RESOURCE DIALOG r_pm_text_dialog
@@ -858,7 +916,7 @@ RESOURCE ARRAY r_pm_check_array
 	items=
 		{
 		LBUF { txt="Off"; }, LBUF { txt="Every 10 minutes"; }, LBUF { txt="Every 15 minutes"; },
-		LBUF { txt="Every 30 minutes"; }, LBUF { txt="Every hour"; }
+		LBUF { txt="Every 30 minutes"; }, LBUF { txt="Every hour"; }, LBUF { txt="At once"; }
 		};
 	}
 

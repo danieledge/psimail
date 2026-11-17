@@ -103,6 +103,114 @@ static int queued(int r)
 	       r == PM_RES_LOGIN_FAILED || r == PM_RES_CANCELLED;
 }
 
+/* ------------------------------------------------------------------ rules */
+
+/* (1.01) Tools > Rules: what is done with new mail as it arrives in the
+   Inbox. rules.txt in the account's folder (the app writes it), at most
+   8, one a line, the first that matches a message is used:
+       what TAB words TAB action TAB folder
+   what: F the sender contains, S the subject contains (any case);
+   action: M move to the folder (its IMAP name), F flag, R mark read,
+   Q no new-mail alert. A message moved, marked read or quietened does not
+   count as new mail. Only mail that came in this sync is looked at, and
+   none on an account's first sync (all of it would be "new"). */
+#define PM_RULES 8
+typedef struct { char what; char act; char words[60]; char folder[128]; } PmRule;
+
+static int rules_load(int acct, PmRule *r)
+{
+	static char buf[2048];
+	char dir[160], path[190];
+	FILE *f;
+	int n = 0, len;
+	char *p, *e;
+	st_acct_dir(acct, dir, sizeof(dir));
+	snprintf(path, sizeof(path), "%srules.txt", dir);
+	if (!(f = fopen(path, "rb"))) return 0;
+	len = (int)fread(buf, 1, sizeof(buf) - 1, f);
+	fclose(f);
+	if (len < 0) len = 0;
+	buf[len] = 0;
+	for (p = buf; *p && n < PM_RULES; p = e) {
+		char *t1, *t2, *t3;
+		e = p + strcspn(p, "\n");
+		if (*e) *e++ = 0;
+		p[strcspn(p, "\r")] = 0;
+		if (!*p || *p == '#') continue;
+		if (!(t1 = strchr(p, '\t'))) continue;
+		*t1++ = 0;
+		if (!(t2 = strchr(t1, '\t'))) continue;
+		*t2++ = 0;
+		t3 = strchr(t2, '\t');
+		if (t3) *t3++ = 0;
+		if ((p[0] != 'F' && p[0] != 'S') || !t1[0] || !strchr("MFRQ", t2[0])) continue;
+		if (t2[0] == 'M' && (!t3 || !t3[0])) continue;
+		r[n].what = p[0];
+		r[n].act = t2[0];
+		pm_copy(r[n].words, t1, sizeof(r[n].words));
+		pm_copy(r[n].folder, t3 ? t3 : "", sizeof(r[n].folder));
+		n++;
+	}
+	return n;
+}
+
+/* the Inbox's newest uid as the store has it (0: none yet) */
+static unsigned int inbox_top(int acct)
+{
+	static PmIndex ix;
+	unsigned int u = 0;
+	if (st_index_load(acct, "INBOX", "index.txt", &ix) != 0) return 0;
+	if (ix.n) u = ix.m[ix.n - 1].uid;
+	st_index_free(&ix);
+	return u;
+}
+
+static void rules_run(int acct, unsigned int after)
+{
+	static PmRule rule[PM_RULES];
+	static PmIndex ix;
+	static unsigned int uid[50];
+	static char act[50];
+	static int which[50];
+	PmShared *s = pm_shared();
+	int nr, n = 0, i, k;
+	char line[220], why[160];
+	if (!after || !(nr = rules_load(acct, rule))) return;
+	if (st_index_load(acct, "INBOX", "index.txt", &ix) != 0) return;
+	for (i = 0; i < ix.n && n < 50; i++) {
+		PmMsg *m = &ix.m[i];
+		if (m->uid <= after || st_flag_has(m->flags, 'S')) continue;
+		for (k = 0; k < nr; k++)
+			if (pm_stristr(rule[k].what == 'F' ? m->from : m->subject, rule[k].words)) break;
+		if (k < nr) { uid[n] = m->uid; act[n] = rule[k].act; which[n] = k; n++; }
+	}
+	st_index_free(&ix);
+	for (i = 0; i < n; i++) {
+		int r;
+		const PmRule *ru = &rule[which[i]];
+		why[0] = 0;
+		if (act[i] == 'M') {
+			snprintf(line, sizeof(line), "MOVE\tINBOX\t%u\t%s", uid[i], ru->folder);
+			st_pending_add(acct, line);
+			local_update(acct, "INBOX", uid[i], "", 1);
+			r = imap_move(acct, "INBOX", uid[i], ru->folder, why, sizeof(why));
+		} else if (act[i] == 'F' || act[i] == 'R') {
+			const char *op = act[i] == 'F' ? "+F" : "+S";
+			snprintf(line, sizeof(line), "FLAG\tINBOX\t%u\t%s", uid[i], op);
+			st_pending_add(acct, line);
+			local_update(acct, "INBOX", uid[i], op, 0);
+			r = imap_flag(acct, "INBOX", uid[i], op, why, sizeof(why));
+		} else
+			r = PM_RES_OK;
+		if (act[i] != 'Q') {
+			if (queued(r)) pm_log("rule %d: %c %u queued (%s)", which[i] + 1, act[i], uid[i], why);
+			else st_pending_drop(acct, line);
+		}
+		if (act[i] != 'F' && s->new_mail > 0) s->new_mail--;
+		pm_log("rule %d: %c %u", which[i] + 1, act[i], uid[i]);
+	}
+}
+
 /* ----------------------------------------------------------------- outbox */
 
 typedef struct { char names[40][24]; int n; } NameList;
@@ -382,10 +490,14 @@ static int run(PmCmd *c, char *why, int whymax)
 		r = imap_list_folders(a, why, whymax);
 		break;
 	case PM_CMD_SYNC:
+	{
+		unsigned int top = strcmp(c->folder, "INBOX") ? 0 : inbox_top(a);
 		replay(a, why, whymax);
 		r = imap_sync(a, c->folder, 0, why, whymax);
+		if (r == PM_RES_OK && top) rules_run(a, top);
 		if (r == PM_RES_OK) pf_want(a, c->folder);
 		break;
+	}
 	case PM_CMD_OLDER:
 		r = imap_sync(a, c->folder, 1, why, whymax);
 		break;
@@ -453,8 +565,32 @@ static int run(PmCmd *c, char *why, int whymax)
 	case PM_CMD_DELFOLDER:
 		r = imap_delete_folder(a, c->folder, why, whymax);
 		break;
+	case PM_CMD_IDLE:
+	{
+		/* (1.01) wait on the Inbox; if mail came, sync it (and the rules) */
+		int arrived = 0, secs = atoi(c->arg);
+		unsigned int top = inbox_top(a);
+		if (secs <= 0 || secs > 1500) secs = 1500;
+		r = s->offline ? PM_RES_OFFLINE : imap_idle(a, secs, &arrived, why, whymax);
+		s->new_mail = 0;
+		if (r == PM_RES_OK && arrived) {
+			r = imap_sync(a, "INBOX", 0, why, whymax);
+			if (r == PM_RES_OK && top) rules_run(a, top);
+			if (r == PM_RES_OK) {
+				pf_want(a, "INBOX");
+				if (s->new_mail) snprintf(why, whymax, "%d new in the Inbox", s->new_mail);
+			}
+		}
+		break;
+	}
 	case PM_CMD_SEARCH:
-		r = imap_search(a, c->folder, c->arg, why, whymax);
+		/* (1.01) offline, or "\x01L words" (On this Psion): the downloaded mail */
+		if (c->arg[0] == 1 && c->arg[1] == 'L')
+			r = local_search(a, c->folder, c->arg + 2, why, whymax);
+		else if (s->offline)
+			r = local_search(a, c->folder, c->arg, why, whymax);
+		else
+			r = imap_search(a, c->folder, c->arg, why, whymax);
 		break;
 	case PM_CMD_SEND:
 		r = send_outbox(a, why, whymax, &n);
@@ -463,12 +599,15 @@ static int run(PmCmd *c, char *why, int whymax)
 	{
 		char w2[160];
 		int got = 0;
+		unsigned int top;
 		r = send_outbox(a, why, whymax, &n);
 		if (queued(r)) break;
 		w2[0] = 0;
 		replay(a, why, whymax);
 		r = imap_list_folders(a, why, whymax);
+		top = inbox_top(a);
 		if (r == PM_RES_OK) r = imap_sync(a, "INBOX", 0, why, whymax);
+		if (r == PM_RES_OK && top) rules_run(a, top);
 		if (r == PM_RES_OK) got = s->new_mail;
 		if (r == PM_RES_OK) pf_want(a, "INBOX");
 		if (r == PM_RES_OK && c->folder[0] && strcmp(c->folder, "INBOX")) {

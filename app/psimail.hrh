@@ -100,7 +100,10 @@ enum TPmCommands
 	EPmCmdKeepLog,           // Tools > Troubleshooting > Keep a log (0.93)
 	EPmCmdShowMenu,          // View > Show (a cascade, 0.96)
 	EPmCmdTogglePreview,     // View > Show > Preview (0.96: tall screens)
-	EPmCmdDayListView        // (1.00) the calendar's View > Switch view > Day list (tall screens: added in DynInitMenuPaneL)
+	EPmCmdDayListView,       // (1.00) the calendar's View > Switch view > Day list (tall screens: added in DynInitMenuPaneL)
+	EPmCmdNextUnread,        // (1.02) View > Go to > Next unread (Shift+Ctrl+J)
+	EPmCmdRules,             // (1.02) Tools > Accounts > Rules... (pmrules.cpp)
+	EPmCmdSignatures         // (1.02) Tools > Accounts > Signatures... (pmrules.cpp)
 	};
 
 enum TPmDialogControls
@@ -185,7 +188,16 @@ enum TPmDialogControls
 	EPmDlgDetailed,          // Show detailed progress (0.75)
 	EPmDlgWebProxy,          // Preferences: Web pictures via proxy (0.84: No / Yes)
 	EPmDlgInfo7,             // (0.98) About: zlib and Dropbear
-	EPmDlgInfo8              // (0.98) About: the Symbian C library notice
+	EPmDlgInfo8,             // (0.98) About: the Symbian C library notice
+	EPmDlgRuleNo,            // (1.02) Rules: which rule
+	EPmDlgRuleWhat,          //   the sender or the subject
+	EPmDlgRuleWords,         //   contains
+	EPmDlgRuleAct,           //   then
+	EPmDlgRuleFolder,        //   the folder to move it to
+	EPmDlgSigNew,            // (1.02) Signatures: for new messages
+	EPmDlgSigReply,          //   for replies
+	EPmDlgSigWhere,          //   above or below the quote
+	EPmDlgSigNote            //   its annotation
 	};
 
 enum TPmButtons

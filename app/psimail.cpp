@@ -112,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.01");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.02");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -730,7 +730,9 @@ void CPmView::SettingsChanged()
 
 TBool CPmView::Busy() const
 	{
-	return iShared->busy || iShared->cmd_head != iShared->cmd_tail;
+	// (1.02: an IDLE waiting on the Inbox is not busy: it steps aside, within
+	// a second, for anything queued)
+	return (iShared->busy && iShared->cur_op != PM_CMD_IDLE) || iShared->cmd_head != iShared->cmd_tail;
 	}
 
 // The engine is busy with a download ahead (pf_step: busy with no command
@@ -818,7 +820,7 @@ TBool CPmView::TickWanted() const
 		return EFalse;                       // (the engine has stopped: nothing to follow)
 	if (!iSplashDone || iEngineLow)
 		return ETrue;
-	if (s->busy || s->cmd_tail != s->cmd_head || s->state != PM_STATE_READY)
+	if ((s->busy && s->cur_op != PM_CMD_IDLE) || s->cmd_tail != s->cmd_head || s->state != PM_STATE_READY)
 		return ETrue;
 	if (s->done_seq != iDoneSeen || s->changed_seq != iChangedSeen || s->online != iOnlineWas)
 		return ETrue;
@@ -1452,6 +1454,55 @@ void CPmView::StepMessageL(TInt aDir)
 	iSel = s;
 	iMode = EList;
 	OpenCurrentL();
+	}
+
+// (1.02) View > Go to > Next unread (Shift+Ctrl+J): the next unread
+// message below this one in the folder; past the last, the next folder
+// (round from this one) with unread mail, at its first unread message. A
+// message open stays open: the next unread one is opened in its place.
+void CPmView::NextUnreadL()
+	{
+	TBool reading = iMode == EMessage;
+	if (iMode == EList || reading)
+		for (TInt i = iSel + 1; i < iRows->Count(); i++)
+			if ((*iRows)[i].iFlags.Locate('S') < 0)
+				{
+				GoToRowL(i, reading);
+				return;
+				}
+	TInt n = iFolders->Count();
+	TInt cur = (iMode == EList || reading) ? iFolderSel : -1;
+	for (TInt k = 1; k <= n; k++)
+		{
+		TInt f = ((cur < 0 ? -1 : cur) + k) % n;
+		if (f < 0) f += n;
+		const TPmFolder& fo = (*iFolders)[f];
+		TBool counts = !(fo.iKind == 'S' || fo.iKind == 'D' || fo.iKind == 'T' || fo.iKind == 'J' || fo.iKind == 'N');
+		if (!counts || fo.iUnread <= 0 || (f == cur && (iMode == EList || reading)))
+			continue;
+		OpenFolderL(fo.iImap);
+		for (TInt i = 0; i < iRows->Count(); i++)
+			if ((*iRows)[i].iFlags.Locate('S') < 0)
+				{
+				GoToRowL(i, reading);
+				return;
+				}
+		return;                              // (its unread ones are not downloaded yet: the list)
+		}
+	iEikonEnv->InfoMsg(_L("No more unread messages"));
+	}
+
+void CPmView::GoToRowL(TInt aRow, TBool aOpen)
+	{
+	iSel = aRow;
+	iSidebar = EFalse;
+	if (aOpen)
+		{
+		iMode = EList;
+		OpenCurrentL();
+		}
+	else
+		Render();
 	}
 
 void CPmView::DeleteCurrentL()
@@ -2175,6 +2226,10 @@ void CPmView::TickL()
 		}
 	if (redraw)
 		((CPmAppUi*)iEikonEnv->EikAppUi())->RefreshConnPanel();   // (1.00) the toolbar's connection panel
+	{
+	TRAPD(ie, IdleTickL());                    // (1.02) new mail at once: wait on the Inbox
+	(void)ie;
+	}
 	// what the engine is doing: EIKON's busy message, bottom left - one
 	// steady message per command, or every step (pmstatus.cpp)
 	BusyTickL();
@@ -4479,13 +4534,16 @@ TBool CPmAppUi::EditAccountL(TInt aIndex, TBool aNew)
 	return ETrue;
 	}
 
-void CPmAppUi::AddSignature(CPmDraft& /*aDraft*/, TDes& aBody)
+void CPmAppUi::AddSignature(CPmDraft& /*aDraft*/, TDes& aBody, TBool aReply)
 	{
 	PmAccount& a = iSettings.iAccounts[iSettings.iAcct];
-	if (!a.signature[0])
-		return;
 	TBuf<200> sig;
-	FromC(sig, a.signature);
+	if (aReply)
+		PmReplySignature(*iView, iSettings.iAcct, sig);   // (1.02: Tools > Accounts > Signatures)
+	if (!sig.Length())
+		FromC(sig, a.signature);
+	if (!sig.Length())
+		return;
 	TInt at;
 	while ((at = sig.Find(_L("\\n"))) >= 0)
 		sig.Replace(at, 2, _L("\n"));
@@ -4638,7 +4696,9 @@ CPmDraft* CPmAppUi::ReplyDraftL(TBool aAll)
 	HBufC* body = HBufC::NewL(24 * 1024);
 	TPtr p = body->Des();
 	p.Append('\n');
-	AddSignature(*d, p);
+	TBool below = (iSettings.iSpare[0] & KPmSigBelowBit) != 0;   // (1.02)
+	if (!below)
+		AddSignature(*d, p, ETrue);
 	TBuf<120> who;
 	DisplayName(who, h->iFrom);
 	p.Append('\n');
@@ -4648,6 +4708,8 @@ CPmDraft* CPmAppUi::ReplyDraftL(TBool aAll)
 	p.Append(Clip(who, 60));
 	p.Append(_L(" wrote:\n"));
 	iView->PlainBodyL(p, ETrue);
+	if (below)
+		AddSignature(*d, p, ETrue);           // (1.02: under the quote)
 	delete d->iBody;
 	d->iBody = body;
 	CleanupStack::Pop();                      // d
@@ -5850,6 +5912,23 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 	case EPmCmdEditAccount:
 		if (EditAccountL(iSettings.iAcct, EFalse))
 			iView->AccountChangedL();
+		break;
+	case EPmCmdRules:
+		{
+		// (1.02) the rules for new mail (pmrules.cpp; the engine applies them)
+		CPmRulesDialog* dlg = new(ELeave) CPmRulesDialog(*iView, iSettings.iAcct);
+		dlg->ExecuteLD(R_PM_RULES_DIALOG);
+		break;
+		}
+	case EPmCmdSignatures:
+		{
+		CPmSigDialog* dlg = new(ELeave) CPmSigDialog(*iView, iSettings, iSettings.iAcct);
+		if (dlg->ExecuteLD(R_PM_SIG_DIALOG))
+			SaveSettings();
+		break;
+		}
+	case EPmCmdNextUnread:
+		iView->NextUnreadL();
 		break;
 	case EPmCmdNewAccount:
 		{

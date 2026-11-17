@@ -64,7 +64,8 @@ enum
 	PM_CMD_PICTURES,         /* folder, uid, arg = part ids to fetch and decode ("1.2 1.3"; "!2" = however big): see engine/pictures.c */
 	PM_CMD_UNDO,             /* folder, uid: put back the message moved from there (Edit > Undo: engine/undo.c); last_file = its uid now */
 	PM_CMD_WEBPICS,          /* folder, uid: fetch and set out the message's pictures from the web (engine/webpics.c) */
-	PM_CMD_PUTLOG            /* POST the engine's logs to the web proxy (0.86: Tools > Send log to server; webpics.c pm_send_log) */
+	PM_CMD_PUTLOG,           /* POST the engine's logs to the web proxy (0.86: Tools > Send log to server; webpics.c pm_send_log) */
+	PM_CMD_IDLE              /* (1.01) wait on the Inbox for new mail (IMAP IDLE), arg = the most seconds; then sync it if any came */
 	};
 
 /* pictures in a message (engine/pictures.c, app/pmpict.cpp): a part this

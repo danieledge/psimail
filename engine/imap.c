@@ -1685,6 +1685,81 @@ int imap_search(int acct, const char *folder, const char *words, char *why, int 
 	return r;
 }
 
+/* ------------------------------------------------------------------ idle */
+
+/* (1.01) Preferences > New mail > Check for new mail: At once, on a route
+   that stays connected (a network card, Psion TCP/IP kept up): IDLE on the
+   Inbox (RFC 2177) until the server says EXISTS, the app has a command
+   for the engine, Esc, or maxsec is up (the app asks again; servers drop
+   an IDLE after 30 minutes). Then DONE and the tagged answer. Lines are
+   read a byte at a time with a short wait, so that the app's commands
+   are seen within a second and nothing of a line is lost between waits. */
+static int idle_line(char *buf, int max, int *k)
+{
+	for (;;) {
+		int c = pmn_getc(1000);
+		if (c == PMN_TIMEOUT) return 0;
+		if (c < 0) return c;
+		if (c == '\n') {
+			if (*k && buf[*k - 1] == '\r') (*k)--;
+			buf[*k] = 0;
+			return 1;
+		}
+		if (*k < max - 1) buf[(*k)++] = (char)c;
+	}
+}
+
+int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
+{
+	static char line[300];
+	PmShared *s = pm_shared();
+	char tag[12], out[24];
+	int r, n, k = 0, done = 0;
+	unsigned long t0;
+	*arrived = 0;
+	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
+	if (!has_cap("IDLE")) { set_why(why, whymax, "Not available - the server cannot say at once"); return PM_RES_FAILED; }
+	if ((r = select_folder("INBOX", 0, 0, why, whymax)) != PM_RES_OK) return r;
+	sprintf(tag, "P%03d", ++g_tagno % 1000);
+	n = sprintf(out, "%s IDLE\r\n", tag);
+	if (pmn_write(out, n) != 0) return lost(why, whymax, -1);
+	t0 = pm_ms();
+	pm_progress("Waiting for new mail...");
+	for (;;) {
+		if (!done && (*arrived || s->cmd_head != s->cmd_tail || s->quitting || s->offline ||
+		              pm_ms() - t0 > (unsigned long)maxsec * 1000UL)) {
+			if (pmn_write("DONE\r\n", 6) != 0) return lost(why, whymax, -1);
+			done = 1;
+			t0 = pm_ms();                      /* (now the tagged answer's own time) */
+		}
+		r = idle_line(line, sizeof(line), &k);
+		if (r == PMN_CANCEL && !done) {
+			/* Esc: end the IDLE politely, then say so */
+			if (pmn_write("DONE\r\n", 6) != 0) return lost(why, whymax, -1);
+			done = 1;
+			continue;
+		}
+		if (r < 0) return lost(why, whymax, r);
+		if (r == 0) {
+			if (done && pm_ms() - t0 > 30000UL) return lost(why, whymax, PMN_TIMEOUT);
+			continue;
+		}
+		k = 0;
+		g_last_cmd = pm_ms();
+		if (!strncmp(line, tag, strlen(tag)) && line[strlen(tag)] == ' ') {
+			const char *p = line + strlen(tag) + 1;
+			if (pm_strncasecmp(p, "OK", 2)) { set_why(why, whymax, "%.100s", p); return PM_RES_FAILED; }
+			set_why(why, whymax, *arrived ? "New mail" : "No new mail");
+			return PM_RES_OK;
+		}
+		/* "* 12 EXISTS": something came in */
+		if (line[0] == '*' && pm_stristr(line, " EXISTS")) {
+			*arrived = 1;
+			pm_log("imap: idle: %.60s", line);
+		}
+	}
+}
+
 /* ---------------------------------------------------------------- append */
 
 int imap_append(int acct, const char *folder, const char *path, const char *flags, char *why, int whymax)

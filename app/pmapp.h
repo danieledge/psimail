@@ -61,7 +61,7 @@ const TInt KPmViewEmailButtonAsked = 0x200;
 // All zero is the standard: sound & message, no timed check, send waiting mail
 const TInt KPmViewAlertShift = 12;          // 0x3000: 0 sound & message, 1 message only, 2 off
 const TInt KPmViewAlertMask = 0x3000;
-const TInt KPmViewCheckShift = 14;          // 0x1C000: check every 0 never, 1 10, 2 15, 3 30, 4 60 minutes
+const TInt KPmViewCheckShift = 14;          // 0x1C000: check every 0 never, 1 10, 2 15, 3 30, 4 60 minutes, 5 at once (1.02: IDLE)
 const TInt KPmViewCheckMask = 0x1C000;
 const TInt KPmViewCheckConnect = 0x20000;   // the timed check may connect (else only while connected)
 const TInt KPmViewNoAutoSend = 0x40000;     // don't send the Outbox when a connection comes up
@@ -81,8 +81,8 @@ const TInt KPmViewNoPreview = 0x200000;
 // standard) shows the week as a time grid there; set, as the 5mx shows it
 // (the week strip and the chosen day's list). The 5mx ignores it.
 const TInt KPmViewDayList = 0x800000;
-// Free, as far as 1.00 goes (nothing in app/ reads them): iView bits 3 to 7,
-// 10, 11, 22 and 24 to 31; iSpare[0] bits 5 to 7 and 10 to 31. Take new
+// Free, as far as 1.02 goes (nothing in app/ reads them): iView bits 3 to 7,
+// 10, 11, 22 and 24 to 31; iSpare[0] bits 6, 7 and 10 to 31. Take new
 // options from these, and mark them here and in the comment by TPmSettings.
 
 // TPmSettings::iSpare[0] bit 2 (0.84): web pictures fetched through the
@@ -94,6 +94,10 @@ const TInt KPmWebProxyBit = 0x4;
 // TPsiLink::iModemTls (the shared PsiLink.ini is authoritative; this bit
 // carries it to the engine through PmShared::net.modem_tls).
 const TInt KPmModemTlsBit = 0x8;
+
+// TPmSettings::iSpare[0] bit 5 (1.02): Tools > Accounts > Signatures > In
+// replies: below the quote. Zero (the standard, as before): above it.
+const TInt KPmSigBelowBit = 0x20;
 
 // TPmSettings::iSpare[0] bit 4 (0.93): Tools > Troubleshooting > Keep a log.
 // Off (0, the standard, and what older settings read as): no psimail.log,
@@ -127,6 +131,7 @@ struct TPmSettings
 	                       //   bits 8-9 (0x300, 0.75): pictures from the web - 0 ask, 1 always, 2 never (pmwebpic.cpp)
 	                       //   bit 2 (0x4, 0.84): web pictures fetched via the "psiproxy" HTTP proxy (pmwebpic.cpp)
 	                       //   bit 3 (0x8, 0.88): the modem does TLS; bit 4 (0x10, 0.93): keep a log (KPmLogBit)
+	                       //   bit 5 (0x20, 1.02): the reply signature below the quote (KPmSigBelowBit)
 	                       // iSpare[1]: where PsiMail was when closed (CPmView::WhereToken)
 	PmAccount iAccounts[PM_MAX_ACCOUNTS];
 	};
@@ -216,6 +221,8 @@ public:
 	void ToggleMonthL();                     // View > Switch view (Ctrl+Q): the week or the month, round and round
 	void ShowMonthL(TBool aMonth);           // View > Switch view > Week / Month
 	void ShowDayListL(TBool aDayList);       // (1.00) ... > Week (the time grid) / Day list, on a tall screen
+	void NextUnreadL();                      // (1.02) View > Go to > Next unread
+	void GoToRowL(TInt aRow, TBool aOpen);
 	TBool MonthShown() const { return iMode == ECalendar && iCalMonth; }
 	void CalendarTodayL();                   // Event > Go to today
 	void NewEventL();                        // the Create new event dialog: into the Agenda (then synced)
@@ -620,6 +627,10 @@ private:
 	TPmUndo iUndoDoing;                      // the one with the engine
 	CPeriodic* iCheckTimer;                  // every 5 minutes while a timed check is on
 	TInt iCheckTicks;                        // 5-minute ticks since the last check
+	TUint iIdleCmd;                          // (1.02) the IDLE waiting on the Inbox (done_seq when done; 0 none)
+	TBool iIdleBroken;                       // (1.02) the server has no IDLE: timed checks
+	TBool IdleWanted() const;
+	void IdleTickL();
 	TUint iAutoCmd;                          // cmd_head + 1 of the automatic check in flight (0 none)
 	TBool iAutoOnlineWas;
 	// a refused login (pmlogin.cpp, issue 1): asked about once, then quiet
@@ -767,6 +778,51 @@ private:
 	};
 
 // one line of text: search words, a password...
+// (1.02) Tools > Accounts > Rules and Signatures (pmrules.cpp)
+const TInt KPmRules = 8;
+struct TPmRule
+	{
+	TUint8 iWhat;            // 'F' the sender, 'S' the subject
+	TInt iAct;               // 0 none, 1 move, 2 flag, 3 mark read, 4 no alert
+	TBuf<58> iWords;
+	TBuf8<128> iFolder;      // IMAP name
+	};
+
+class CPmRulesDialog : public CEikDialog
+	{
+public:
+	CPmRulesDialog(CPmView& aView, TInt aAcct) : iView(aView), iAcct(aAcct) {}
+	~CPmRulesDialog();
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	void HandleControlStateChangeL(TInt aControlId);
+	void LoadL();
+	void SaveL();
+	void ShowRuleL(TInt aIndex);
+	void TakeRule(TInt aIndex);
+	void DimLines();
+	CPmView& iView;
+	TInt iAcct;
+	TPmRule iRule[KPmRules];
+	TInt iCurrent;
+	CDesCArrayFlat* iNames;
+	CArrayFixFlat<TBuf8<128> >* iImap;
+	};
+
+class CPmSigDialog : public CEikDialog
+	{
+public:
+	CPmSigDialog(CPmView& aView, TPmSettings& aSettings, TInt aAcct) : iView(aView), iSettings(aSettings), iAcct(aAcct) {}
+private:
+	void PreLayoutDynInitL();
+	TBool OkToExitL(TInt aButtonId);
+	CPmView& iView;
+	TPmSettings& iSettings;
+	TInt iAcct;
+	};
+void PmReplySignature(CPmView& aView, TInt aAcct, TDes& aOut);
+
 class CPmTextDialog : public CEikDialog
 	{
 public:
@@ -1170,7 +1226,7 @@ private:
 	void SwitchAccountL();
 	void DeleteAccountL();
 	void AboutL();
-	void AddSignature(CPmDraft& aDraft, TDes& aBody);
+	void AddSignature(CPmDraft& aDraft, TDes& aBody, TBool aReply = EFalse);   // (1.02 aReply: the reply signature, if the account has one)
 	void LoadCalSettings();
 	void EditCalendarL();
 	CPmView* iView;

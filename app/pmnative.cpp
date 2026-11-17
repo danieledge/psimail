@@ -493,6 +493,33 @@ public:
 		{
 		((CPmMsgItemDrawer*)iItemDrawer)->SetFonts(Model()->ColumnData(), aFont, aBold);
 		}
+	// (1.02) a tap on the state picture of the message already chosen marks
+	// it read or unread (one tap chooses, a second acts, as the guide has it;
+	// the tap is on the picture, not the row). Elsewhere, the list's own
+	void HandlePointerEventL(const TPointerEvent& aEvent)
+		{
+		if (aEvent.iType == TPointerEvent::EButton1Down && aEvent.iPosition.iX < Rect().iTl.iX + KIconCol - 2)
+			{
+			TInt idx = -1;
+			if (View() && View()->XYPosToItemIndex(aEvent.iPosition, idx) && idx >= 0 && idx == CurrentItemIndex())
+				{
+				iPictureTap = ETrue;
+				return;
+				}
+			}
+		if (iPictureTap)
+			{
+			if (aEvent.iType == TPointerEvent::EButton1Up)
+				{
+				iPictureTap = EFalse;
+				((CPmAppUi*)CEikonEnv::Static()->EikAppUi())->CommandL(EPmCmdUnread);
+				}
+			return;
+			}
+		CEikTextListBox::HandlePointerEventL(aEvent);
+		}
+private:
+	TBool iPictureTap;
 	};
 
 // ----- zoom -----------------------------------------------------------------------
@@ -760,7 +787,7 @@ void CPmView::LayoutNative()
 	if (folders && PmTall() && panelRows > 0 && folderRows > 0)
 		{
 		TInt ih = iFolderList->ItemHeight();
-		TInt need = folderRows * ih + 4;
+		TInt need = (folderRows + 1) * ih;      // (the list's own margins: a row more, so the last shows)
 		TInt legend = (panelRows + 1) * ih + 10;
 		if (listTop + need + legend <= r.iBr.iY)
 			{

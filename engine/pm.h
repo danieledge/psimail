@@ -264,6 +264,14 @@ int  pm_strcasecmp(const char *a, const char *b);
 int  pm_strncasecmp(const char *a, const char *b, int n);
 const char *pm_stristr(const char *hay, const char *needle);
 
+/* ---- (1.01) new mail at once (imap.c): IMAP IDLE on the Inbox, at most
+   maxsec, ended early by a command from the app or Esc; *arrived when the
+   server said EXISTS */
+int  imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax);
+
+/* ---- (1.01) Find on this Psion (local.c): the downloaded mail, no connection */
+int  local_search(int acct, const char *folder, const char *words, char *why, int whymax);
+
 /* ---- certificate checks (certcheck.c) */
 void tlsv_set_host(const char *host, int port);
 const char *tlsv_fingerprint(void);
