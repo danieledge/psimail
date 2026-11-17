@@ -7,6 +7,7 @@
 // pmcalview.cpp; writing a message and making an event are dialogs.)
 #include "pmapp.h"
 #include "pmicons.h"
+#include "pgsetup.h"
 #include "pmpict.h"
 #include <eiktxlbx.h>
 #include <eiktxlbm.h>
@@ -2145,13 +2146,45 @@ static void DrawArrow(CWindowGc& aGc, TInt aX, TInt aY, TBool aDownwards)
 
 // the box on the right of the title band: only when there's something to
 // say (the middle shows what the engine is doing)
-static void ConnectionText(const TPmSettings& aSettings, const PmShared* aShared, TDes& aOut)
+// (1.03) the route box at the right of the title band: the route and who
+// does the TLS ("Modem - Atom does TLS", "TCP/IP - TLS here"), or
+// Offline / ready / Connecting...; aLight for a colour screen's light
+// (PmLight: 0 grey, 1 amber, 2 green, 3 red). A tap opens Status information.
+static void ConnectionText(const TPmSettings& aSettings, const PmShared* aShared, TDes& aOut, TInt* aLight = NULL)
 	{
 	aOut.Zero();
+	TInt light = 0;
+	TBool modem = aSettings.iNetMode == 0;
+	TBool atomTls = modem && (aSettings.iSpare[0] & KPmModemTlsBit);
+	const PmAccount& a = aSettings.iAccounts[aSettings.iAcct >= 0 && aSettings.iAcct < PM_MAX_ACCOUNTS ? aSettings.iAcct : 0];
+	TBool insecure = a.used && a.imap_tls == PM_TLS_NONE && !atomTls;
+	TPtrC route(modem ? _L("Modem") : _L("TCP/IP"));
 	if (aSettings.iOffline)
 		aOut = _L("Offline");
 	else if (aShared && aShared->online)
-		aOut = _L("Online");
+		{
+		aOut = route;
+		if (insecure) { aOut.Append(_L(" - not secure")); light = 3; }
+		else { aOut.Append(atomTls ? _L(" - Atom does TLS") : _L(" - TLS here")); light = 2; }
+		}
+	else if (aShared && aShared->busy && aShared->cur_op != PM_CMD_IDLE)
+		{
+		aOut = _L("Connecting...");
+		light = 1;
+		}
+	else
+		{
+		aOut = route;
+		aOut.Append(_L(" - ready"));
+		}
+	if (aLight)
+		*aLight = light;
+	}
+
+// the box's width: the words, and the light on a colour screen
+static TInt ConnBoxWidth(const CFont* aFont, const TDesC& aText)
+	{
+	return aFont->TextWidthInPixels(aText) + 12 + (PmColour() ? 12 : 0);
 	}
 
 void CPmView::UpdateStatusLine()
@@ -2194,19 +2227,33 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 	TInt base = band.iTl.iY + (iTitleH - iTitleFont->HeightInPixels()) / 2 + iTitleFont->AscentInPixels();
 	// the connection, in a box on the right (when there's one to show)
 	TBuf<40> conn;
-	ConnectionText(*iSettings, iShared, conn);
+	TInt light = 0;
+	ConnectionText(*iSettings, iShared, conn, &light);
+	if (iMode == ENoAccount && !iSettings->iOffline)
+		conn.Zero();                             // (no account yet: nothing to say of the route)
 	TRect box(band.iBr.iX, band.iTl.iY, band.iBr.iX, band.iBr.iY);
 	if (conn.Length())
 		{
-		TInt cw = iTitleFont->TextWidthInPixels(conn) + 12;
+		TInt cw = ConnBoxWidth(iTitleFont, conn);
 		box = TRect(band.iBr.iX - cw - 2, band.iTl.iY + 2, band.iBr.iX - 2, band.iBr.iY - 2);
 		gc.SetPenStyle(CGraphicsContext::ESolidPen);
 		gc.SetPenColor(PmFaceText());
 		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
 		gc.SetBrushColor(iPenHead == 11 ? KPmDarkGrey : KPmLightGrey);
 		gc.DrawRect(box);
+		TInt tx = box.iTl.iX + 6;
+		if (PmColour())
+			{
+			// (1.03) the light: grey, amber, green or red
+			TInt d = box.Height() - 6;
+			if (d > 9) d = 9;
+			TRect dot(tx, box.iTl.iY + (box.Height() - d) / 2, tx + d, box.iTl.iY + (box.Height() - d) / 2 + d);
+			gc.SetBrushColor(PmLight(light));
+			gc.DrawEllipse(dot);
+			tx += 12;
+			}
 		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
-		gc.DrawText(conn, TPoint(box.iTl.iX + 6, base));
+		gc.DrawText(conn, TPoint(tx, base));
 		}
 	// where you are: the folder
 	TBuf<120> where;
@@ -2343,7 +2390,9 @@ TInt CPmView::HeaderHit(const TPoint& aPos) const
 			return 10;
 		TBuf<40> conn;
 		ConnectionText(*iSettings, iShared, conn);
-		if (conn.Length() && aPos.iX > r.iBr.iX - iTitleFont->TextWidthInPixels(conn) - 14)
+		if (iMode == ENoAccount && !iSettings->iOffline)
+			conn.Zero();
+		if (conn.Length() && aPos.iX > r.iBr.iX - ConnBoxWidth(iTitleFont, conn) - 2)
 			return 11;
 		return -1;
 		}
@@ -2661,7 +2710,8 @@ void CPmConnPanel::Draw(const TRect& /*aRect*/) const
 	for (TInt i = 0; rest.Length() && i < 6; i++)
 		{
 		TInt nl = rest.Locate('\n');
-		TBuf<40> line(nl >= 0 ? rest.Left(nl) : rest);
+		TPtrC piece(nl >= 0 ? rest.Left(nl) : rest);
+		TBuf<40> line(piece.Left(Min(piece.Length(), 40)));
 		rest.Set(nl >= 0 ? rest.Mid(nl + 1) : TPtrC());
 		TInt lx = x;
 		if (i == 0)
@@ -2704,23 +2754,22 @@ void CPmConnPanel::HandlePointerEventL(const TPointerEvent& aEvent)
 		}
 	}
 
-_LIT(KPsionInternet, "Psion Internet");
-_LIT(KModem, "modem");
 
 void CPmView::StatusInfoL()
 	{
-	TBuf<120> lines[6];
+	// (1.03) eight short lines, none cut: the account, the route, who does
+	// the security, the web pictures' helper, this folder, the Outbox, the
+	// last thing done, and where the mail is kept
+	TBuf<80> lines[8];
 	const PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
-	TPtrC8 name((const TUint8*)a.name);
-	TPtrC8 email((const TUint8*)a.email);
 	lines[0] = _L("Account: ");
 	if (a.used)
 		{
-		TBuf<40> n;
-		n.Copy(Clip(name, 30));
+		TBuf<24> n;
+		n.Copy(Clip(TPtrC8((const TUint8*)a.name), 20));
 		lines[0].Append(n);
-		TBuf<70> e;
-		e.Copy(Clip(email, 60));
+		TBuf<40> e;
+		e.Copy(Clip(TPtrC8((const TUint8*)a.email), 34));
 		lines[0].AppendFormat(_L(" (%S)"), &e);
 		}
 	else
@@ -2728,45 +2777,67 @@ void CPmView::StatusInfoL()
 	const TInt KBauds[5] = { 9600, 19200, 38400, 57600, 115200 };
 	TInt bi = iSettings->iBaudIndex;
 	if (bi < 0 || bi > 4) bi = 4;
-	lines[1].Format(_L("Connection: %S, %d baud"), iSettings->iNetMode ? &KPsionInternet() : &KModem(), KBauds[bi]);
-	TBuf<40> conn;
-	ConnectionText(*iSettings, iShared, conn);
-	lines[1].Append(_L(" - "));
-	lines[1].Append(conn);
+	TBool modem = iSettings->iNetMode == 0;
+	if (modem)
+		lines[1].Format(_L("Route: the modem, %d baud"), KBauds[bi]);
+	else
+		lines[1] = _L("Route: Psion TCP/IP (network card or dial-up)");
+	lines[1].Append(iSettings->iOffline ? _L(" - offline") : iShared && iShared->online ? _L(" - online") : _L(""));
+	TBool atomTls = modem && (iSettings->iSpare[0] & KPmModemTlsBit);
+	if (a.used && a.imap_tls == PM_TLS_NONE && !atomTls)
+		lines[2] = _L("Security: none (the account says None)");
+	else if (atomTls)
+		lines[2] = _L("Security: TLS by the Atom modem");
+	else
+		lines[2] = _L("Security: TLS 1.3 here, certificate checked");
+	{
+	TBuf8<64> host;
+	TInt useProxy = 0;
+	if (iShared)
+		{
+		useProxy = iShared->use_proxy;
+		host = TPtrC8((const TUint8*)iShared->proxy_host);
+		}
+	host.ZeroTerminate();
+	TPtrC8 route((const TUint8*)pg_su_route_name(useProxy, (const char*)host.Ptr()));
+	TBuf<40> r;
+	r.Copy(route);
+	lines[3].Format(_L("Web pictures: %S"), &r);
+	}
 	if (iMode == EList)
 		{
 		TInt unread = 0;
 		for (TInt i = 0; i < iRows->Count(); i++)
 			if ((*iRows)[i].iFlags.Locate('S') < 0) unread++;
-		lines[2].Format(_L("This folder: %d messages here, %d unread"), iRows->Count(), unread);
+		lines[4].Format(_L("This folder: %d messages here, %d unread"), iRows->Count(), unread);
 		}
 	else
-		lines[2] = _L("This folder: -");
-	lines[3].Format(_L("Outbox: %d waiting to be sent"), OutboxCount());
+		lines[4] = _L("This folder: -");
+	lines[5].Format(_L("Outbox: %d waiting to be sent"), OutboxCount());
+	lines[6] = _L("Last: ");
+	if (Busy() && iLastProgress.Length())
+		lines[6].Append(Clip(iLastProgress, 60));
+	else if (iStatus.Length())
+		lines[6].Append(Clip(iStatus, 60));
+	else
+		lines[6].Append(iRunning ? _L("the mail engine is ready") : _L("the mail engine is not running"));
 	{
-	// where the mail is kept (pmstore.cpp): \System\Data\PsiMail on a disk
+	// where the mail is kept (pmstore.cpp), the disk's room, and memory
 	TBuf<100> dir;
 	StoreDir(dir);
-	if (dir.Length() > 1 && dir[dir.Length() - 1] == '\\')
-		dir.SetLength(dir.Length() - 1);
-	lines[3].Append(_L(" - the mail is in "));
-	lines[3].Append(Clip(dir, 40));
-	}
-	lines[4] = _L("Last: ");
-	if (Busy() && iLastProgress.Length())
-		lines[4].Append(Clip(iLastProgress, 100));
-	else if (iStatus.Length())
-		lines[4].Append(Clip(iStatus, 100));
-	else
-		lines[4].Append(iRunning ? _L("the mail engine is ready") : _L("the mail engine is not running"));
+	TInt drive = EDriveC;
+	if (dir.Length() && RFs::CharToDrive(dir[0], drive) != KErrNone) drive = EDriveC;
+	TVolumeInfo vol;
+	TInt freeKb = iCoeEnv->FsSession().Volume(vol, drive) == KErrNone ? (TInt)(vol.iFree / TInt64(1024)).Low() : -1;
 	TMemoryInfoV1Buf mem;
 	UserHal::MemoryInfo(mem);
-	lines[5].Format(_L("Free memory: %d KB - the mail engine uses %d KB"), mem().iFreeRamInBytes / 1024,
-		iShared ? iShared->heap_used / 1024 : 0);
-	TPtrC ptrs[6];
-	for (TInt k = 0; k < 6; k++) ptrs[k].Set(lines[k]);
-	CPmInfoDialog* dlg = new(ELeave) CPmInfoDialog(_L("Status information"), ptrs, 6);
-	dlg->ExecuteLD(R_PM_INFO_DIALOG);
+	lines[7].Format(_L("Mail on %c: %d KB free, memory %d KB"), dir.Length() ? (TUint)dir[0] : 'C',
+		freeKb, mem().iFreeRamInBytes / 1024);
+	}
+	TPtrC ptrs[8];
+	for (TInt k = 0; k < 8; k++) ptrs[k].Set(lines[k]);
+	CPmInfoDialog* dlg = new(ELeave) CPmInfoDialog(_L("Status information"), ptrs, 8);
+	dlg->ExecuteLD(R_PM_STATUS_DIALOG);
 	}
 
 // ----- keys and the pen -------------------------------------------------------------

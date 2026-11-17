@@ -71,9 +71,9 @@ void CPmRulesDialog::LoadL()
 		r.iWhat = field[0][0] == 'F' ? 'F' : 'S';
 		TInt a = TPtrC8((const TUint8*)"MFRQ").Locate(field[2][0]);
 		r.iAct = a < 0 ? 0 : a + 1;
-		r.iWords.Copy(field[1].Left(r.iWords.MaxLength()));
+		r.iWords.Copy(field[1].Left(Min(field[1].Length(), r.iWords.MaxLength())));
 		if (k > 3)
-			r.iFolder = field[3].Left(r.iFolder.MaxLength());
+			r.iFolder = field[3].Left(Min(field[3].Length(), r.iFolder.MaxLength()));
 		if (r.iAct) n++;
 		}
 	}
@@ -261,7 +261,7 @@ TBool CPmSigDialog::OkToExitL(TInt /*aButtonId*/)
 	GetEdwinText(sig, EPmDlgSigNew);
 	LineToSig(sig);
 	TPtr8 s8((TUint8*)a.signature, sizeof(a.signature) - 1);
-	s8.Copy(sig.Left(sizeof(a.signature) - 1));
+	s8.Copy(sig.Left(Min(sig.Length(), (TInt)sizeof(a.signature) - 1)));
 	a.signature[s8.Length()] = 0;
 	TBuf<200> reply;
 	GetEdwinText(reply, EPmDlgSigReply);
@@ -300,5 +300,5 @@ void PmReplySignature(CPmView& aView, TInt aAcct, TDes& aOut)
 	TBuf8<160> b;
 	f.Read(b);
 	f.Close();
-	aOut.Copy(b.Left(aOut.MaxLength()));
+	aOut.Copy(b.Left(Min(b.Length(), aOut.MaxLength())));
 	}

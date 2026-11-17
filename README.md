@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.02, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.03, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.02](#whats-new-in-102) (and [1.01](#101), [1.00](#100), [0.96](#096))
+- [What's new in 1.03](#whats-new-in-103) (and [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,38 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.02
+## What's new in 1.03
+
+Knowing your route, on every machine:
+
+- **Set up PsiMail**: the first time PsiMail starts on a Psion with no
+  settings of any of the suite's programs, it asks how the Psion gets
+  online (a network card or dial-up, the Atom modem, another WiFi modem)
+  and where web pictures come from (direct, the Atom modem helper,
+  PsiProxy on a computer), and fills in Connection settings - nothing
+  else, and Cancel changes nothing. Later: Connection settings > Set up
+  (Ctrl+U). It is the same assistant as PsiWeb's (psion-core).
+- **The route box** at the right of the title bar says the route and who
+  does the security: "Modem - Atom does TLS", "TCP/IP - TLS here",
+  "Modem - ready", "Connecting...", "Offline". On a colour screen it has a
+  light: green online, amber connecting, grey not connected, red when the
+  account has no security. A tap opens Status information.
+- **Status information** has eight short lines: the account, the route,
+  who does the security, where web pictures come from, this folder, the
+  Outbox, the last thing done, and the disk the mail is on with its room.
+  About says the route, and a baud rate only for the modem.
+- **The words** are the suite's own now: "Network card or dial-up (Psion
+  TCP/IP)" for Psion Internet, "Dial-up: first send", and Web helper
+  (None - direct, or the Atom modem or PsiProxy) for "Use proxy".
+- **Help**: Ways to connect, and PsiProxy and other helpers, with where to
+  get PsiProxy and the Atom modem's software.
+- Mail says which machine wrote it (User-Agent), and on a colour screen web
+  picture requests say the screen (X-Psi-Screen), so PsiProxy and the Atom
+  make the pictures for it.
+- TLS 1.3 can use AES-128-GCM as well as ChaCha20-Poly1305, for servers
+  that prefer it (psion-core 4aec0ab).
+
+### 1.02
 
 On every machine:
 
@@ -148,7 +179,7 @@ Since 0.93, the last signed release.
 
 ## Screenshots
 
-PsiMail 0.96 on the netBook and the Series 5mx, with the same demo account, mail and calendar (made up). Taken in emulators. Tap or click one to see it full size.
+PsiMail on the netBook (1.03: the inbox and the calendar) and the Series 5mx (0.96, which looks the same), with the same demo account, mail and calendar (made up). Taken in emulators. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
@@ -172,9 +203,9 @@ PsiMail 0.96 on the netBook and the Series 5mx, with the same demo account, mail
 <td><a href="docs/screenshots/netbook-psimail-reader.png"><img src="docs/screenshots/netbook-psimail-reader.png" alt="netBook: a JPEG photo in a message" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-reader.png"><img src="docs/screenshots/5mx-psimail-reader.png" alt="Series 5mx: a JPEG photo in a message" width="400"></a></td>
 </tr>
-<tr><td colspan="2"><b>The calendar: a week and the chosen day</b></td></tr>
+<tr><td colspan="2"><b>The calendar's week: a time grid on the netBook, the chosen day's list on the 5mx</b></td></tr>
 <tr>
-<td><a href="docs/screenshots/netbook-psimail-calendar-week.png"><img src="docs/screenshots/netbook-psimail-calendar-week.png" alt="netBook: the week, with a bar in each calendar's colour" width="400"></a></td>
+<td><a href="docs/screenshots/netbook-psimail-calendar-week.png"><img src="docs/screenshots/netbook-psimail-calendar-week.png" alt="netBook: the week as a time grid, each event in its calendar's colour" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-calendar-week.png"><img src="docs/screenshots/5mx-psimail-calendar-week.png" alt="Series 5mx: the week and the day's events" width="400"></a></td>
 </tr>
 <tr><td colspan="2"><b>The calendar: a month</b></td></tr>
@@ -374,27 +405,33 @@ settings are shared with PsiTerm and PsiWeb.
   modem's; 115200 with RTS/CTS flow control is fastest if the cable carries
   those lines. The line is only taken while PsiMail needs it, and File >
   Disconnect (Ctrl+U) hangs up so PsiTerm or PsiWeb can have it.
-* **Psion Internet (PPP)**: the Psion's own dial-up connection, set up in the
-  Control panel's Internet and Modems settings. PsiMail starts it when it
-  needs to and the Psion's connection dialogs appear; PsiWeb shares it.
+* **Network card or dial-up (Psion TCP/IP)** (called Psion Internet before
+  1.03): the Psion's own TCP/IP - a PC Card network card on a netBook or
+  Series 7 (set it up in the Control panel; leave *Dial-up: first send*
+  empty), or a dial-up connection set up in the Control panel's Internet and
+  Modems settings. PsiMail starts it when it needs to and the Psion's
+  connection dialogs appear; PsiWeb shares it. Nobody has run PsiMail over
+  a network card on a real netBook yet: reports welcome.
+* **Set up** (Ctrl+U) asks which of these you have, and the web helper, and
+  fills the lines in (the assistant a new Psion is shown once).
 * **Test** (Ctrl+T) tries the settings shown, before OK: whether the modem
   answers and at what speed, CTS and DCD, the modem's name, and whether
-  RTS/CTS will work; for Psion Internet, whether the connection is up and
+  RTS/CTS will work; for Psion TCP/IP, whether the connection is up and
   names can be looked up (it asks before dialling).
 
-* **After use, Psion Internet** (Network page): *Stays connected* (the
+* **After use, Psion TCP/IP** (Network page): *Stays connected* (the
   standard on a new Psion) keeps the dial-up connection up after use, for
   PsiTerm and PsiWeb too, until File > Disconnect (Ctrl+U); *Disconnects when
   idle* leaves it to the Psion's own idle time, as before. Anyone updating
   from an older version keeps *Disconnects when idle* until they change it.
   The modem route always hangs up after use.
-* **Use proxy** (Network page), shared with PsiTerm and PsiWeb, is optional
+* **Web helper** (Network page; *Use proxy* before 1.03), shared with PsiTerm and PsiWeb, is optional
   and off as standard; no address is built in. **PsiMail does not need it**:
   mail, the calendar and contacts always go direct to your servers, over
   PsiMail's own TLS 1.3 with the certificate checked. PsiMail uses the proxy
   for only two things:
   * **Web pictures** in HTML mail, if Preferences > Screen > *Web pictures
-    via proxy* is Yes. The computer fetches each picture (doing the TLS) and
+    via helper* is Yes. The computer fetches each picture (doing the TLS) and
     turns it into a small 16-grey GIF, so there is less to download and
     decode, and formats the Psion cannot decode (WebP, AVIF) can be shown. If
     the proxy does not answer, the pictures come direct, for the rest of

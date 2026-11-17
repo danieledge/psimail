@@ -230,7 +230,8 @@ enum TPmPages
 enum TPmLinkTest
 	{
 	EPmBidTest = 0x7400,
-	EPmDlgTest1, EPmDlgTest2, EPmDlgTest3, EPmDlgTest4, EPmDlgTest5
+	EPmDlgTest1, EPmDlgTest2, EPmDlgTest3, EPmDlgTest4, EPmDlgTest5,
+	EPmBidSetup = 0x7410          // (1.03) Connection settings > Set up...: the setup assistant
 	};
 
 // Preferences > Screen greys... (0.84): the button, the same id in all

@@ -1171,7 +1171,9 @@ public:
 	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
-	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }   // (1.00) a command from the view's own controls (the preview's actions)
+	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }
+	TBool RunSetupL();                             // (1.03) the setup assistant; ETrue if it saved
+	TBool iFirstStart;                             // (1.03) a new user: no settings of any program yet   // (1.00) a command from the view's own controls (the preview's actions)
 	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
 	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7

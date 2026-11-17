@@ -374,7 +374,8 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 	fprintf(f, "Message-ID: %s\r\n", msgid);
 	if (irt[0]) fprintf(f, "In-Reply-To: %s\r\n", irt);
 	if (refs[0]) fprintf(f, "References: %s\r\n", refs);
-	fprintf(f, "MIME-Version: 1.0\r\nUser-Agent: PsiMail (Psion Series 5mx)\r\n");
+	fprintf(f, "MIME-Version: 1.0\r\nUser-Agent: PsiMail/%s (%s)\r\n", pm_shared()->net.version,
+		pm_shared()->machine[0] ? pm_shared()->machine : "Psion");   /* (1.03: the machine it was written on) */
 	if (natt) {
 		fprintf(f, "Content-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n", boundary);
 		fprintf(f, "This is a message in MIME format.\r\n\r\n--%s\r\n", boundary);

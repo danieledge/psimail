@@ -12,6 +12,7 @@
 #define TLS_FAST_X25519 1
 #define TLS_RESUME 1
 #define TLS_FAST_CRYPTO 1     /* web/tls/aead.c */
+#define TLS_AES_GCM 1         /* (1.03) TLS_AES_128_GCM_SHA256 too, for servers that want it (ssh/aesgcm.c) */
 #include <string.h>
 #include <stdlib.h>
 #include "tomcrypt.h"

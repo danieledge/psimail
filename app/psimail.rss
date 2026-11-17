@@ -25,6 +25,7 @@ NAME PSMA
 #include <eiklbx.rh>
 
 #include "psimail.hrh"
+#include "psilink.rh"           // (1.03) the shared connection words (psion-core)
 
 RESOURCE RSS_SIGNATURE { }
 
@@ -35,6 +36,28 @@ RESOURCE EIK_APP_INFO
 	menubar=r_pm_menubar;
 	hotkeys=r_pm_hotkeys;
 	toolbar=r_pm_toolbar;
+	}
+
+// (1.03) the setup assistant (psion-core's pgsetup): asked once, of a new
+// user, before the first account; Connection settings > Set up... after
+#define PGSU_TXT_HELPER_PROMPT "Web pictures are fetched by"
+#include "pgsetup.rssi"
+
+RESOURCE DIALOG r_pm_setup_dialog
+	{
+	title="Set up PsiMail";
+	flags=EEikDialogFlagWait;
+	buttons=r_pgsu_buttons;
+	pages=r_pm_setup_pages;
+	}
+
+RESOURCE ARRAY r_pm_setup_pages
+	{
+	items=
+		{
+		PAGE { text="Connection"; id=EPgSuPageConn; lines=r_pgsu_conn_lines; },
+		PAGE { text="Web helper"; id=EPgSuPageHelper; lines=r_pgsu_helper_lines; }
+		};
 	}
 
 // the standard toolbar, laid out as the built-in Email program has it: New,
@@ -439,6 +462,25 @@ RESOURCE MENU_PANE r_pm_reply_popup
 	}
 
 // ----------------------------------------------------------------- dialogs
+
+// (1.03) View > Status information: eight lines
+RESOURCE DIALOG r_pm_status_dialog
+	{
+	title="Status information";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CONTINUE;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo7; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo8; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt=""; }; }
+		};
+	}
 
 RESOURCE DIALOG r_pm_info_dialog
 	{
@@ -963,7 +1005,7 @@ RESOURCE ARRAY r_pm_prefs_screen_lines
 			control=CHOICELIST { array_id=r_pm_pictures_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Web pictures"; id=EPmDlgWebPictures;
 			control=CHOICELIST { array_id=r_pm_web_pictures_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Web pictures via proxy"; id=EPmDlgWebProxy;
+		DLG_LINE { type=EEikCtChoiceList; prompt="Web pictures via helper"; id=EPmDlgWebProxy;
 			control=CHOICELIST { array_id=r_pm_web_proxy_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Reading mode"; id=EPmDlgReading;
 			control=CHOICELIST { array_id=r_pm_reading_array; }; }
@@ -1056,7 +1098,7 @@ RESOURCE ARRAY r_pm_conn_link_lines
 		DLG_LINE { type=EEikCtChoiceList; prompt="Flow control"; id=EPmDlgFlow; control=CHOICELIST { array_id=r_pm_flow_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Mail connects via"; id=EPmDlgLink; control=CHOICELIST { array_id=r_pm_link_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Modem provides TLS"; id=EPmDlgModemTls; control=CHOICELIST { array_id=r_pm_yesno_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Psion Internet: first send"; id=EPmDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
+		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_FIRST_SEND; id=EPmDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
 		};
 	}
 
@@ -1064,12 +1106,12 @@ RESOURCE ARRAY r_pm_conn_proxy_lines
 	{
 	items=
 		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="After use, Psion Internet"; id=EPmDlgKeepUp; control=CHOICELIST { array_id=r_pm_keepup_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_AFTER_USE; id=EPmDlgKeepUp; control=CHOICELIST { array_id=r_pm_keepup_array; }; },
 		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation;
 			txt="Disconnect with Ctrl+U - the modem route always hangs up after use"; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Use proxy"; id=EPmDlgUseProxy; control=CHOICELIST { array_id=r_pm_yesno_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Proxy host"; id=EPmDlgProxyHost; control=EDWIN { width=22; maxlength=60; }; },
-		DLG_LINE { type=EEikCtNumberEditor; prompt="Proxy port"; id=EPmDlgProxyPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
+		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_HELPER; id=EPmDlgUseProxy; control=CHOICELIST { array_id=r_pm_helper_array; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_HELPER_HOST; id=EPmDlgProxyHost; control=EDWIN { width=22; maxlength=60; }; },
+		DLG_LINE { type=EEikCtNumberEditor; prompt=PSILINK_TXT_HELPER_PORT; id=EPmDlgProxyPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
 		};
 	}
 
@@ -1106,7 +1148,13 @@ RESOURCE ARRAY r_pm_flow_array
 
 RESOURCE ARRAY r_pm_link_array
 	{
-	items={ LBUF { txt="Modem (ATDT host:port)"; }, LBUF { txt="Psion Internet (PPP)"; } };
+	items={ LBUF { txt=PSILINK_TXT_VIA_MODEM; }, LBUF { txt=PSILINK_TXT_VIA_NET; } };
+	}
+
+// (1.03) Network > Web helper: None - direct, or the Atom modem or PsiProxy
+RESOURCE ARRAY r_pm_helper_array
+	{
+	items={ LBUF { txt=PSILINK_TXT_HELPER_NO; }, LBUF { txt=PSILINK_TXT_HELPER_YES; } };
 	}
 
 // ----------------------------------------------------------------- calendar
@@ -1261,6 +1309,7 @@ RESOURCE DLG_BUTTONS r_pm_conn_buttons
 	{
 	buttons=
 		{
+		DLG_BUTTON { id=EPmBidSetup; button=CMBUT { txt="Set up..."; }; hotkey='U'; },
 		DLG_BUTTON { id=EPmBidTest; button=CMBUT { txt="Test"; }; hotkey='T'; },
 		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; },
 		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="OK"; }; hotkey=EEikBidOk; flags=0; }

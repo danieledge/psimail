@@ -62,7 +62,7 @@ SYSLIBS := $(REL)/estlib.lib $(REL)/euser.lib $(REL)/c32.lib $(REL)/efsrv.lib $(
 endif
 
 ENG_OBJS := $(addprefix $(O)/,$(ENGINE:=.o)) $(addprefix $(O)/cal/,$(CAL_SRCS:=.o)) $(O)/certcheck.o $(O)/pmrsa.o $(addprefix $(O)/img/,$(IMG_SRCS:=.o)) $(addprefix $(O)/zlib/,$(Z_SRCS:=.o))
-TLS_OBJS := $(O)/tls13.o $(O)/x25519.o $(O)/pmrandom.o
+TLS_OBJS := $(O)/tls13.o $(O)/x25519.o $(O)/pmrandom.o $(O)/aesgcm.o
 LTC_OBJS := $(addprefix $(O)/ltc/,$(subst /,__,$(LTC_SRCS:=.o)))
 LTM_OBJS := $(addprefix $(O)/ltm/,$(LTM_SRCS:=.o))
 HDRS    := $(MAIL)/psimail.h $(MAIL)/engine/pm.h $(MAIL)/engine/invite.h $(CORE)/ssh/psishared.h $(CAL)/calport.h $(CAL)/cal.h $(CAL)/calacct.h
@@ -97,7 +97,11 @@ $(O)/pmupdate.o: engine/pmupdate.c $(HDRS)
 $(O)/pmrsa.o: $(TLSV)/pmrsa.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTMFLAGS) $< -o $@
-$(O)/tls13.o: $(CORE)/ssh/tls13.c tls/includes.h
+# AES-128-GCM, TLS 1.3's second cipher (psion-core 4aec0ab; TLS_AES_GCM in tls/includes.h)
+$(O)/aesgcm.o: $(CORE)/ssh/aesgcm.c $(CORE)/ssh/aesgcm.h
+	@mkdir -p $(dir $@)
+	$(CC) -c $(TFLAGS) $< -o $@
+$(O)/tls13.o: $(CORE)/ssh/tls13.c $(CORE)/ssh/aesgcm.h tls/includes.h
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh/db/src $< -o $@
 $(O)/%.o: tls/%.c tls/includes.h tls/options.h

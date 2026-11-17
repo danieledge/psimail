@@ -28,6 +28,7 @@
 #include <eikbtpan.h>
 #include "pmicons.h"
 #include "pmapp.h"
+#include "pgsetup.h"
 #include "pmcontacts.h"
 #include "psilink.h"
 #include "pglinktest.h"
@@ -112,7 +113,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.02");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.03");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -465,6 +466,27 @@ TBool CPmView::ProxyUsable()
 void CPmView::CopySettingsToShared()
 	{
 	PmShared* s = iShared;
+	{
+	// (1.03) the machine for User-Agent (its own name from the HAL), and,
+	// on a colour screen, the screen for X-Psi-Screen (the 5mx sends none:
+	// its pictures are as before)
+	TMachineInfoV1Buf mi;
+	TBuf<32> name;
+	if (UserHal::MachineInfo(mi) == KErrNone)
+		name = mi().iMachineName.Left(Min(mi().iMachineName.Length(), 24));   // (Left past the end panics: USER 22)
+	if (!name.Length())
+		name = PmTall() ? _L("netBook or Series 7") : _L("Series 5mx");
+	TBuf<32> ua(_L("Psion "));
+	if (name.Length() >= 5 && name.Left(5).CompareF(_L("Psion")) == 0)
+		ua.Zero();
+	ua.Append(name.Left(Min(name.Length(), ua.MaxLength() - ua.Length())));
+	CopyToC(s->machine, sizeof(s->machine), ua);
+	TSize sz = iCoeEnv->ScreenDevice()->SizeInPixels();
+	TBuf<16> scr;
+	if (PmColour())
+		scr.Format(_L("%dx%dx256"), sz.iWidth, sz.iHeight);
+	CopyToC(s->screen, sizeof(s->screen), scr);
+	}
 	TBuf<40> ppp;
 	UseSharedLink(iCoeEnv->FsSession(), *iSettings, &ppp);   // may have changed in another app
 	s->net.baud_index = iSettings->iBaudIndex;
@@ -2896,16 +2918,18 @@ void CPmInfoDialog::PreLayoutDynInitL()
 	TBuf<80> title(iTitle.Left(iTitle.Length() < 79 ? iTitle.Length() : 79));
 	PmFitText(title, *iEikonEnv->TitleFont(), KPmDlgTextPx);
 	SetTitleL(title);
-	for (TInt i = 0; i < 6; i++)
+	// (1.03: Status information has eight lines, the 7th and 8th Info7, Info8)
+	for (TInt i = 0; i < (iCount > 6 ? 8 : 6); i++)
 		{
+		TInt id = i < 6 ? EPmDlgInfo1 + i : i == 6 ? EPmDlgInfo7 : EPmDlgInfo8;
 		if (i < iCount)
 			{
 			TBuf<256> t(iLines[i].Left(iLines[i].Length() < 255 ? iLines[i].Length() : 255));
-			PmFitText(t, *((CEikLabel*)Control(EPmDlgInfo1 + i))->Font(), KPmDlgTextPx);
-			SetLabelL(EPmDlgInfo1 + i, t);
+			PmFitText(t, *((CEikLabel*)Control(id))->Font(), KPmDlgTextPx);
+			SetLabelL(id, t);
 			}
 		else
-			MakeLineVisible(EPmDlgInfo1 + i, EFalse);
+			MakeLineVisible(id, EFalse);
 		}
 	}
 
@@ -3567,6 +3591,8 @@ TBool CPmConnDialog::OkToExitL(TInt aButtonId)
 		TestL();
 		return EFalse;
 		}
+	if (aButtonId == EPmBidSetup)
+		return ETrue;                        // (1.03: the app UI runs the assistant; nothing here is kept)
 	TInt proxy = ChoiceListCurrentItem(EPmDlgUseProxy) == 1;
 	TBuf<60> host;
 	GetEdwinText(host, EPmDlgProxyHost);
@@ -3574,7 +3600,7 @@ TBool CPmConnDialog::OkToExitL(TInt aButtonId)
 	TInt port = NumberEditorValue(EPmDlgProxyPort);
 	if (proxy && host.Length() == 0)
 		{
-		iEikonEnv->InfoMsg(_L("No proxy host entered"));
+		iEikonEnv->InfoMsg(_L("No helper's address entered"));
 		TryChangeFocusToL(EPmDlgProxyHost);
 		return EFalse;
 		}
@@ -3623,6 +3649,7 @@ void CPmAppUi::ConstructL()
 	// (0.96) the screen: colour and 480 lines on the netBook and Series 7
 	iColour = iCoeEnv->ScreenDevice()->DisplayMode() >= EColor16;
 	iTall = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	iFirstStart = CPgSetupDialog::FirstRun(iCoeEnv->FsSession(), KIniFile);   // (1.03, before anything is saved)
 	LoadSettings();
 	LoadCalSettings();
 	TRAPD(mbm, iMbm = CPmMbm::NewL(iCoeEnv->FsSession(), Application()->BitmapStoreName()));
@@ -3644,6 +3671,15 @@ void CPmAppUi::ConstructL()
 	// Reading mode without doing it (docs/display.md)
 	TPsiReading::Recover(iCoeEnv->FsSession(), iCoeEnv->WsSession(), KUidPsiMail);
 	iForeground = ETrue;
+	// (1.03) a new user (no PsiLink.ini, no PsiMail.ini): how this Psion
+	// gets online, first (psion-core's setup assistant)
+	if (iFirstStart)
+		{
+		iAccountSetup = ETrue;               // (the Email icon question waits for this too)
+		TRAPD(su, RunSetupL());
+		iAccountSetup = EFalse;
+		(void)su;
+		}
 	if (!iSettings.iAccounts[iSettings.iAcct].used)
 		{
 		iAccountSetup = ETrue;               // (the Email icon question waits for this)
@@ -5425,13 +5461,45 @@ void CPmAppUi::DeleteAccountL()
 	iView->AccountChangedL();
 	}
 
+// (1.03) the setup assistant (psion-core's pgsetup): the way online and
+// the web helper, into the shared PsiLink.ini; and "Modem provides TLS",
+// which only PsiMail has: on for the Atom modem, off for another one
+class CPmSetupDialog : public CPgSetupDialog
+	{
+public:
+	CPmSetupDialog() : CPgSetupDialog(R_PM_TEST_DIALOG, EPmDlgTest1) {}
+private:
+	void AppSaveL()
+		{
+		RFs& fs = iEikonEnv->FsSession();
+		TPsiLink link;
+		link.SetDefaults();
+		link.Load(fs);
+		link.iModemTls = Choice().conn == PG_SU_CONN_ATOM ? 1 : 0;
+		link.Save(fs);
+		}
+	};
+
+TBool CPmAppUi::RunSetupL()
+	{
+	CPmSetupDialog* dlg = new(ELeave) CPmSetupDialog;
+	if (!dlg->ExecuteLD(R_PM_SETUP_DIALOG))
+		return EFalse;
+	UseSharedLink(iCoeEnv->FsSession(), iSettings, NULL);   // (what it wrote, in PsiMail's copy)
+	SaveSettings();
+	return ETrue;
+	}
+
 void CPmAppUi::AboutL()
 	{
 	const TInt KBauds[5] = { 9600, 19200, 38400, 57600, 115200 };
 	TInt bi = iSettings.iBaudIndex >= 0 && iSettings.iBaudIndex <= 4 ? iSettings.iBaudIndex : 4;
-	TPtrC link(iSettings.iNetMode ? _L("Psion Internet") : _L("modem"));
 	TBuf<80> status;
-	status.Format(_L("%d baud, mail via %S"), KBauds[bi], &link);
+	// (1.03) the route in the shared words; a baud rate only on the modem's
+	if (iSettings.iNetMode)
+		status = _L("Mail via Psion TCP/IP (a network card or dial-up)");
+	else
+		status.Format(_L("Mail via the modem at %d baud"), KBauds[bi]);
 	CPmAboutDialog* dlg = new(ELeave) CPmAboutDialog(status);
 	dlg->ExecuteLD(R_PM_ABOUT_DIALOG);
 	}
@@ -5956,7 +6024,18 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		TBuf<40> ppp;
 		UseSharedLink(iCoeEnv->FsSession(), iSettings, &ppp);
 		CPmConnDialog* dlg = new(ELeave) CPmConnDialog(iSettings, ppp);
-		if (dlg->ExecuteLD(R_PM_CONN_DIALOG))
+		TInt b = dlg->ExecuteLD(R_PM_CONN_DIALOG);
+		if (b == EPmBidSetup)
+			{
+			// (1.03) Set up...: the assistant, then the settings it wrote
+			if (RunSetupL())
+				{
+				iView->StopEngine();
+				iView->StartEngineL();
+				iView->SettingsChanged();
+				}
+			}
+		else if (b)
 			{
 			SaveSharedLink(iCoeEnv->FsSession(), iSettings, ppp);
 			SaveSettings();
@@ -5974,7 +6053,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		if (!iView->LogOn())
 			iView->Toast(KPmLogIsOff);
 		else if (!iView->ProxyUsable())
-			iView->Toast(_L("Not available - set a proxy in Connection settings"));
+			iView->Toast(_L("Not available - set a web helper in Connection settings"));
 		else
 			iView->SendLog();
 		break;
@@ -6006,7 +6085,7 @@ void CPmAppUi::HandleAttemptDimmedSelectionL(TInt aCommandId)
 		if (!iView->LogOn())
 			iView->Toast(KPmLogIsOff);
 		else if (!iView->ProxyUsable())
-			iView->Toast(_L("Not available - set a proxy in Connection settings"));
+			iView->Toast(_L("Not available - set a web helper in Connection settings"));
 		else
 			iView->Toast(_L("Not available - the log is being sent"));
 		return;

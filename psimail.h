@@ -180,6 +180,13 @@ typedef struct
 	   them in order, so two commands finishing between its ticks are both
 	   acted on (last_* alone held only the later one). */
 	PmDone done[PM_CMDQ];
+
+	/* (1.03, app) the machine, for User-Agent ("Psion Series 5mx", the
+	   machine's own name), and the screen for X-Psi-Screen on web picture
+	   requests ("640x480x256": PsiProxy and the Atom then size and colour
+	   pictures for it); "" before the app has said */
+	char machine[32];
+	char screen[16];
 	} PmShared;
 
 #endif

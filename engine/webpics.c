@@ -26,6 +26,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pm.h"
+
+/* (1.03) User-Agent names the machine (the app puts its name in the
+   shared chunk), and X-Psi-Screen tells PsiProxy and the Atom's proxy the
+   screen, so they send pictures sized (and, for a colour screen, coloured)
+   for it rather than the 5mx's 16 greys */
+static const char *ua_ver(void) { return pm_shared()->net.version; }
+static const char *ua_machine(void) { return pm_shared()->machine[0] ? pm_shared()->machine : "Psion"; }
+static const char *screen_line(void)
+{
+	static char line[40];
+	const char *sc = pm_shared()->screen;
+	if (!sc[0]) return "";
+	snprintf(line, sizeof(line), "X-Psi-Screen: %.15s\r\n", sc);
+	return line;
+}
 #include "../core/ssh/pgdevbox.h"
 
 #define WEB_MAX       16
@@ -211,19 +226,20 @@ static int get(const char *url0, const char *path, long max, long *got, char *wh
 				int def = u.tls ? 443 : 80;
 				if (u.port == def)
 					snprintf(req, sizeof(req), "GET http://%s%s HTTP/1.1\r\nHost: %s\r\n"
-						"User-Agent: PsiMail (Psion Series 5mx)\r\n"
+						"User-Agent: PsiMail/%s (%s)\r\n%s"
 						"Accept: image/jpeg, image/png, image/gif\r\n"
 						"Proxy-Connection: keep-alive\r\nConnection: keep-alive\r\n\r\n",
-						u.host, u.path, u.host);
+						u.host, u.path, u.host, ua_ver(), ua_machine(), screen_line());
 				else
 					snprintf(req, sizeof(req), "GET http://%s:%d%s HTTP/1.1\r\nHost: %s\r\n"
-						"User-Agent: PsiMail (Psion Series 5mx)\r\n"
+						"User-Agent: PsiMail/%s (%s)\r\n%s"
 						"Accept: image/jpeg, image/png, image/gif\r\n"
 						"Proxy-Connection: keep-alive\r\nConnection: keep-alive\r\n\r\n",
-						u.host, u.port, u.path, u.host);
+						u.host, u.port, u.path, u.host, ua_ver(), ua_machine(), screen_line());
 			} else
-			snprintf(req, sizeof(req), "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: PsiMail (Psion Series 5mx)\r\n"
-				"Accept: image/jpeg, image/png, image/gif\r\nConnection: keep-alive\r\n\r\n", u.path, u.host);
+			snprintf(req, sizeof(req), "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: PsiMail/%s (%s)\r\n%s"
+				"Accept: image/jpeg, image/png, image/gif\r\nConnection: keep-alive\r\n\r\n", u.path, u.host,
+				ua_ver(), ua_machine(), screen_line());
 			if (pmn_write(req, (int)strlen(req)) != 0) {
 				pmn_close(1);
 				g_conn = -1;
@@ -491,9 +507,9 @@ int pm_send_log(char *why, int whymax)
 		return pm_cancelled() ? PM_RES_CANCELLED : PM_RES_FAILED;
 	}
 	snprintf(req, sizeof(req),
-		"POST /_putlog?app=PsiMail&ver=%s HTTP/1.0\r\nHost: %s:%d\r\nUser-Agent: PsiMail (Psion Series 5mx)\r\n"
+		"POST /_putlog?app=PsiMail&ver=%s HTTP/1.0\r\nHost: %s:%d\r\nUser-Agent: PsiMail/%s (%s)\r\n"
 		"Content-Type: text/plain\r\nContent-Length: %ld\r\nConnection: close\r\n\r\n",
-		s->net.version, pg_devbox_hostname(lhost), lport, total);
+		s->net.version, pg_devbox_hostname(lhost), lport, ua_ver(), ua_machine(), total);
 	left = total;
 	if (pmn_write(req, (int)strlen(req)) != 0) ok = 0;
 	if (ok && ho > 0) { if (pmn_write(hdr_old, (int)strlen(hdr_old)) != 0) ok = 0; else left -= ho; }

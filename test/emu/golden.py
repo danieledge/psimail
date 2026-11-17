@@ -86,7 +86,9 @@ def tours(kind):
         ('Z', S, ST + ('^m +1 shot:list-zoom-b ^m +1 shot:list-zoom-c ^m +1 ^t +1 shot:list-no-toolbar ^t ^^l +1 '
                        'shot:list-no-folders ^^l ^^t +1 shot:list-no-title ^^t menu right right right down down down down '
                        'right down down down enter +2 shot:no-preview').split()),
-        ('N', 'CARD0', ('+2 shot:first-run +1 tap:130,%d +1 shot:first-run-incoming esc +2 shot:first-run-cancelled esc +2 '
+        # (1.03: a new user is asked how the Psion gets online first; Esc goes on to the account)
+        ('N', 'CARD0', ('+2 shot:first-setup tab +1 shot:first-setup-helper esc +3 shot:first-run +1 tap:130,%d +1 '
+                        'shot:first-run-incoming esc +2 shot:first-run-cancelled esc +2 '
                         'shot:empty menu right right right right down enter +2 shot:first-conn' % y(34)).split()),
         # (1.02) next unread, the rules, the signatures, Check for new mail: At once
         ('J', S, ST + '^^j +2 shot:next-unread ^^j +2 shot:next-unread2 enter +4 ^^j +4 shot:next-unread-reader esc'.split()),
@@ -141,6 +143,12 @@ def run_tour(kind, name, card, steps, outdir, work):
     env = dict(os.environ, PSION_RTC_SEED=RTC)
     if kind == 'mx':
         if not ev: ev = ['%.2f 4 8' % T0]
+        # MX_LAUNCH_AT=S (45): open PsiMail from Extras at S s rather than run.sh's
+        # 37 s (a bigger card can keep the System screen busy past that)
+        at = os.environ.get('MX_LAUNCH_AT', '45')
+        if at:
+            env['EMU_LAUNCH'] = '0'
+            ev = ['%.2f tap 670 262' % float(at), '%.2f tap 335 215' % (float(at) + 2)] + ev
         last = max(float(e.split()[0]) for e in ev)
         env.update(EMU_CARD=card, EMU_OUT=frames_dir, PSION_APP=REPO, PSION_EMU=EMU, EMU_SECS=str(int(t - last) + 4))
         subprocess.run(['bash', os.path.join(CORE, 'tools', 'emu', 'run.sh'), name] + ev, env=env,

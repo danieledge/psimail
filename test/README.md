@@ -311,3 +311,14 @@ moved to Archive, a sender's mail marked read, a bad line skipped.
 EXISTS SECS into it; the engine's `idle` ends with DONE and syncs the new
 message, waits the whole time when nothing comes, and says "Not available"
 to a server without IDLE.
+
+On the 5mx the tours open PsiMail from Extras at 45 s (`MX_LAUNCH_AT`), not
+run.sh's 37 s: with 1.03's bigger program on the card the System screen was
+still busy at 37 s and the tap was lost. The screens are the same either way.
+If a tour on the 5mx never opens PsiMail (the System screen stays) or the
+first-run dialog stops answering, the card's layout has wedged the
+emulator's CF card (see core/tools/emu/README.md): make that card again
+another way (mkcard.ts with another EMU_PAD, or the program's files written
+over an older card) before suspecting the program. The seeded tours'
+TESTSEED block also sets iFirstStart to EFalse, so they start without the
+setup assistant (1.03); the first-run tour shows it.
