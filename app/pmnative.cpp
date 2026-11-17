@@ -86,10 +86,12 @@ CFbsBitmap* CPmMbm::CreateBitmapL(TInt aId)
 			{
 			const TUint32* h = (const TUint32*)(iData->Ptr() + off);
 			TInt hdr = (TInt)h[1], wd = (TInt)h[2], ht = (TInt)h[3], bpp = (TInt)h[6], colour = (TInt)h[7], comp = (TInt)h[9];
-			TDisplayMode mode = bpp == 1 ? EGray2 : bpp == 2 ? EGray4 : bpp == 4 ? EGray16 : bpp == 8 ? EGray256 : ENone;
+			// (1.00) the colour set's pictures are 8 bits a pixel in EPOC's 256 colours
+			TDisplayMode mode = colour ? (bpp == 8 ? EColor256 : ENone)
+				: bpp == 1 ? EGray2 : bpp == 2 ? EGray4 : bpp == 4 ? EGray16 : bpp == 8 ? EGray256 : ENone;
 			TInt stride = ((wd * bpp + 31) / 32) * 4;
-			if (mode != ENone && !colour && !comp && hdr >= 40 && wd > 0 && ht > 0 && wd <= 640 && ht <= 240 &&
-				off + hdr + stride * ht <= size)
+			if (mode != ENone && (colour == 0 || colour == 1) && !comp && hdr >= 40 && wd > 0 && ht > 0 && wd <= 640 && ht <= 240 &&
+				stride > 0 && stride <= 640 && off + hdr >= off && off + hdr + stride * ht <= size)
 				{
 				User::LeaveIfError(b->Create(TSize(wd, ht), mode));
 				TInt dst = CFbsBitmap::ScanLineLength(wd, mode);
@@ -110,11 +112,47 @@ CFbsBitmap* CPmMbm::CreateBitmapL(TInt aId)
 	return b;
 	}
 
+// (1.00) the colour set is loaded after the grey one on a colour screen
+// (CPmView::LoadIconsL): a grey id is then drawn from its colour twin
+TBool PmColourIcons(CArrayPtr<CFbsBitmap>* aIcons)
+	{
+	return aIcons && aIcons->Count() >= EMbmAllCount;
+	}
+
+CFbsBitmap* PmIconBitmap(CArrayPtr<CFbsBitmap>* aIcons, TInt aId)
+	{
+	if (!aIcons || aId < 0 || aId >= EMbmCount || aId >= aIcons->Count())
+		return NULL;
+	return aIcons->At(PmColourIcons(aIcons) ? aId + EMbmColourBase : aId);
+	}
+
+// (1.00) an attachment's picture, by the end of its name: a picture, a
+// Word file, a Sheet file, a PDF, or anything else
+TInt PmAttKindIcon(const TDesC& aName)
+	{
+	TInt dot = aName.LocateReverse('.');
+	if (dot < 0 || aName.Length() - dot > 6)
+		return EMbmAttOther;
+	TBuf<6> e(aName.Mid(dot + 1));
+	e.LowerCase();
+	if (e == _L("jpg") || e == _L("jpeg") || e == _L("png") || e == _L("gif") || e == _L("bmp") || e == _L("mbm") || e == _L("webp") || e == _L("heic"))
+		return EMbmAttPicture;
+	if (e == _L("doc") || e == _L("docx") || e == _L("rtf") || e == _L("wrd") || e == _L("txt") || e == _L("odt"))
+		return EMbmAttWord;
+	if (e == _L("xls") || e == _L("xlsx") || e == _L("csv") || e == _L("shd") || e == _L("ods"))
+		return EMbmAttSheet;
+	if (e == _L("pdf"))
+		return EMbmAttPdf;
+	return EMbmAttOther;
+	}
+
 // a picture from PsiMail.mbm, drawn through its mask (black = drawn)
 void PmDrawIcon(CWindowGc& aGc, CArrayPtr<CFbsBitmap>* aIcons, TInt aId, const TPoint& aPos)
 	{
 	if (!aIcons || aId < 0 || aId + 1 >= aIcons->Count())
 		return;
+	if (PmColourIcons(aIcons) && aId < EMbmCount)
+		aId += EMbmColourBase;
 	CFbsBitmap* bmp = aIcons->At(aId);
 	CFbsBitmap* mask = aIcons->At(aId + 1);
 	aGc.BitBltMasked(aPos, bmp, TRect(bmp->SizeInPixels()), mask, ETrue);
@@ -177,6 +215,52 @@ TRgb PmFlagColour()
 	{
 	if (!PmColour()) return KRgbBlack;
 	return DarkWorkspace() ? TRgb(255, 102, 102) : TRgb(204, 0, 0);
+	}
+
+// (1.00) the colour pass. Each is a colour of the 256's cube, with a
+// light and a dark workspace's value; on the 5mx they are not drawn
+TRgb PmUnreadBar()
+	{
+	return DarkWorkspace() ? TRgb(102, 204, 255) : TRgb(0, 0, 204);
+	}
+
+// a colour halfway between two, put on the cube (so it is not dithered)
+TRgb PmMix(const TRgb& aA, const TRgb& aB)
+	{
+	TInt c[3] = { (aA.Red() + aB.Red()) / 2, (aA.Green() + aB.Green()) / 2, (aA.Blue() + aB.Blue()) / 2 };
+	for (TInt i = 0; i < 3; i++)
+		c[i] = (c[i] + 25) / 51 * 51;
+	return TRgb(c[0], c[1], c[2]);
+	}
+
+// the preview's heading: the button face's tint, between it and the workspace
+TRgb PmBandColour()
+	{
+	return PmMix(PmFace(), PmBack());
+	}
+
+// the calendar: the weekend's columns and today's, faintly tinted
+TRgb PmWeekendTint()
+	{
+	return DarkWorkspace() ? PmMix(PmBack(), TRgb(102, 102, 102)) : TRgb(238, 238, 238);
+	}
+
+TRgb PmTodayTint()
+	{
+	return DarkWorkspace() ? PmMix(PmBack(), TRgb(102, 102, 0)) : TRgb(255, 255, 204);
+	}
+
+// the connection light: 0 grey (offline, not connected), 1 amber
+// (connecting), 2 green (connected), 3 red (connected with no security)
+TRgb PmLight(TInt aState)
+	{
+	switch (aState)
+		{
+	case 1: return TRgb(255, 153, 0);
+	case 2: return TRgb(0, 204, 0);
+	case 3: return TRgb(204, 0, 0);
+	default: return TRgb(153, 153, 153);
+		}
 	}
 
 TRgb PmCalColour(TInt aShade)
@@ -341,6 +425,25 @@ public:
 			iGc->SetBrushColor(PmBack());
 			iGc->DrawRect(TRect(aRect.iTl.iX, aRect.iTl.iY, aRect.iTl.iX + KIconCol - 2, aRect.iBr.iY));
 			}
+		if (PmColourIcons(iIcons))
+			{
+			// (1.00) colour pictures (the red flag, the yellow envelope of an
+			// unread message) and a blue bar at the left of an unread row
+			TInt x = aRect.iTl.iX;
+			if (v & KMsgUnread)
+				{
+				iGc->SetPenStyle(CGraphicsContext::ENullPen);
+				iGc->SetBrushStyle(CGraphicsContext::ESolidBrush);
+				iGc->SetBrushColor(PmUnreadBar());
+				iGc->DrawRect(TRect(x, aRect.iTl.iY + 1, x + 2, aRect.iBr.iY - 1));
+				iGc->SetBrushStyle(CGraphicsContext::ENullBrush);
+				}
+			if (icon != 0xff)
+				PmDrawIcon(*iGc, iIcons, icon, TPoint(x + 3, y));
+			if (v & KMsgAttach)
+				PmDrawIcon(*iGc, iIcons, EMbmMsgAttach, TPoint(x + 13, y));
+			return;
+			}
 		if (icon == EMbmMsgFlag && PmColour())
 			{
 			// (0.96) on a colour screen the flag is red: drawn here, as the
@@ -427,7 +530,9 @@ void CPmView::LoadIconsL()
 	iIcons = new(ELeave) CArrayPtrFlat<CFbsBitmap>(EMbmCount);
 	CPmAppUi* ui = (CPmAppUi*)iEikonEnv->EikAppUi();
 	TFileName mbm = ui->Application()->BitmapStoreName();
-	for (TInt i = 0; i < EMbmCount; i++)
+	// (1.00) a colour screen takes the colour set too; the 5mx only the greys
+	TInt n = PmColour() ? EMbmAllCount : EMbmCount;
+	for (TInt i = 0; i < n; i++)
 		{
 		CFbsBitmap* b = NULL;
 		TInt err;
@@ -438,6 +543,16 @@ void CPmView::LoadIconsL()
 		else
 			{
 			TRAP(err, b = iEikonEnv->CreateBitmapL(mbm, i));
+			}
+		if (err != KErrNone && i >= EMbmCount)
+			{
+			// (an older PsiMail.mbm, with no colour set: the greys)
+			while (iIcons->Count() > EMbmCount)
+				{
+				delete iIcons->At(iIcons->Count() - 1);
+				iIcons->Delete(iIcons->Count() - 1);
+				}
+			return;
 			}
 		if (err != KErrNone)
 			{
@@ -627,7 +742,22 @@ void CPmView::LayoutNative()
 		if (iSplitX < 130) iSplitX = 130;
 		}
 	TInt msgX = r.iTl.iX + (folders ? iSplitX + 1 : 0);
-	TRAPD(e1, iFolderList->SetRectL(TRect(TPoint(r.iTl.iX, listTop), TSize(folders ? iSplitX : 1, r.iBr.iY - listTop))));
+	// (1.00) a tall screen showing the calendar: its calendars under the
+	// folders, with their colours (CalLegend*), when there is room
+	TInt foldersH = r.iBr.iY - listTop;
+	iLegendRect = TRect();
+	if (folders && PmTall() && iMode == ECalendar && iCalModel.ncal > 0)
+		{
+		TInt ih = iFolderList->ItemHeight();
+		TInt need = iFolderList->Model()->NumberOfItems() * ih + 4;
+		TInt legend = (iCalModel.ncal + 1) * ih + 10;
+		if (listTop + need + legend <= r.iBr.iY)
+			{
+			foldersH = need;
+			iLegendRect = TRect(r.iTl.iX, listTop + need, r.iTl.iX + iSplitX, r.iBr.iY);
+			}
+		}
+	TRAPD(e1, iFolderList->SetRectL(TRect(TPoint(r.iTl.iX, listTop), TSize(folders ? iSplitX : 1, foldersH))));
 	// (0.96) on a tall screen the list has the top of its pane, and the
 	// selected message is shown under it (pmpreview.cpp): whole rows, a
 	// little under half the height
@@ -2146,7 +2276,11 @@ void CPmView::DrawHeaders(CWindowGc& gc) const
 		if (room > 8 && iBoldFont->TextWidthInPixels(t) > room)
 			TextUtils::ClipToFit(t, *iBoldFont, room);
 		TInt tx = i == 1 ? x0 + (b.Width() - iBoldFont->TextWidthInPixels(t)) / 2 : x0 + 4;
-		gc.DrawText(t, TPoint(tx, base));
+		if (i == 1 && PmColourIcons(iIcons))
+			// (1.00) the state column: an envelope in place of "?"
+			PmDrawIcon(gc, iIcons, EMbmMsgRead, TPoint(x0 + (b.Width() - 14) / 2, y + (iHeadH - 11) / 2));
+		else
+			gc.DrawText(t, TPoint(tx, base));
 		if (arrow >= 0)
 			DrawArrow(gc, x0 + 4 + iBoldFont->TextWidthInPixels(t) + 4, y + iHeadH / 2 - 2, arrow);
 		}
@@ -2213,7 +2347,10 @@ void CPmView::DrawNative(const TRect& /*aRect*/) const
 	DrawHeaders(gc);
 	DrawReaderBar(gc);
 	if (iMode == ECalendar)
+		{
 		DrawCalendar(gc);
+		DrawCalLegend(gc);
+		}
 	if (PreviewOn())
 		DrawPreviewHead(gc);
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
@@ -2359,6 +2496,164 @@ void CPmView::ToggleViewL(TInt aFlag)
 		iNativeMode = (TMode)-1;
 		UpdateNativeL();
 		DrawNow();
+		}
+	}
+
+// ----- (1.00) the toolbar's connection panel (tall screens) ---------------------------
+
+void CPmView::ConnPanelText(TInt& aLight, TDes& aText) const
+	{
+	aText.Zero();
+	TBool modem = iSettings->iNetMode == 0;
+	const PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
+	TBool atomTls = modem && (iSettings->iSpare[0] & KPmModemTlsBit);
+	if (iSettings->iOffline)
+		{
+		aLight = 0;
+		aText = _L("Offline");
+		}
+	else if (iShared && iShared->online)
+		{
+		aLight = (a.used && a.imap_tls == PM_TLS_NONE && !atomTls) ? 3 : 2;
+		aText = _L("Online");
+		}
+	else if (iShared && iShared->busy)
+		{
+		aLight = 1;
+		aText = _L("Connecting");
+		}
+	else
+		{
+		aLight = 0;
+		aText = _L("Not connected");
+		}
+	aText.Append('\n');
+	aText.Append(modem ? _L("Modem") : _L("Psion TCP/IP"));
+	aText.Append('\n');
+	if (a.used && a.imap_tls == PM_TLS_NONE && !atomTls)
+		aText.Append(_L("Not secure"));
+	else
+		aText.Append(atomTls ? _L("TLS: the Atom") : _L("TLS: here"));
+	aText.Append('\n');
+	aText.Append(iShared && iShared->use_proxy ? _L("Web: helper") : _L("Web: direct"));
+	aText.Append('\n');
+	if (iLastChecked.Int64() == TInt64(0))
+		aText.Append(_L("Last: -"));
+	else
+		{
+		TBuf<16> t;
+		TRAPD(err, iLastChecked.FormatL(t, _L("%-B%:0%J%:1%T%+B")));
+		if (!err)
+			{
+			aText.Append(_L("Last "));      // (when it was last checked: "Last 09:41")
+			aText.Append(t);
+			}
+		}
+	}
+
+CPmConnPanel* CPmConnPanel::NewL(CPmView& aView)
+	{
+	CPmConnPanel* p = new(ELeave) CPmConnPanel(aView);
+	CleanupStack::PushL(p);
+	p->CreateWindowL();
+	p->MakeVisible(EFalse);
+	p->ActivateL();
+	CleanupStack::Pop();
+	return p;
+	}
+
+void CPmConnPanel::Place(const TRect& aRect)
+	{
+	if (aRect.IsEmpty())
+		{
+		MakeVisible(EFalse);
+		return;
+		}
+	TRAPD(err, SetRectL(aRect));
+	(void)err;
+	iShown.Zero();
+	MakeVisible(ETrue);
+	Refresh();
+	}
+
+void CPmConnPanel::Refresh()
+	{
+	if (!IsVisible())
+		return;
+	TBuf<160> t;
+	TInt light = 0;
+	iView.ConnPanelText(light, t);
+	if (t == iShown && light == iLight)
+		return;
+	iShown = t;
+	iLight = light;
+	DrawNow();
+	}
+
+void CPmConnPanel::Draw(const TRect& /*aRect*/) const
+	{
+	CWindowGc& gc = SystemGc();
+	TRect r = Rect();
+	// the toolbar's face round a white box, as the clock sits in it
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(iEikonEnv->Color(EEikColorToolbarBackground));
+	gc.DrawRect(r);
+	TRect box(r);
+	box.Shrink(1, 1);
+	gc.SetPenStyle(CGraphicsContext::ESolidPen);
+	gc.SetPenColor(TRgb(102, 102, 102));
+	gc.SetBrushColor(iDown ? PmFace() : PmBack());
+	gc.DrawRect(box);
+	const CFont* f = iEikonEnv->DenseFont();
+	gc.UseFont(f);
+	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+	TInt lh = f->HeightInPixels() + 2;
+	TInt x = box.iTl.iX + 4, y = box.iTl.iY + 3;
+	TPtrC rest(iShown);
+	for (TInt i = 0; rest.Length() && i < 6; i++)
+		{
+		TInt nl = rest.Locate('\n');
+		TBuf<40> line(nl >= 0 ? rest.Left(nl) : rest);
+		rest.Set(nl >= 0 ? rest.Mid(nl + 1) : TPtrC());
+		TInt lx = x;
+		if (i == 0)
+			{
+			// the light, then the state
+			TInt d = 8;
+			TRect dot(x, y + (lh - d) / 2, x + d, y + (lh - d) / 2 + d);
+			gc.SetPenColor(KRgbBlack);
+			gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+			gc.SetBrushColor(PmLight(iLight));
+			gc.DrawEllipse(dot);
+			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+			lx += d + 4;
+			}
+		TextUtils::ClipToFit(line, *f, box.iBr.iX - 3 - lx);
+		gc.SetPenColor(PmText());
+		gc.DrawText(line, TPoint(lx, y + (lh - f->HeightInPixels()) / 2 + f->AscentInPixels()));
+		y += lh;
+		if (y + lh > box.iBr.iY)
+			break;
+		}
+	gc.DiscardFont();
+	}
+
+// a tap: Status information (as the title band's box does)
+void CPmConnPanel::HandlePointerEventL(const TPointerEvent& aEvent)
+	{
+	if (aEvent.iType == TPointerEvent::EButton1Down)
+		{
+		iDown = ETrue;
+		DrawNow();
+		}
+	else if (aEvent.iType == TPointerEvent::EButton1Up)
+		{
+		TBool was = iDown;
+		iDown = EFalse;
+		DrawNow();
+		if (was && Rect().Contains(aEvent.iPosition))
+			iView.StatusInfoL();
 		}
 	}
 
@@ -2566,9 +2861,121 @@ TKeyResponse CPmView::NativeKeyL(const TKeyEvent& aKeyEvent, TEventCode aType)
 
 // the pen on the title band and headings (the controls take the rest):
 // returns ETrue if it was ours
+// (1.00) the calendars under the folders (tall screens): each with its
+// colour; a tap shows or hides that calendar's events (cal\hidden.txt)
+TInt CPmView::CalLegendRow(TInt aRow, TRect& aRect) const
+	{
+	if (iLegendRect.IsEmpty() || aRow < 0 || aRow >= iCalModel.ncal)
+		return EFalse;
+	TInt ih = iFolderList ? iFolderList->ItemHeight() : 20;
+	TInt y = iLegendRect.iTl.iY + 6 + (aRow + 1) * ih;
+	aRect = TRect(iLegendRect.iTl.iX, y, iLegendRect.iBr.iX, y + ih);
+	return ETrue;
+	}
+
+void CPmView::DrawCalLegend(CWindowGc& gc) const
+	{
+	if (iLegendRect.IsEmpty() || iMode != ECalendar)
+		return;
+	gc.SetPenStyle(CGraphicsContext::ENullPen);
+	gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+	gc.SetBrushColor(PmBack());
+	gc.DrawRect(iLegendRect);
+	TInt ih = iFolderList ? iFolderList->ItemHeight() : 20;
+	TInt x = iLegendRect.iTl.iX + 6;
+	// a rule, and the heading
+	gc.SetPenStyle(CGraphicsContext::ESolidPen);
+	gc.SetPenColor(TRgb(153, 153, 153));
+	gc.DrawLine(TPoint(x, iLegendRect.iTl.iY + 2), TPoint(iLegendRect.iBr.iX - 6, iLegendRect.iTl.iY + 2));
+	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+	gc.UseFont(iBoldFont);
+	gc.SetPenColor(PmText());
+	TInt hy = iLegendRect.iTl.iY + 6;
+	gc.DrawText(_L("Calendars"), TPoint(x, hy + (ih - iBoldFont->HeightInPixels()) / 2 + iBoldFont->AscentInPixels()));
+	gc.DiscardFont();
+	gc.UseFont(iListFont);
+	for (TInt i = 0; i < iCalModel.ncal; i++)
+		{
+		TRect row;
+		if (!CalLegendRow(i, row))
+			break;
+		TBool shown = !(iCalModel.hidden & (1u << i));
+		TInt sy = row.iTl.iY + (ih - 10) / 2;
+		TRect sw(x, sy, x + 12, sy + 10);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		gc.SetPenColor(PmCalColour(i & 3));
+		gc.SetBrushStyle(shown ? CGraphicsContext::ESolidBrush : CGraphicsContext::ENullBrush);
+		gc.SetBrushColor(PmCalColour(i & 3));
+		gc.DrawRect(sw);
+		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+		TBuf<60> name;
+		const char* n = iCalModel.calName[i];
+		for (TInt c = 0; c < iCalModel.calLen[i] && c < 58; c++) name.Append((TUint8)n[c]);
+		if (!name.Length()) name = _L("(no name)");
+		TextUtils::ClipToFit(name, *iListFont, row.iBr.iX - x - 20 - 4);
+		gc.SetPenColor(shown ? PmText() : KPmDarkGrey);
+		gc.DrawText(name, TPoint(x + 18, row.iTl.iY + (ih - iListFont->HeightInPixels()) / 2 + iListFont->AscentInPixels()));
+		}
+	gc.DiscardFont();
+	}
+
+TBool CPmView::CalLegendPointerL(const TPointerEvent& aEvent)
+	{
+	if (iLegendRect.IsEmpty() || iMode != ECalendar || !iLegendRect.Contains(aEvent.iPosition))
+		return EFalse;
+	if (aEvent.iType != TPointerEvent::EButton1Up)
+		return ETrue;
+	for (TInt i = 0; i < iCalModel.ncal; i++)
+		{
+		TRect row;
+		if (CalLegendRow(i, row) && row.Contains(aEvent.iPosition))
+			{
+			ToggleCalendarL(i);
+			break;
+			}
+		}
+	return ETrue;
+	}
+
+// shows or hides one calendar: cal\hidden.txt holds the hidden ones' ids
+void CPmView::ToggleCalendarL(TInt aIndex)
+	{
+	if (aIndex < 0 || aIndex >= iCalModel.ncal)
+		return;
+	TUint hidden = iCalModel.hidden ^ (1u << aIndex);
+	TBuf8<600> out;
+	for (TInt i = 0; i < iCalModel.ncal; i++)
+		if (hidden & (1u << i))
+			{
+			const char* id = iCalModel.calId[i];
+			TInt n = 0;
+			while (id[n] && id[n] != '\t' && n < 64) n++;
+			if (out.Length() + n + 1 > out.MaxLength())
+				break;
+			out.Append(TPtrC8((const TUint8*)id, n));
+			out.Append('\n');
+			}
+	TBuf<120> path;
+	StoreDir(path);
+	path.Append(_L("cal\\hidden.txt"));
+	RFile f;
+	RFs& fs = iCoeEnv->FsSession();
+	if (!out.Length())
+		fs.Delete(path);
+	else if (f.Replace(fs, path, EFileWrite) == KErrNone)
+		{
+		f.Write(out);
+		f.Close();
+		}
+	LoadCalendarL();
+	DrawNow();
+	}
+
 TBool CPmView::NativePointerL(const TPointerEvent& aEvent)
 	{
 	if (ReaderBarPointerL(aEvent))
+		return ETrue;
+	if (CalLegendPointerL(aEvent))
 		return ETrue;
 	TInt hit = HeaderHit(aEvent.iPosition);
 	if (aEvent.iType == TPointerEvent::EButton1Down)

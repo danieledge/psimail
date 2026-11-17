@@ -80,6 +80,15 @@ void CPmView::LoadCalendarL()
 		cals ? (const char*)cals->Ptr() : NULL, cals ? cals->Length() : 0,
 		push ? (const char*)push->Ptr() : NULL, push ? push->Length() : 0);
 	CleanupStack::PopAndDestroy(3);          // (the model keeps copies)
+	// (1.00) the calendars hidden from the legend under the folders
+	HBufC* hid = NULL;
+	path = dir; path.Append(_L("hidden.txt"));
+	ReadFileL(path, hid, 2000);
+	if (hid)
+		{
+		calm_hide(&iCalModel, (const char*)hid->Ptr(), hid->Length());
+		delete hid;
+		}
 	iCalLoaded = ETrue;
 	CalendarToday();
 	}
@@ -296,7 +305,7 @@ void CPmView::MonthGrid(TRect& aNames, TRect& aGrid, TInt& aCellW, TInt& aCellH)
 // ----- drawing ------------------------------------------------------------------------
 
 // a small filled square: how busy a day is (up to three)
-static void DrawMarks(CWindowGc& gc, TInt aCount, TInt aCx, TInt aY, const TRgb& aColor)
+static void DrawMarks(CGraphicsContext& gc, TInt aCount, TInt aCx, TInt aY, const TRgb& aColor)
 	{
 	TInt n = aCount > 3 ? 3 : aCount;
 	if (n <= 0)
@@ -310,7 +319,7 @@ static void DrawMarks(CWindowGc& gc, TInt aCount, TInt aCx, TInt aY, const TRgb&
 	}
 
 // a solid frame two pixels wide: today
-static void DrawTodayFrame(CWindowGc& gc, const TRect& aRect, const TRgb& aColor)
+static void DrawTodayFrame(CGraphicsContext& gc, const TRect& aRect, const TRgb& aColor)
 	{
 	gc.SetPenStyle(CGraphicsContext::ESolidPen);
 	gc.SetPenColor(aColor);
@@ -323,7 +332,7 @@ static void DrawTodayFrame(CWindowGc& gc, const TRect& aRect, const TRgb& aColor
 
 // the highlight is where the keys are: inverted when the pane has them, a
 // dotted frame when the folder tree has them (as EIKON's lists do)
-static void DrawFocusFrame(CWindowGc& gc, const TRect& aRect)
+static void DrawFocusFrame(CGraphicsContext& gc, const TRect& aRect)
 	{
 	gc.SetPenStyle(CGraphicsContext::EDottedPen);
 	gc.SetPenColor(PmText());
@@ -653,7 +662,7 @@ void CPmView::DrawCalWeek(CWindowGc& gc, const PmUiCalendar& k) const
 		}
 	}
 
-void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
+void CPmView::DrawCalMonth(CBitmapContext& gc, const PmUiCalendar& k) const
 	{
 	TRect names, grid;
 	TInt cw, ch;
@@ -704,11 +713,20 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 				gc.SetBrushColor(PmHighlight());
 				gc.DrawRect(cell);
 				}
+			else if (PmColour() && (d.today || col >= 5))
+				{
+				// (1.00) today's cell and the weekend's, faintly tinted
+				gc.SetPenStyle(CGraphicsContext::ENullPen);
+				gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+				gc.SetBrushColor(d.today ? PmTodayTint() : PmWeekendTint());
+				gc.DrawRect(cell);
+				}
 			// the date: black in this month, dimmed (dark grey) around it
 			TRgb fg = inv ? PmHighlightText() : in ? PmText() : KPmDarkGrey;
 			gc.SetPenStyle(CGraphicsContext::ESolidPen);
 			gc.SetBrushStyle(CGraphicsContext::ENullBrush);
-			gc.SetPenColor(fg);
+			// (1.00) today's date in red on a colour screen
+			gc.SetPenColor(d.today && !inv && PmColour() ? PmFlagColour() : fg);
 			const CFont* f = d.today && nf == iListFont ? iBoldFont : nf;
 			TBuf<4> num;
 			num.Num(d.mday);
@@ -717,6 +735,7 @@ void CPmView::DrawCalMonth(CWindowGc& gc, const PmUiCalendar& k) const
 			if (d.today && f != iBoldFont)
 				gc.DrawText(num, TPoint(cell.iTl.iX + 4, cell.iTl.iY + 2 + f->AscentInPixels()));   // (bolder)
 			gc.DiscardFont();
+			gc.SetPenColor(fg);
 			if (d.count)
 				{
 				DrawMarks(gc, d.count, cell.iBr.iX - 9, cell.iTl.iY + 3, fg);
@@ -784,11 +803,14 @@ void CPmView::DrawCalendar(CWindowGc& gc) const
 	gc.SetClippingRect(CalRect());
 	DrawCalHead(gc);
 	if (iCalMonth)
+		{
 		DrawCalMonth(gc, k);
+		}
 	else
 		DrawCalWeek(gc, k);
 	gc.CancelClippingRect();
 	}
+
 
 // ----- keys ---------------------------------------------------------------------------
 

@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 0.96, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.00, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 0.96](#whats-new-in-096)
+- [What's new in 1.00](#whats-new-in-100) (and [0.96](#whats-new-in-096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,34 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 0.96
+## What's new in 1.00
+
+The colour pass, for the netBook and Series 7's colour screens. The Series
+5mx looks and works exactly as in 0.99: its 78 screens in the emulator are
+compared pixel for pixel with 0.99's (`test/emu/golden.py`).
+
+- Every picture PsiMail draws has a colour twin: manila folders, a blue
+  Inbox tray, a yellow envelope for an unread message and an open white one
+  for a read message, a red flag, a blue paperclip, and the four toolbar
+  pictures. They use only EPOC's 256 colours, so nothing is dithered.
+- An unread message has a blue bar at the left of its row as well as bold
+  text. The "?" over the pictures' column is a small envelope.
+- The preview under the list has a heading band in the button face's tint,
+  and the message's first attachment in a box: what kind of file it is
+  (a picture, a Word file, a Sheet file, a PDF), its name, its size and
+  "+2" for any more. The reader's attachment boxes show the kind of file too.
+- The calendar's month: the weekend's columns and today's cell are tinted,
+  and today's date is red. On a tall screen the calendars are listed under
+  the folders with their colours; a tap on one hides or shows its events
+  (kept in `cal\hidden.txt` beside the mail, not in the settings).
+- A panel in the toolbar's empty space, above the clock: a light (grey
+  offline or not connected, amber connecting, green online, red when the
+  account has no security), the route (Modem or Psion TCP/IP), who does the
+  TLS (here, or the Atom modem), whether web pictures come direct or by a
+  helper, and when the mail was last checked. A tap opens Status information.
+- Server certificates: ECDSA ones on P-256 and P-384 are checked too (Gmail's
+  IMAP has one), and five more roots (psion-core 33c3eeb).
+
 
 On the netBook and Series 7:
 

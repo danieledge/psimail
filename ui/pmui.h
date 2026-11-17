@@ -109,6 +109,7 @@ struct PmCalItem
 	const char* title; int tlen;
 	const char* loc; int llen;
 	const char* cal; int clen;
+	int ci;                            /* (1.00) which of calendars.txt's, -1 none */
 	};
 struct PmCalModel
 	{
@@ -116,11 +117,15 @@ struct PmCalModel
 	char* cals;
 	PmCalItem* items; int n, cap;
 	const char* calName[8]; int calLen[8]; const char* calId[8]; int ncal;
+	unsigned int hidden;               /* (1.00) calendars not shown: bit i for calName[i] */
 	};
 long cal_days_from(int y, int m, int d);     /* m 1..12 */
 void cal_date_of(long days, int* y, int* m, int* d);
 int  cal_weekday(long days);                  /* 0 = Monday */
 void calm_init(PmCalModel* m);
+/* (1.00) after calm_load: the calendars named in aHidden (cal\\hidden.txt,
+   one id a line) are not shown; their events are left out of the model */
+void calm_hide(PmCalModel* m, const char* aHidden, int aLen);
 void calm_free(PmCalModel* m);
 /* events.txt, calendars.txt, push.txt (any may be 0) */
 void calm_load(PmCalModel* m, const char* events, int elen, const char* cals, int clen, const char* push, int plen);

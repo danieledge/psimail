@@ -347,7 +347,11 @@ private:
 	void DrawCalendar(CWindowGc& aGc) const;
 	void DrawCalHead(CWindowGc& aGc) const;
 	void DrawCalWeek(CWindowGc& aGc, const PmUiCalendar& k) const;
-	void DrawCalMonth(CWindowGc& aGc, const PmUiCalendar& k) const;
+	void DrawCalMonth(CBitmapContext& aGc, const PmUiCalendar& k) const;
+	TInt CalLegendRow(TInt aRow, TRect& aRect) const;   // (1.00) the calendars under the folders (tall screens)
+	void DrawCalLegend(CWindowGc& aGc) const;
+	TBool CalLegendPointerL(const TPointerEvent& aEvent);
+	void ToggleCalendarL(TInt aIndex);
 	void DrawCalEvent(CWindowGc& aGc, const PmUiEvent& e, const TRect& aRect, TBool aSel) const;
 	void MonthGrid(TRect& aNames, TRect& aGrid, TInt& aCellW, TInt& aCellH) const;
 	TInt CalHit(const TPoint& aPos, TInt& aIndex) const;
@@ -363,6 +367,7 @@ private:
 	void CreatePreviewL();
 	void LayoutPreview(const TRect& aArea);  // the part of the list's room it takes (LayoutNative)
 	void PreviewSyncL();                     // the selected message into it, if it isn't there already
+	void PreviewAttachmentsL(TUint aUid);
 	void PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC& aFile);
 	void DrawPreviewHead(CWindowGc& aGc) const;
 	void PreviewPageL(TBool aDown);          // Space and Shift+Space
@@ -371,6 +376,9 @@ private:
 	TRect iPrevRect;                         // all of it: the rule, the heading, the text (empty: none)
 	TRect iPrevHead;                         // its heading: subject, sender, date
 	TUint iPrevUid;                          // what it shows (0 nothing)
+	TInt iPrevAttN;                          // (1.00) its attachments: how many,
+	TBuf<64> iPrevAttName;                   // the first one's name
+	TBuf<16> iPrevAttSize;                   // and size (colour screens: a box in the heading)
 	TBuf8<128> iPrevFolder;
 	TInt iPrevHave;                          // ... 1 the text, 0 "not downloaded"
 	TBool iPrevPen;                          // the pen went down on it
@@ -378,6 +386,8 @@ public:
 	void SortL(TInt aMode);                  // Tools > Sort, a column heading
 	void ToggleViewL(TInt aFlag);            // View > Show toolbar / title bar / folders
 	void StatusInfoL();                      // View > Status information
+	void ConnPanelText(TInt& aLight, TDes& aText) const;   // (1.00) the toolbar's connection panel: lines split by '\n'
+	TTime iLastChecked;                      // (1.00) the mail last checked (0: not yet)
 	void ToolbarPopupL(TInt aCommand);       // the toolbar's New and Reply/f'ward
 	TInt SortMode() const { return iSettings->iSort; }
 private:
@@ -496,6 +506,7 @@ private:
 	// the calendar
 	PmCalModel iCalModel;
 	TBool iCalLoaded;
+	TRect iLegendRect;                       // (1.00) the calendars' legend (empty: none)
 	TBool iSplashDone;               // the start-up screen has gone
 	TBool iStartPending;             // FinishStartL is still to run (from the first tick)
 	TBool iFirstFetch;               // a new account's first fetch waits for the engine
@@ -1023,10 +1034,39 @@ TRgb PmFlagColour();            // a flagged message's flag, today in the calend
 TRgb PmCalColour(TInt aShade);  // a calendar's own colour (5mx: black)
 void PmDrawButtonFace(CWindowGc& aGc, const TRect& aRect, TBool aDown, TBool aScrollBar = EFalse);   // (aScrollBar: a scroll bar's thumb or button)
 void PmDrawIcon(CWindowGc& aGc, CArrayPtr<CFbsBitmap>* aIcons, TInt aId, const TPoint& aPos);
+// (1.00) the colour pass: colour screens only (check PmColour() first)
+TBool PmColourIcons(CArrayPtr<CFbsBitmap>* aIcons);       // the colour set is loaded
+CFbsBitmap* PmIconBitmap(CArrayPtr<CFbsBitmap>* aIcons, TInt aId);   // a grey id's picture, its colour twin if loaded
+TInt PmAttKindIcon(const TDesC& aName);   // an attachment's picture (EMbmAtt*), by its name
+TRgb PmUnreadBar();             // the bar at the left of an unread row
+TRgb PmMix(const TRgb& aA, const TRgb& aB);   // halfway, on the 256's cube
+TRgb PmBandColour();            // the preview's heading
+TRgb PmWeekendTint();           // the calendar's weekend columns
+TRgb PmTodayTint();             // ... and today's
+TRgb PmLight(TInt aState);      // the connection light: 0 grey, 1 amber, 2 green, 3 red
 // a scroll bar as EIKON draws its own: the shaft and thumb, the up and down
 // buttons at the bottom; aPress 1 up, 2 down
 void PmDrawScrollBar(CWindowGc& aGc, const TRect& aRect, TInt aTotal, TInt aShown, TInt aAbove, TInt aPress);
 void PmScrollBarParts(const TRect& aRect, TInt aTotal, TInt aShown, TInt aAbove, TRect& aShaft, TRect& aThumb, TRect& aUp, TRect& aDown);
+
+// (1.00) tall screens: a panel in the toolbar's empty gap, above the clock -
+// a light, the route, who does TLS and when the mail was last checked. A
+// status area, not a button: a tap opens Status information
+class CPmConnPanel : public CCoeControl
+	{
+public:
+	static CPmConnPanel* NewL(CPmView& aView);
+	void Place(const TRect& aRect);             // empty: hidden
+	void Refresh();
+private:
+	CPmConnPanel(CPmView& aView) : iView(aView) {}
+	void Draw(const TRect& aRect) const;
+	void HandlePointerEventL(const TPointerEvent& aEvent);
+	CPmView& iView;
+	TBuf<160> iShown;                           // what it says now (drawn again only when that changes)
+	TInt iLight;
+	TBool iDown;
+	};
 
 class CPmAppUi : public CEikAppUi
 	{
@@ -1050,6 +1090,8 @@ public:
 	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
+	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
+	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7
 	TBool iTall;                                   // ... of 400 lines or more
 private:
@@ -1108,6 +1150,7 @@ private:
 	CPmView* iView;
 	CPmContacts* iContacts;
 	CPmMbm* iMbm;
+	CPmConnPanel* iConnPanel;          // (1.00) tall screens: in the toolbar's gap
 	CIdle* iSoon;                      // EmailButtonSoon
 	TBool iAccountSetup;               // the first account's dialog is open (ConstructL)
 	TBool iTool4Close;                 // the last toolbar button says Close

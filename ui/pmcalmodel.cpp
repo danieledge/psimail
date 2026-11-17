@@ -145,6 +145,7 @@ static void item(PmCalModel* m, char** f, int* fl, int calf, int startf, int fla
 	it->loc = f[titlef + 1]; it->llen = fl[titlef + 1];
 	int ci = cal_index(m, f[calf], fl[calf]);
 	it->shade = ci < 0 ? 0 : ci & 3;
+	it->ci = ci;
 	it->cal = ci < 0 ? "" : m->calName[ci];
 	it->clen = ci < 0 ? 0 : m->calLen[ci];
 	}
@@ -206,6 +207,40 @@ void calm_load(PmCalModel* m, const char* events, int elen, const char* cals, in
 	m->text[k] = 0;
 	each_line(m->text, pstart - 1, event_line, m);
 	each_line(m->text + pstart, k - pstart, push_line, m);
+	}
+
+void calm_hide(PmCalModel* m, const char* aHidden, int aLen)
+	{
+	m->hidden = 0;
+	if (!aHidden || aLen <= 0) return;
+	for (int i = 0; i < m->ncal; i++)
+		{
+		const char* id = m->calId[i];
+		int idl = 0;
+		while (id[idl] && id[idl] != '\t') idl++;
+		int start = 0;
+		for (int k = 0; k <= aLen; k++)
+			if (k == aLen || aHidden[k] == '\n' || aHidden[k] == '\r')
+				{
+				int n = k - start;
+				if (n == idl && n > 0)
+					{
+					int j = 0;
+					while (j < n && aHidden[start + j] == id[j]) j++;
+					if (j == n) m->hidden |= 1u << i;
+					}
+				start = k + 1;
+				}
+		}
+	if (!m->hidden) return;
+	int w = 0;
+	for (int r = 0; r < m->n; r++)
+		{
+		int ci = m->items[r].ci;
+		if (ci >= 0 && ci < 32 && (m->hidden & (1u << ci))) continue;
+		m->items[w++] = m->items[r];
+		}
+	m->n = w;
 	}
 
 static int on_day(const PmCalItem* it, long day) { return day >= it->day0 && day <= it->day1; }

@@ -7,6 +7,14 @@ programs) -> BMP files for bmconv, and ui/pmicons.h with their ids.
 Each icon is ASCII art: k black, d dark grey, l light grey, w white,
 . transparent. Every icon gets a 1-bit mask right after it in the MBM
 (black = drawn), so ids go icon, mask, icon, mask...
+
+(1.00) Two sets in the one file. The grey set comes first, its ids as they
+were, so the 5mx draws exactly what it drew. Then the colour set (8 bits a
+pixel, EPOC's 256 colours), the same pictures in the same order at
+EMbmColourBase: each grey picture with its greys mapped to colours by the
+icon's COLOUR entry (or drawn again in COLOUR_ART), all from the 256's
+6 x 6 x 6 cube so nothing is dithered. Colour screens use it
+(PmDrawIcon adds the base); the 5mx never loads it.
 """
 import sys, os
 from PIL import Image
@@ -417,7 +425,144 @@ kkkkkkkkkkkkkkkkkkkkkkk.
 ...kwwwwwwwwwwwwwwwwwk..
 ...kkkkkkkkkkkkkkkkkkk..
 """),
+# ---- (1.00) kinds of attachment, in the reader's and the preview's boxes (11x11)
+('AttPicture', """
+kkkkkkkkkkk
+kwwwwwwwwwk
+kwwwwwwkkwk
+kwwwwwwkkwk
+kwwkwwwwwwk
+kwkdkwwwwwk
+kkdddkwkwwk
+kdddddkdkwk
+kddddddddkk
+kdddddddddk
+kkkkkkkkkkk
+"""),
+('AttWord', """
+kkkkkkkk...
+kwwwwwwkk..
+kwkkkkwkwk.
+kwwwwwwkkkk
+kwkkkkkkkwk
+kwwwwwwwwwk
+kwkkkkkkkwk
+kwwwwwwwwwk
+kwkkkkkkwwk
+kwwwwwwwwwk
+kkkkkkkkkkk
+"""),
+('AttSheet', """
+kkkkkkkkkkk
+klllllllllk
+kkkkkkkkkkk
+kwwkwwkwwwk
+kkkkkkkkkkk
+kwwkwwkwwwk
+kkkkkkkkkkk
+kwwkwwkwwwk
+kkkkkkkkkkk
+kwwkwwkwwwk
+kkkkkkkkkkk
+"""),
+('AttPdf', """
+kkkkkkkk...
+kwwwwwwkk..
+kwwwwwwkwk.
+kwwwwwwkkkk
+kddddddddwk
+kdwdwdwddwk
+kddddddddwk
+kwwwwwwwwwk
+kwkkkkkkwwk
+kwwwwwwwwwk
+kkkkkkkkkkk
+"""),
+('AttOther', """
+kkkkkkkk...
+kwwwwwwkk..
+kwwwwwwkwk.
+kwwwwwwkkkk
+kwwwwwwwwwk
+kwwwwwwwwwk
+kwwwwwwwwwk
+kwwwwwwwwwk
+kwwwwwwwwwk
+kwwwwwwwwwk
+kkkkkkkkkkk
+"""),
 ]
+
+
+# ---- (1.00) the colour set: EPOC's 256 colours, the 6 x 6 x 6 cube only
+MANILA, MANILA_D, MANILA_L = (255, 204, 102), (153, 102, 0), (255, 255, 204)
+YELLOW, RED, BLUE, BLUE_L, BLUE_D = (255, 204, 0), (204, 0, 0), (0, 102, 204), (153, 204, 255), (0, 51, 153)
+ORANGE, GREEN, PALE_BLUE, PINK = (255, 153, 0), (0, 153, 0), (204, 255, 255), (255, 204, 204)
+GREYS = {'k': (0, 0, 0), 'd': (85, 85, 85), 'l': (170, 170, 170), 'w': (255, 255, 255), '.': (255, 255, 255)}
+# per picture: grey letter -> colour (letters not named keep their grey;
+# 'd' and 'l' as 102 and 153 greys, the cube's own, where they stay grey)
+CUBE_GREYS = {'d': (102, 102, 102), 'l': (153, 153, 153)}
+COLOUR = {
+    'Folder': {'l': MANILA, 'w': MANILA_L, 'd': MANILA_D},
+    'FolderOpen': {'l': MANILA, 'w': MANILA_L, 'd': MANILA_D},
+    'Inbox': {'w': PALE_BLUE, 'd': BLUE},
+    'Outbox': {'w': PALE_BLUE, 'd': BLUE},
+    'Drafts': {'d': ORANGE, 'l': (153, 153, 153)},
+    'Sent': {'d': BLUE, 'l': BLUE_L},
+    'Trash': {'w': (204, 204, 204)},
+    'Archive': {'l': MANILA, 'w': MANILA_L, 'd': MANILA_D},
+    'Junk': {'w': PINK},
+    'MsgUnread': {'w': YELLOW},
+    'MsgRead': {'l': (204, 204, 204)},
+    'MsgReplied': {'l': (204, 204, 204)},
+    'MsgFlag': {'d': RED},
+    'MsgAttach': {'k': BLUE_D, 'w': BLUE_L},
+    'MsgDraft': {'d': ORANGE},
+    'MsgError': {'w': (255, 255, 102)},
+    'EvAlarm': {'w': YELLOW},
+    'EvRepeat': {'w': BLUE_L},
+    'EvPending': {'w': (255, 204, 153)},
+    'MsgOutbox': {'w': (255, 255, 153)},
+    'ToolNew': {'w': (255, 255, 204), 'd': BLUE},
+    'ToolReply': {'w': BLUE_L},
+    'ToolCheck': {'w': (255, 255, 204)},
+    'ToolDelete': {'w': (204, 204, 204)},
+    'ToolBack': {'w': BLUE_L},
+    'AttPicture': {'w': PALE_BLUE, 'd': GREEN},
+    'AttWord': {'k': BLUE_D},
+    'AttSheet': {'k': (0, 102, 51), 'l': (153, 255, 153)},
+    'AttPdf': {'d': RED},
+}
+# pictures drawn again for colour (same size and shape: the mask is the
+# grey one's): r is red, otherwise the grey letters and COLOUR's
+COLOUR_ART = {
+    'Calendar': ("""
+..kk......kk....
+.kkkkkkkkkkkkkk.
+krwrrrrrrrrwrrrk
+krrrrrrrrrrrrrrk
+kwwwwwwwwwwwwwdk
+kwkwkwkwkwkwkwdk
+kwwwwwwwwwwwwwdk
+kwkwkwkwkwkwkwdk
+kwwwwwwwwwwwwwdk
+kwkwkwkwkwkrrwdk
+kwwwwwwwwwkrrwdk
+kddddddddddddddk
+.kkkkkkkkkkkkkk.
+""", {'r': RED}),
+}
+
+
+def colour_of(name, c, extra=None):
+    m = dict(GREYS); m.update(CUBE_GREYS); m.update(COLOUR.get(name, {}))
+    if extra: m.update(extra)
+    if c == '.':
+        return (255, 255, 255)
+    for v in m[c]:
+        if v % 51:
+            raise SystemExit(f'{name}: {m[c]} is not one of the 256 colours\' cube')
+    return m[c]
 
 
 def parse(art):
@@ -449,15 +594,36 @@ def main():
         mask.convert('RGB').save(fm)
         files += [fi, fm]
         ids.append(name)
+    # (1.00) the colour set, in the same order after the grey one
+    for name, art in ICONS:
+        rows, w, h = parse(art)
+        extra = None
+        if name in COLOUR_ART:
+            crows, cw, ch = parse(COLOUR_ART[name][0])
+            extra = COLOUR_ART[name][1]
+            if (cw, ch) != (w, h) or any((a == '.') != (b == '.') for ra, rb in zip(rows, crows) for a, b in zip(ra, rb)):
+                raise SystemExit(f'{name}: the colour picture is not the grey one\'s shape')
+            rows = crows
+        img = Image.new('RGB', (w, h), (255, 255, 255))
+        for y, r in enumerate(rows):
+            for x, c in enumerate(r):
+                img.putpixel((x, y), colour_of(name, c, extra))
+        fi = os.path.join(out, f'{name}_c.bmp')
+        img.save(fi)
+        files += [fi, os.path.join(out, f'{name}_m.bmp')]
     with open(header, 'w') as f:
         f.write('/* pmicons.h - made by tools/mkicons.py: PsiMail.mbm ids */\n')
         f.write('#ifndef PMICONS_H\n#define PMICONS_H\nenum TPmIconId\n\t{\n')
         for i, n in enumerate(ids):
             f.write(f'\tEMbm{n} = {2 * i}, EMbm{n}Mask = {2 * i + 1},\n')
-        f.write(f'\tEMbmCount = {2 * len(ids)}\n\t}};\n#endif\n')
+        f.write(f'\tEMbmCount = {2 * len(ids)},\n')
+        f.write(f'\tEMbmColourBase = {2 * len(ids)},      /* (1.00) the colour set: the same pictures, EMbmColourBase + id */\n')
+        f.write(f'\tEMbmAllCount = {4 * len(ids)}\n\t}};\n#endif\n')
     with open(os.path.join(out, 'files.txt'), 'w') as f:
+        n = len(ids) * 2
         for i, p in enumerate(files):
-            f.write(('/2' if i % 2 == 0 else '/1') + os.path.basename(p) + '\n')
+            opt = ('/2' if i % 2 == 0 else '/1') if i < n else ('/c8' if i % 2 == 0 else '/1')
+            f.write(opt + os.path.basename(p) + '\n')
 
 
 if __name__ == '__main__':

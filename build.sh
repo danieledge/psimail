@@ -27,7 +27,7 @@ done
 
 echo "== pictures (PsiMail.mbm)"
 python3 "$HERE/tools/mkicons.py" "$TOP/build/mail-icons" "$HERE/ui/pmicons.h"
-(cd "$TOP/build/mail-icons" && WINEDEBUG=-all wine "$EPOCROOT/epoc32/tools/bmconv.exe" /q psimail.mbm $(tr '\n' ' ' < files.txt) > /dev/null 2>&1)
+(cd "$TOP/build/mail-icons" && WINEDEBUG=-all wine "$EPOCROOT/epoc32/tools/bmconv.exe" /n /q psimail.mbm $(tr '\n' ' ' < files.txt) > /dev/null 2>&1)
 
 echo "== PsiMail.app"
 (

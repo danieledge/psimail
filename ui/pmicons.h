@@ -29,6 +29,13 @@ enum TPmIconId
 	EMbmToolCheck = 46, EMbmToolCheckMask = 47,
 	EMbmToolDelete = 48, EMbmToolDeleteMask = 49,
 	EMbmToolBack = 50, EMbmToolBackMask = 51,
-	EMbmCount = 52
+	EMbmAttPicture = 52, EMbmAttPictureMask = 53,
+	EMbmAttWord = 54, EMbmAttWordMask = 55,
+	EMbmAttSheet = 56, EMbmAttSheetMask = 57,
+	EMbmAttPdf = 58, EMbmAttPdfMask = 59,
+	EMbmAttOther = 60, EMbmAttOtherMask = 61,
+	EMbmCount = 62,
+	EMbmColourBase = 62,      /* (1.00) the colour set: the same pictures, EMbmColourBase + id */
+	EMbmAllCount = 124
 	};
 #endif

@@ -98,6 +98,14 @@ void CPmView::DrawPreviewHead(CWindowGc& gc) const
 	gc.DrawRect(TRect(iPrevRect.iTl.iX, iPrevRect.iTl.iY, iPrevRect.iBr.iX, iPrevRect.iTl.iY + 1));
 	gc.SetBrushColor(PmBack());
 	gc.DrawRect(TRect(iPrevRect.iTl.iX, iPrevRect.iTl.iY + 1, iPrevRect.iBr.iX, iPrevHead.iBr.iY + 3));
+	// (1.00) a colour screen: the heading on a band of the button face's
+	// tint, so it reads as a message and not as more of the list
+	TBool band = PmColour();
+	if (band)
+		{
+		gc.SetBrushColor(PmBandColour());
+		gc.DrawRect(TRect(iPrevRect.iTl.iX, iPrevRect.iTl.iY + 1, iPrevRect.iBr.iX, iPrevHead.iBr.iY + 1));
+		}
 	if (!iRows->Count() || iSel < 0 || iSel >= iRows->Count())
 		return;
 	const TPmRow& row = (*iRows)[iSel];
@@ -123,7 +131,37 @@ void CPmView::DrawPreviewHead(CWindowGc& gc) const
 	// who it is from (or to, in Sent), and a paperclip if it carries files
 	TInt y2 = y1 + iBoldFont->HeightInPixels() + 2;
 	TInt fr = right;
-	if (row.iFlags.Locate('T') >= 0 && iIcons && iIcons->Count())
+	if (band && iPrevAttN > 0 && row.iUid == iPrevUid)
+		{
+		// (1.00) the first attachment in a box, as the reader shows them:
+		// its kind of file, its name and size, and "+2" for any more
+		TBuf<80> att(iPrevAttName);
+		TBuf<24> tail(iPrevAttSize);
+		if (iPrevAttN > 1)
+			tail.AppendFormat(_L(" +%d"), iPrevAttN - 1);
+		TInt tw = iSmallFont->TextWidthInPixels(tail);
+		TInt room = (right - x) * 2 / 5 - tw - 30;
+		if (room < 30) room = 30;
+		TextUtils::ClipToFit(att, *iSmallFont, room);
+		TInt bw = 11 + 4 + iSmallFont->TextWidthInPixels(att) + 6 + tw + 8;
+		TInt bh = iListFont->HeightInPixels();
+		TRect box(right - bw, y2, right, y2 + bh);
+		gc.SetPenStyle(CGraphicsContext::ESolidPen);
+		gc.SetPenColor(TRgb(102, 102, 102));
+		gc.SetBrushStyle(CGraphicsContext::ESolidBrush);
+		gc.SetBrushColor(KRgbWhite);
+		gc.DrawRect(box);
+		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
+		PmDrawIcon(gc, iIcons, PmAttKindIcon(iPrevAttName), TPoint(box.iTl.iX + 4, box.iTl.iY + (bh - 11) / 2));
+		gc.UseFont(iSmallFont);
+		gc.SetPenColor(KRgbBlack);
+		TInt sb = box.iTl.iY + (bh - iSmallFont->HeightInPixels()) / 2 + iSmallFont->AscentInPixels();
+		gc.DrawText(att, TPoint(box.iTl.iX + 19, sb));
+		gc.DrawText(tail, TPoint(box.iBr.iX - 4 - tw, sb));
+		gc.DiscardFont();
+		fr = box.iTl.iX - 6;
+		}
+	else if (row.iFlags.Locate('T') >= 0 && iIcons && iIcons->Count())
 		{
 		fr -= 12;
 		PmDrawIcon(gc, iIcons, EMbmMsgAttach, TPoint(fr, y2 + (iListFont->HeightInPixels() - 11) / 2));
@@ -135,9 +173,12 @@ void CPmView::DrawPreviewHead(CWindowGc& gc) const
 	gc.SetPenColor(PmText());
 	gc.DrawText(from, TPoint(x, y2 + iListFont->AscentInPixels()));
 	gc.DiscardFont();
-	// a rule under the heading
+	// a rule under the heading (the band's edge, on a colour screen)
 	gc.SetPenColor(PmColour() ? TRgb(153, 153, 153) : KRgbBlack);
-	gc.DrawLine(TPoint(x, iPrevHead.iBr.iY), TPoint(right, iPrevHead.iBr.iY));
+	if (band)
+		gc.DrawLine(TPoint(iPrevRect.iTl.iX, iPrevHead.iBr.iY + 1), TPoint(iPrevRect.iBr.iX, iPrevHead.iBr.iY + 1));
+	else
+		gc.DrawLine(TPoint(x, iPrevHead.iBr.iY), TPoint(right, iPrevHead.iBr.iY));
 	}
 
 static void PvSpanL(CArrayFixFlat<TInt>& aSpans, TInt aPos, TInt aLen, TInt aKind, TInt aArg = 0)
@@ -308,6 +349,56 @@ void CPmView::PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC
 // The selected message into the preview, unless it is there already. Called
 // whenever the selection may have moved (the list's keys and taps, and
 // UpdateNativeL), so it must be cheap when nothing has changed.
+// a tab-separated field (as psimail.cpp reads the store's files)
+static TPtrC PvField(TPtrC& aLine)
+	{
+	TInt t = aLine.Locate('\t');
+	TPtrC f = t < 0 ? aLine : aLine.Left(t);
+	aLine.Set(t < 0 ? TPtrC() : aLine.Mid(t + 1));
+	return f;
+	}
+
+// (1.00) the message's attachments, for the box in the heading: how many,
+// and the first one's name and size (the .att file: part, size, name)
+void CPmView::PreviewAttachmentsL(TUint aUid)
+	{
+	iPrevAttN = 0;
+	iPrevAttName.Zero();
+	iPrevAttSize.Zero();
+	if (!PmColour())
+		return;
+	TBuf<150> path;
+	MsgPath(aUid, _L("att"), path);
+	HBufC* att = NULL;
+	ReadFileL(path, att, 16 * 1024);
+	if (!att)
+		return;
+	CleanupStack::PushL(att);
+	TPtrC rest = *att;
+	while (rest.Length())
+		{
+		TInt nl = rest.Locate('\n');
+		TPtrC line = nl >= 0 ? rest.Left(nl) : rest;
+		rest.Set(nl >= 0 ? rest.Mid(nl + 1) : TPtrC());
+		if (!line.Length())
+			continue;
+		if (!iPrevAttN++)
+			{
+			TPtrC l = line;
+			PvField(l);
+			TLex lex(PvField(l));
+			TInt size = 0;
+			if (lex.Val(size) != KErrNone || size < 0) size = 0;
+			TPtrC name = PvField(l);
+			iPrevAttName = name.Left(name.Length() < iPrevAttName.MaxLength() ? name.Length() : iPrevAttName.MaxLength());
+			TInt kb = (size * 3 / 4 + 1023) / 1024;   // (base64 is 4/3 of the file)
+			if (kb >= 1024) iPrevAttSize.Format(_L("%d.%d MB"), kb / 1024, (kb % 1024) * 10 / 1024);
+			else iPrevAttSize.Format(_L("%d KB"), kb);
+			}
+		}
+	CleanupStack::PopAndDestroy();          // att
+	}
+
 void CPmView::PreviewSyncL()
 	{
 	if (!iPreview)
@@ -327,6 +418,7 @@ void CPmView::PreviewSyncL()
 	iPrevUid = row.iUid;
 	iPrevFolder = iFolder;
 	iPrevHave = have;
+	PreviewAttachmentsL(row.iUid);
 
 	HBufC* file = NULL;
 	if (have)

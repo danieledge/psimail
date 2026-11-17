@@ -275,3 +275,26 @@ not count. To see the 0.73 failure in the emulator, starve PsiMail.app for
 30 s (a busy thread above it, as a busy foreground program would) and then
 open a message: 0.73's engine has quit ("The mail engine is not running",
 the reader at "Downloading the message..." for ever); 0.75's carries on.
+
+## The 5mx's golden screens (1.00)
+
+`emu/golden.py` drives PsiMail's screen tours in the emulator (each tour its
+own run, three at a time) and compares the 5mx's screenshots pixel for pixel
+with `emu/golden/5mx/`, the 78 screens of 0.99 (the review of 17 Nov 2026,
+with the clock masked). Every change for the netBook's taller or colour
+screen must leave them as they are; a difference is either named in the
+commit or a bug.
+
+    CARD=mx.img CARD0=mx0.img python3 test/emu/golden.py run mx OUT
+    python3 test/emu/golden.py compare test/emu/golden/5mx OUT DIFFS
+    CARD=nb/OS.IMG CARD0=nb0/OS.IMG python3 test/emu/golden.py run nb OUT
+
+`CARD` holds a TESTSEED build (made in a copy of the checkout, never in the
+checkout itself) with the demo mail in SEED, SEEDA0, SEEDX and SEEDCAL;
+`CARD0` an ordinary build, for the first-run tour. On the netBook they are
+Coda images (psion-netbook's `tools/mkimage.mts --smooth-text --font-choice
+--with PsiMail.sis`) with PsiMail and the seed in the ROM, run with
+`PSION_NB_HOOK_MASK=0xdf`. The emulator's clock starts at 17 Nov 2026 09:40.
+
+Two screens change with every release by design: About (the version) and
+Status information (the free memory, which the program's own size moves).

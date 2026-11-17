@@ -781,13 +781,15 @@ void CPmView::HeaderFormatL(CRichText& aText)
 				CFont* f = ZoomFont(iZoomFactor, KHdSubject, ETrue);
 				TInt h = f ? f->AscentInPixels() : 0;
 				if (f) iZoomFactor->ReleaseFont(f);
-				pic = new(ELeave) CPmHdIcon(iIcons->At(id), iZoomFactor, h);
+				pic = new(ELeave) CPmHdIcon(PmIconBitmap(iIcons, id), iZoomFactor, h);
 				}
 			else
 				{
 				if (value >= iAttNames->Count())
 					continue;
 				CFbsBitmap* clip = iIcons && EMbmMsgAttach < iIcons->Count() ? iIcons->At(EMbmMsgAttach) : NULL;
+				if (PmColourIcons(iIcons))
+					clip = PmIconBitmap(iIcons, PmAttKindIcon((*iAttNames)[value]));   // (1.00) the kind of file, in colour
 				TInt w = iReader->Rect().Width() / 2;
 				pic = CPmHdChip::NewL(clip, iZoomFactor, SmallTwips(KHdChip, iZoomFactor->ZoomFactor()),
 					(*iAttNames)[value], (*iAttSizes)[value], w);

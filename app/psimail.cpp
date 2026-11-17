@@ -112,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.99");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.00");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -2173,6 +2173,8 @@ void CPmView::TickL()
 			redraw = ETrue;                      // (the progress alone changes nothing drawn)
 		iBusyWas = s->busy;
 		}
+	if (redraw)
+		((CPmAppUi*)iEikonEnv->EikAppUi())->RefreshConnPanel();   // (1.00) the toolbar's connection panel
 	// what the engine is doing: EIKON's busy message, bottom left - one
 	// steady message per command, or every step (pmstatus.cpp)
 	BusyTickL();
@@ -2250,6 +2252,9 @@ void CPmView::TakeResultsL()
 
 void CPmView::HandleResultL(const PmCmd& aCmd)
 	{
+	// (1.00) when the mail was last checked (the toolbar's connection panel)
+	if ((aCmd.op == PM_CMD_SYNC || aCmd.op == PM_CMD_SENDRECV) && iShared && iShared->last_res == PM_RES_OK)
+		iLastChecked.HomeTime();
 	if (aCmd.op == PM_CMD_UNDO)
 		{
 		UndoResultL(aCmd);                   // (pmundo.cpp)
@@ -3572,6 +3577,13 @@ void CPmAppUi::ConstructL()
 	iView = new(ELeave) CPmView;
 	iView->ConstructL(ClientRect(), iSettings, iCalSettings);
 	AddToStackL(iView);
+	if (iTall && iToolBar)
+		{
+		// (1.00) the connection panel in the toolbar's gap (tall screens)
+		TRAPD(cp, iConnPanel = CPmConnPanel::NewL(*iView));
+		(void)cp;
+		PlaceConnPanel();
+		}
 	iCoeEnv->RootWin().EnableOnEvents(EEventControlAlways);   // (0.68) switch-on events even when in the background
 	// the user's contrast and backlight back if a program stopped in
 	// Reading mode without doing it (docs/display.md)
@@ -3685,7 +3697,15 @@ void CPmAppUi::ButtonPictureL(TInt aId, TInt aIcon, const TDesC* aText)
 	if (aText)
 		b->SetTextL(*aText);
 	TFileName mbm = Application()->BitmapStoreName();
-	CFbsBitmap* bmp = iMbm ? iMbm->CreateBitmapL(aIcon) : iEikonEnv->CreateBitmapL(mbm, aIcon);
+	CFbsBitmap* bmp = NULL;
+	if (iColour && iMbm)
+		{
+		// (1.00) a colour screen: the picture's colour twin
+		TRAPD(err, bmp = iMbm->CreateBitmapL(aIcon + EMbmColourBase));
+		(void)err;
+		}
+	if (!bmp)
+		bmp = iMbm ? iMbm->CreateBitmapL(aIcon) : iEikonEnv->CreateBitmapL(mbm, aIcon);
 	CleanupStack::PushL(bmp);
 	CFbsBitmap* mask = iMbm ? iMbm->CreateBitmapL(aIcon + 1) : iEikonEnv->CreateBitmapL(mbm, aIcon + 1);
 	CleanupStack::PushL(mask);
@@ -3709,6 +3729,33 @@ void CPmAppUi::ToolbarPicturesL()
 	ButtonPictureL(EPmCmdSendRecv, EMbmToolCheck);
 	ButtonPictureL(EPmCmdTool4, EMbmToolDelete);
 	iToolBar->DrawNow();
+	}
+
+void CPmAppUi::PlaceConnPanel()
+	{
+	if (!iConnPanel)
+		return;
+	TRect r;
+	CCoeControl* last = iToolBar ? iToolBar->ControlById(EPmCmdTool4) : NULL;
+	// (the clock: the toolbar's last control but its spacer below)
+	TInt n = iToolBar && iToolBar->ControlArray() ? iToolBar->ControlArray()->Count() : 0;
+	CCoeControl* clock = n >= 2 ? iToolBar->Control(n - 2) : NULL;
+	if (last && clock && iToolBar->IsVisible() && !(iSettings.iView & 1))
+		{
+		TPoint o = iToolBar->Position();
+		TInt top = o.iY + last->Position().iY + last->Size().iHeight + 6;
+		TInt bottom = o.iY + clock->Position().iY - 6;
+		TInt h = 82;
+		if (bottom - top >= h)
+			r = TRect(o.iX + 3, bottom - h, o.iX + iToolBar->Size().iWidth - 3, bottom);
+		}
+	iConnPanel->Place(r);
+	}
+
+void CPmAppUi::RefreshConnPanel()
+	{
+	if (iConnPanel)
+		iConnPanel->Refresh();
 	}
 
 // the last button: Delete in a list, Close (back to the list) in a message
@@ -3737,6 +3784,7 @@ void CPmAppUi::ShowToolBar(TBool aShow)
 		aShow = EFalse;
 	if (iToolBar && iToolBar->IsVisible() != aShow)
 		iToolBar->MakeVisible(aShow);
+	PlaceConnPanel();
 	if (iView)
 		{
 		TRect r = ClientRect();
@@ -3893,6 +3941,8 @@ CPmAppUi::~CPmAppUi()
 	iReading.Leave(iCoeEnv->FsSession(), KUidPsiMail);   // the user's contrast and backlight back
 	delete iExitTimer;
 	delete iSoon;
+	delete iConnPanel;
+	iConnPanel = NULL;
 	if (iView)
 		{
 		RemoveFromStack(iView);
