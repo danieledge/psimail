@@ -112,7 +112,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "0.98");          // also pkg/psimail.pkg
+_LIT(KVersion, "0.99");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -3929,6 +3929,9 @@ static void UrlDecode(TDes& aOut, const TDesC& aIn, TBool aPlusIsSpace)
 		}
 	}
 
+// (0.99) the most a mailto: link may be: 8 attachments, %-encoded
+const TInt KPmMailtoMax = 4096;
+
 // mailto:someone@example.com?subject=Hello&cc=...&body=...
 void CPmAppUi::MailtoL(const TDesC& aUrl)
 	{
@@ -3962,14 +3965,45 @@ void CPmAppUi::MailtoL(const TDesC& aUrl)
 			UrlDecode(d->iTo, val, EFalse);
 			}
 		else if (key.CompareF(_L("body")) == 0) UrlDecode(bp, val, ETrue);
+		// (0.99) a file to attach, its full name %-encoded: Coda's Share
+		// icon sends "mailto:?attach=C%3A%5CDocuments%5CReport.docx&attach=..."
+		// (not part of RFC 6068: other programs' links never carry it, and a
+		// name that is not a file is left out)
+		else if (key.CompareF(_L("attach")) == 0)
+			{
+			TFileName f;
+			UrlDecode(f, val, EFalse);
+			TEntry e;
+			if (d->iAttach->Count() < 8 && f.Length() && iEikonEnv->FsSession().Entry(f, e) == KErrNone && !e.IsDir())
+				d->iAttach->AppendL(f);
+			}
 		}
 	if (bp.Length() == 0 || bp[bp.Length() - 1] != '\n')
 		bp.Append('\n');
+	// (0.99) files sent with no subject: the first one's name
+	if (!d->iSubject.Length() && d->iAttach->Count())
+		{
+		TParsePtrC fp((*d->iAttach)[0]);
+		d->iSubject.Copy(Clip(fp.NameAndExt(), d->iSubject.MaxLength()));
+		}
 	AddSignature(*d, bp);
 	delete d->iBody;
 	d->iBody = body;
 	CleanupStack::Pop();                      // d
 	ComposeL(d, _L("New message"));
+	}
+
+// a mailto: link written up; with no account yet, files to send say so
+// (0.99: a link from the Share icon must not vanish without a word)
+void CPmAppUi::MailtoOrSayL(const TDesC& aUrl)
+	{
+	if (iView && iView->Mode() != CPmView::ENoAccount)
+		{
+		MailtoL(aUrl);
+		return;
+		}
+	if (aUrl.FindF(_L("attach=")) >= 0)
+		iEikonEnv->InfoWinL(_L("No email account yet"), _L("Set one up in PsiMail, then share the file again"));
 	}
 
 // PsiWeb (or anyone) hands PsiMail a mailto: link as a message ...
@@ -3980,25 +4014,30 @@ void CPmAppUi::ProcessMessageL(TUid aUid, const TDesC8& aParams)
 		CEikAppUi::ProcessMessageL(aUid, aParams);
 		return;
 		}
-	TBuf<500> url;
+	HBufC* buf = HBufC::NewLC(Min(aParams.Length(), KPmMailtoMax) + 1);
+	TPtr url = buf->Des();
 	url.Copy(Clip(aParams, url.MaxLength()));
 	url.Trim();
-	if (Clip(url, 7).CompareF(_L("mailto:")) == 0 && iView && iView->Mode() != CPmView::ENoAccount)
-		MailtoL(url);
+	if (Clip(url, 7).CompareF(_L("mailto:")) == 0)
+		MailtoOrSayL(url);
+	CleanupStack::PopAndDestroy();          // buf
 	}
 
 // ... or starts it with one on the command line
 TBool CPmAppUi::ProcessCommandParametersL(TApaCommand aCommand, TFileName& aDocumentName, const TDesC8& aTail)
 	{
-	TBuf<500> url;
+	HBufC* buf = HBufC::NewLC(Min(aTail.Length(), KPmMailtoMax) + 1);
+	TPtr url = buf->Des();
 	url.Copy(Clip(aTail, url.MaxLength()));
 	url.Trim();
-	if (Clip(url, 7).CompareF(_L("mailto:")) == 0 && iView && iView->Mode() != CPmView::ENoAccount)
+	if (Clip(url, 7).CompareF(_L("mailto:")) == 0)
 		{
-		TRAPD(err, MailtoL(url));
+		TRAPD(err, MailtoOrSayL(url));
 		(void)err;
+		CleanupStack::PopAndDestroy();      // buf
 		return EFalse;
 		}
+	CleanupStack::PopAndDestroy();          // buf
 	return CEikAppUi::ProcessCommandParametersL(aCommand, aDocumentName, aTail);
 	}
 
