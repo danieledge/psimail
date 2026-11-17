@@ -13,7 +13,11 @@ Go Daddy, Starfield. Added on 17 November 2026 from Mozilla's list
 R6 and R46, Sectigo R46, DigiCert TLS RSA4096 G5; ECDSA ISRG Root X2, GTS
 Root R3 and R4, GlobalSign ECC R4 and R5 and E46, DigiCert Global G3 and
 TLS ECC P384 G5, USERTrust ECC, Sectigo E46, Amazon Root CA 3 and 4,
-Microsoft ECC 2017. Keys of other kinds are left out.
+Microsoft ECC 2017. Added on 17 November 2026, also from Mozilla's list:
+SSL.com TLS ECC Root CA 2022 (example.com and other Cloudflare sites on
+SSL.com's chain, whose cross-signed copy under AAA Certificate Services,
+no longer in Mozilla's list, is not needed) and its RSA sibling, SSL.com
+TLS RSA Root CA 2022. Keys of other kinds are left out.
 """
 import sys
 from cryptography import x509
