@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.06, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.07, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.06](#whats-new-in-106) (and [1.05](#105), [1.04](#104), [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
+- [What's new in 1.07](#whats-new-in-107) (and [1.06](#106), [1.05](#105), [1.04](#104), [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,16 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.06
+## What's new in 1.07
+
+- **New roots for secure connections.** SSL.com TLS ECC Root CA 2022 and
+  SSL.com TLS RSA Root CA 2022, from Mozilla's list, are among the
+  certificates PsiMail trusts (psion-core d3e4952), so a mail or calendar
+  server whose certificate chain ends in one of them (as example.com's and
+  other Cloudflare sites' do) is accepted rather than "Certificate not
+  trusted". Nothing else changed.
+
+### 1.06
 
 - **Ctrl+Z in a message being written** undoes the last cut, paste or
   typing in the address lines, the subject and the text, as in Psion's own
