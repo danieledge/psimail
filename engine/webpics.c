@@ -8,7 +8,8 @@
  * for https), and sets them out as pictures.c does its parts:
  *
  *   <folder>\<uid>_W<hash>.img   one picture as it came, while it waits
- *   <folder>\<uid>_W<hash>.pmi   the same in 16 greys (pictures.c), or why not
+ *   <folder>\<uid>_W<hash>.pmi   the same in 16 greys (pictures.c; in colour on a
+ *                                colour screen), or why not
  *
  * <hash> is FNV-1a (32 bits, 8 hex digits) of the address as the message's
  * text has it (html.c: "\x01i" alt "\x02" src ["\x02" w "x" h]); the app
@@ -366,7 +367,7 @@ int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int why
 	static WebPic pics[WEB_MAX];
 	PmShared *s = pm_shared();
 	int n, i, shown = 0, failed = 0, r = PM_RES_OK, hosts = 0;
-	long total = 0, budget = PM_PIC_BUDGET_KB * 1024L;
+	long total = 0, budget = pic_budget();
 	unsigned long t0 = pm_ms();
 	char note[80], label[40], last_host[80];
 
@@ -411,7 +412,7 @@ int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int why
 			if (ok) {
 				int sw = h[8] | (h[9] << 8), sh = h[10] | (h[11] << 8), w = h[4] | (h[5] << 8), hh = h[6] | (h[7] << 8);
 				if (sw < 4 || sh < 4) { note_pmi(pmi, "spacer"); pm_log("web picture %d: %dx%d - a spacer", i + 1, sw, sh); }
-				else { budget -= ((w + 7) / 8) * 4L * hh; shown++; }
+				else { budget -= (h[3] == '2' ? ((w + 3) / 4) * 4L : ((w + 7) / 8) * 4L) * hh; shown++; }
 			}
 		} else failed++;
 		st_changed();

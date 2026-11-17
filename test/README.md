@@ -322,3 +322,16 @@ another way (mkcard.ts with another EMU_PAD, or the program's files written
 over an older card) before suspecting the program. The seeded tours'
 TESTSEED block also sets iFirstStart to EFalse, so they start without the
 setup assistant (1.03); the first-run tour shows it.
+
+## Pictures in colour (1.04)
+
+`pictest.sh`: the pictures of fakeimap.py's newsletters (`--news`) set out
+by the engine with no screen named (the 5mx: every `.pmi` is "PMI1", 16
+greys, as always) and with `PM_SCREEN=640x480x256` (the netBook: "PMI2",
+one byte a pixel in EPOC's 256 colours, a progressive JPEG too, the 5 MP
+photo within the memory). A "PMI1" set out before 1.04 and already there on
+the colour screen is the cache: left byte for byte as it was. In the
+emulator the seed's `111_2.PMI` (a "PMI1") is the same check on the
+netBook: message 111's diagram still shows, in greys, beside its GIF in
+colour. psion-core's own test of the decoders in colour is
+`make -C core/mail/engine/img/test`.

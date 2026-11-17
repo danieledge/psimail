@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.03, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.04, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.03](#whats-new-in-103) (and [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
+- [What's new in 1.04](#whats-new-in-104) (and [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,26 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.03
+## What's new in 1.04
+
+Pictures in colour on the netBook and the Series 7:
+
+- **Pictures in a message are in colour** on a colour screen: JPEG
+  (baseline and progressive), PNG and GIF, set out in the screen's own 256
+  colours, so a photo is no longer 16 greys on a colour screen. Web
+  pictures too, whether they come direct or through PsiProxy or the Atom
+  modem.
+- **Pictures already set out keep working.** A picture PsiMail set out in
+  greys before 1.04 is kept as it was and still shows; pictures set out
+  from now on are in colour. A message can hold twice the bytes of
+  pictures on a colour screen (the same number of pixels).
+- **The Series 5mx does not change**: its pictures are 16 greys, byte for
+  byte as before.
+- psion-core's picture decoders can now keep a progressive JPEG's colour
+  (`prog_colour`); only PsiMail asks for it, so the Atom modem's pictures
+  are as they were.
+
+### 1.03
 
 Knowing your route, on every machine:
 
@@ -179,7 +198,7 @@ Since 0.93, the last signed release.
 
 ## Screenshots
 
-PsiMail on the netBook (1.03: the inbox and the calendar) and the Series 5mx (0.96, which looks the same), with the same demo account, mail and calendar (made up). Taken in emulators. Tap or click one to see it full size.
+PsiMail on the netBook (1.04: the inbox, the pictures in colour and the calendar) and the Series 5mx (0.96, which looks the same), with the same demo account, mail and calendar (made up). Taken in emulators. Tap or click one to see it full size.
 
 <table>
 <tr><th>netBook</th><th>Series 5mx</th></tr>
@@ -198,7 +217,7 @@ PsiMail on the netBook (1.03: the inbox and the calendar) and the Series 5mx (0.
 <td><a href="docs/screenshots/netbook-psimail-reader-logo.png"><img src="docs/screenshots/netbook-psimail-reader-logo.png" alt="netBook: the start of a message, with a PNG logo" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-reader-logo.png"><img src="docs/screenshots/5mx-psimail-reader-logo.png" alt="Series 5mx: the start of a message, with a PNG logo" width="400"></a></td>
 </tr>
-<tr><td colspan="2"><b>Further down: a photo, dithered on the Psion</b></td></tr>
+<tr><td colspan="2"><b>Further down: a photo, set out on the Psion itself: in colour on the netBook, in 16 greys on the 5mx</b></td></tr>
 <tr>
 <td><a href="docs/screenshots/netbook-psimail-reader.png"><img src="docs/screenshots/netbook-psimail-reader.png" alt="netBook: a JPEG photo in a message" width="400"></a></td>
 <td><a href="docs/screenshots/5mx-psimail-reader.png"><img src="docs/screenshots/5mx-psimail-reader.png" alt="Series 5mx: a JPEG photo in a message" width="400"></a></td>

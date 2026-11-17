@@ -77,7 +77,7 @@ becomes the reader's line format); `store.c` (the local store); the
 calendar engine is core's `core/mail/engine/cal/` (`caldav.c`, `http.c`,
 `ics.c`, `caltz.c`, `xmlscan.c`, `cp1252.c`, shared with PsiSync), given
 PsiMail's settings by `pmcalport.c`; `pictures.c` (on `core/mail/engine/img`,
-producing 16-grey `.pmi` files); `webpics.c`, `http.c`; `invite.c` (iTIP);
+producing `.pmi` files: 16 greys, or EPOC's 256 colours on a colour screen); `webpics.c`, `http.c`; `invite.c` (iTIP);
 `undo.c`; `pmupdate.c`; the certificate check is core's `core/mail/engine/tlsv/`; `pmnet.c`; `pmepoc.cpp`
 (the EPOC side). `tls/` configures core's TLS for PsiMail (`includes.h`,
 `options.h`, `x25519.c`). `host/pmhost.c` is the PC build of the engine, on
@@ -108,7 +108,8 @@ core/tools/docker/psibuild "cd test && bash foldertest.sh"
 
 Host tests (`test/`, after `bash build.sh host` or `make TARGET=host`):
 `foldertest.sh`, `undotest.sh`, `logintest.sh`, `invtest.py`, `invitehost.py`, `htmltest.py`,
-`imgtest.py` (ASan/UBSan, fuzzing the picture decoders), `parsefuzz.py`
+`imgtest.py` (ASan/UBSan, fuzzing the picture decoders), `pictest.sh` (pictures
+in greys and in colour, and the old cache), `parsefuzz.py`
 (MIME/IMAP/ICS/XML/HTML fuzzer), `certtest.py`. `fakeimap.py` is a
 scriptable fake server. All network input is untrusted: run `parsefuzz.py`
 and `imgtest.py` after changing a parser, and use bounded copies everywhere.

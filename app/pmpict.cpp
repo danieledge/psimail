@@ -6,7 +6,11 @@
 // the .pmi file's header (engine/pictures.c): "PMI1", w, h, src w, src h
 // (16-bit, little-endian), status (0 whole, 1 cut short, 2 not shown:
 // a reason follows), 3 spare bytes; then the rows, two pixels a byte as
-// EGray16 has them, each row ((w + 7) / 8) * 4 bytes
+// EGray16 has them, each row ((w + 7) / 8) * 4 bytes. (1.04) "PMI2": the
+// same header, the rows in colour, one byte a pixel as EColor256 has them
+// (an index in EPOC's 256 colours), each row ((w + 3) / 4) * 4 bytes; the
+// engine writes it on a colour screen. Both are read, so pictures set out
+// in greys before 1.04 still show.
 const TInt KPmiHeader = 16;
 
 CPmPictures* CPmPictures::NewL()
@@ -217,6 +221,7 @@ static TUint16 Le16(const TUint8* p)
 	}
 
 // the decoded picture, if the engine has written it: into a 16-grey bitmap
+// (or, for a "PMI2", a 256-colour one)
 TBool CPmPictures::LoadReadyL(RFs& aFs, TInt aIndex)
 	{
 	TPmPicEntry& e = (*iEntries)[aIndex];
@@ -230,7 +235,8 @@ TBool CPmPictures::LoadReadyL(RFs& aFs, TInt aIndex)
 	CleanupClosePushL(f);
 	TBuf8<KPmiHeader> h;
 	User::LeaveIfError(f.Read(h));
-	if (h.Length() < KPmiHeader || h.Left(4) != _L8("PMI1"))
+	TBool colour = h.Length() >= KPmiHeader && h.Left(4) == _L8("PMI2");
+	if (h.Length() < KPmiHeader || (h.Left(4) != _L8("PMI1") && !colour))
 		{
 		CleanupStack::PopAndDestroy();             // f
 		e.iState = TPmPicEntry::EFailed;
@@ -262,9 +268,10 @@ TBool CPmPictures::LoadReadyL(RFs& aFs, TInt aIndex)
 		}
 	CFbsBitmap* bmp = new(ELeave) CFbsBitmap;
 	CleanupStack::PushL(bmp);
-	User::LeaveIfError(bmp->Create(TSize(w, hh), EGray16));
-	TInt stride = CFbsBitmap::ScanLineLength(w, EGray16);
-	TInt fileStride = ((w + 7) / 8) * 4;
+	TDisplayMode mode = colour ? EColor256 : EGray16;
+	User::LeaveIfError(bmp->Create(TSize(w, hh), mode));
+	TInt stride = CFbsBitmap::ScanLineLength(w, mode);
+	TInt fileStride = colour ? ((w + 3) / 4) * 4 : ((w + 7) / 8) * 4;
 	if (stride == fileStride)
 		{
 		// the rows are laid out as the bitmap wants them: straight in

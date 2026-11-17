@@ -209,6 +209,7 @@ void pic_write_index(int acct, const char *folder, unsigned int uid, const PmStr
 void pic_remove(int acct, const char *folder, unsigned int uid);   /* all of a message's picture files */
 int  pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts, char *why, int whymax);
 /* one picture file to its .pmi, below the app (0 shown, 1 not: the .pmi says why, -1 could not write) */
+long pic_budget(void);                 /* (1.04) a message's decoded pictures: twice on a colour screen */
 int  pic_decode_file(const char *img_path, const char *pmi_path, const char *label, long budget_left, char *note, int notemax);
 /* ---- pictures from the web, when asked for (webpics.c) */
 int  pm_send_log(char *why, int whymax);   /* PM_CMD_PUTLOG: POST the logs to the web proxy (webpics.c) */

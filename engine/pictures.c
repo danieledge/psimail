@@ -8,7 +8,8 @@
  *                                 it waits to be turned into greys; '.' in the
  *                                 part id becomes '_' ("1.2" -> "123_1_2.img")
  *   <folder>\<uid>_<part>.pmi     the same in 16 greys, shrunk to fit the reader
- *                                 (see PmiHeader below), or a note of why not
+ *                                 (see PmiHeader below), or a note of why not;
+ *                                 (1.04) on a colour screen in EPOC's 256 colours
  *
  * The app reads the .pic list when it shows a message, and asks for the
  * parts it wants (PM_CMD_PICTURES, the ids in arg: "1.2 1.3", a '!' before
@@ -45,15 +46,42 @@
 
 /* the .pmi file: this header, then (status 0 or 1) h rows of stride bytes,
    two pixels a byte as EPOC's EGray16 (the left pixel in the low nibble),
-   or (status 2) a NUL-terminated reason. Little-endian, as ARM and x86 are. */
+   or (status 2) a NUL-terminated reason. Little-endian, as ARM and x86 are.
+   (1.04) "PMI2" is the same header with the rows in colour: one byte a
+   pixel, an index in EPOC's 256-colour palette as EColor256 has them, each
+   row ((w + 3) / 4) * 4 bytes. It is written only for a colour screen (the
+   app said so in PmShared.screen); a reason is always "PMI1". Both are read:
+   the pictures set out in greys before 1.04 stay as they are (their .img
+   is gone), new ones are in colour. */
 typedef struct
 	{
-	char magic[4];           /* "PMI1" */
+	char magic[4];           /* "PMI1", or "PMI2" in colour */
 	unsigned short w, h;     /* the picture as stored */
 	unsigned short src_w, src_h;   /* its own size */
 	unsigned char status;    /* 0 whole, 1 cut short (the rest grey), 2 not shown: a reason follows */
 	unsigned char reserved[3];
 	} PmiHeader;
+
+/* the bytes of a .pmi's picture, as the budget counts them */
+static long pmi_bytes(const PmiHeader *h)
+{
+	if (h->status == 2) return 0;
+	if (h->magic[3] == '2') return ((h->w + 3L) / 4) * 4L * h->h;
+	return ((h->w + 7L) / 8) * 4L * h->h;
+}
+
+/* (1.04) a colour screen (the app writes PmShared.screen only on one):
+   pictures are set out in colour, and a message may hold twice the bytes
+   (the same number of pixels) */
+static int pic_colour(void)
+{
+	return pm_shared()->screen[0] != 0;
+}
+
+long pic_budget(void)
+{
+	return PM_PIC_BUDGET_KB * 1024L * (pic_colour() ? 2 : 1);
+}
 
 typedef struct
 	{
@@ -207,7 +235,7 @@ static int write_pmi(const char *path, const PmImage *img, const char *reason)
 	int ok;
 	snprintf(tmp, sizeof(tmp), "%s.new", path);
 	memset(&h, 0, sizeof(h));
-	memcpy(h.magic, "PMI1", 4);
+	memcpy(h.magic, img && img->colour ? "PMI2" : "PMI1", 4);
 	if (img) {
 		h.w = (unsigned short)img->w;
 		h.h = (unsigned short)img->h;
@@ -235,7 +263,7 @@ static int pmi_read_header(const char *path, PmiHeader *h)
 	FILE *f = fopen(path, "rb");
 	int ok;
 	if (!f) return -1;
-	ok = fread(h, 1, sizeof(*h), f) == sizeof(*h) && !memcmp(h->magic, "PMI1", 4);
+	ok = fread(h, 1, sizeof(*h), f) == sizeof(*h) && (!memcmp(h->magic, "PMI1", 4) || !memcmp(h->magic, "PMI2", 4));
 	fclose(f);
 	return ok ? 0 : -1;
 }
@@ -316,6 +344,14 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 	o.max_w = PM_PIC_MAX_W;
 	o.max_h = PM_PIC_MAX_H;
 	o.max_full_bytes = 640L * 1024L;
+	if (pic_colour()) {
+		/* (1.04) the netBook: in colour, a progressive JPEG too; an interlaced
+		   PNG or GIF is kept whole at three bytes a pixel, and a progressive
+		   JPEG's chroma is kept as well as its luma, so more room for both */
+		o.colour = 1;
+		o.prog_colour = 1;
+		o.max_full_bytes = 1536L * 1024L;
+	}
 	o.abort = pic_abort;
 	o.abort_ctx = &a;
 	pic_greys(&o);
@@ -334,7 +370,7 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 			pm_log("picture %s: %dx%d", label, sw, sh);
 			int fw = (sw + o.max_w - 1) / o.max_w, fh = (sh + o.max_h - 1) / o.max_h, fs = fw > fh ? fw : fh;
 			long ow = (sw + fs - 1) / fs, oh = (sh + fs - 1) / fs;
-			if (((ow + 7) / 8) * 4L * oh > budget_left) {
+			if ((o.colour ? ((ow + 3) / 4) * 4L : ((ow + 7) / 8) * 4L) * oh > budget_left) {
 				remove(img_path);
 				pm_log("picture %s: %dx%d would be over the message's budget", label, sw, sh);
 				snprintf(note, notemax, "too many pictures in this message");
@@ -361,8 +397,8 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 		return w ? -1 : 1;
 	}
 	w = write_pmi(pmi_path, &img, 0);
-	pm_log("picture %s: %dx%d -> %dx%d%s in %lu ms", label, img.src_w, img.src_h, img.w, img.h,
-		img.partial ? " (cut short)" : "", pm_ms() - a.start);
+	pm_log("picture %s: %dx%d -> %dx%d%s%s in %lu ms", label, img.src_w, img.src_h, img.w, img.h,
+		img.colour ? " in colour" : "", img.partial ? " (cut short)" : "", pm_ms() - a.start);
 	pmimg_free(&img);
 	return w ? -1 : 0;
 }
@@ -372,7 +408,7 @@ int pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts,
 	static PicEntry e[PIC_MAX_PARTS];
 	PmShared *s = pm_shared();
 	int n, i, r = PM_RES_OK, done = 0, shown = 0, notshown = 0, wanted = 0, k;
-	long budget = PM_PIC_BUDGET_KB * 1024L;
+	long budget = pic_budget();
 	const char *p = parts;
 	char want[PIC_MAX_PARTS][16];
 	int force[PIC_MAX_PARTS], nwant = 0;
@@ -397,7 +433,7 @@ int pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts,
 		char pmi[200];
 		PmiHeader h;
 		pic_path(acct, folder, uid, e[i].part, "pmi", pmi, sizeof(pmi));
-		if (pmi_read_header(pmi, &h) == 0 && h.status != 2) budget -= ((h.w + 7) / 8) * 4L * h.h;
+		if (pmi_read_header(pmi, &h) == 0) budget -= pmi_bytes(&h);
 	}
 	note[0] = 0;
 	for (k = 0; k < nwant && !pm_cancelled(); k++) {
@@ -446,7 +482,7 @@ int pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts,
 		if (d < 0) { pm_write_why(why, whymax, "the picture", pmi); r = PM_RES_FAILED; break; }
 		if (d == 0) {
 			PmiHeader h;
-			if (pmi_read_header(pmi, &h) == 0) budget -= ((h.w + 7) / 8) * 4L * h.h;
+			if (pmi_read_header(pmi, &h) == 0) budget -= pmi_bytes(&h);
 			shown++;
 		} else notshown++;
 		done++;

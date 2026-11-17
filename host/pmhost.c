@@ -169,6 +169,7 @@ int main(int argc, char **argv)
 	g_sh.net.rtscts = atoi(env("PM_RTSCTS", "0"));
 	g_sh.prefetch = atoi(env("PM_PREFETCH", "0"));
 	g_sh.web_pic_proxy = atoi(env("PM_WEBPIC_PROXY", "0"));   /* tests: route web pictures via the proxy */
+	snprintf(g_sh.screen, sizeof(g_sh.screen), "%s", env("PM_SCREEN", ""));   /* tests: a colour screen ("640x480x256"): pictures in colour */
 	/* tests: the shared proxy (PsiLink.ini on the device); with PM_WEBPIC_PROXY=1 and no
 	   PM_PROXY_HOST it is a PsiProxy on this machine */
 	snprintf(g_sh.proxy_host, sizeof(g_sh.proxy_host), "%s", env("PM_PROXY_HOST", g_sh.web_pic_proxy ? "127.0.0.1" : ""));
