@@ -362,3 +362,18 @@ from another card, and the netBook never showed it, so it is taken as the
 emulator's; the app starts the engine again and goes on. `golden.py` opens
 PsiMail at 40 s on the seeded card (45 s on the first-run card) and the
 runs are checked with `PSION_EXC_TRACE=1` for no exceptions.
+
+## The netBook's keys and silkscreen (1.06)
+
+psion-netbook's `tools/keytest` (its CLAUDE.md rule) run with Psion's own
+Email on the stock v1.05(450) image beside PsiMail on a Coda image with the
+seed: `gen.py mailmain "at 100;tap 680 30;wait 25" "at 100;ctrlkey 148;wait 1;type
+psimail;key 3;wait 25" - F,J,G,K,T,sT,M,sM,Q,D,W,B,I,U,P,sP,S,sS,O,N,A,R,L,H,Y,X,C,V,Z`
+for the main view, and for a message being written the same with `key 4;
+wait 2;ctrl N;wait 5` after PsiMail's start (Esc first: the seeded card asks
+about the Email icon) and without the silkscreen Menu step (PsiMail's
+writing is a dialog with no menu bar: the Esc after it closed it).
+Found: Ctrl+Z did nothing in PsiMail's text (fixed in 1.06: SetAllowUndo).
+The rest that differs is by design and listed in README.md, "Keys compared
+with Psion's Email". The emulator's held keys repeat and shots can lag a
+step, so pairs are compared by what they show, not pixel for pixel.

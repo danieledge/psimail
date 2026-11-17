@@ -11,7 +11,7 @@ checked, and keeps the Psion's own Agenda in step with Fastmail's calendars
 WiRSa (`ATDT host:port`) or the Psion's own dial-up TCP/IP - and PsiTerm's
 TLS 1.3 client.
 
-**Status: 1.05, alpha.** The engine has been run against Dovecot, Radicale
+**Status: 1.06, alpha.** The engine has been run against Dovecot, Radicale
 and Fastmail both as PC code and as the exact ARM code in an emulator, and the
 EIKON app is driven screen by screen in a 5mx emulator. Expect bugs, and
 please report them via [GitHub issues](https://github.com/danieledge/psimail/issues).
@@ -22,7 +22,7 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 
 ## Contents
 
-- [What's new in 1.05](#whats-new-in-105) (and [1.04](#104), [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
+- [What's new in 1.06](#whats-new-in-106) (and [1.05](#105), [1.04](#104), [1.03](#103), [1.02](#102), [1.01](#101), [1.00](#100), [0.96](#096))
 - [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Setting up Fastmail](#setting-up-fastmail)
@@ -37,7 +37,18 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
-## What's new in 1.05
+## What's new in 1.06
+
+- **Ctrl+Z in a message being written** undoes the last cut, paste or
+  typing in the address lines, the subject and the text, as in Psion's own
+  Email. (Found by comparing PsiMail's keys with Email's on the netBook.)
+- The keys and the silkscreen were checked against Psion's own Email on the
+  netBook (v1.05(450)): what differs is by design - see
+  [Keys compared with Psion's Email](#keys-compared-with-psions-email).
+- psion-core's emulator mail test (`net.py mail`) works again from this
+  checkout.
+
+### 1.05
 
 On every machine:
 
@@ -602,6 +613,25 @@ lists, anniversaries, more than one calendar account.
 | Shift+Ctrl+Y / Shift+Ctrl+D | sync the calendar / go to today |
 | In the calendar: Left/Right, Pg Up/Pg Dn, Home | day, week (month), today |
 | In the calendar: Ctrl+N / Enter | new event / the event in full |
+
+### Keys compared with Psion's Email
+
+On the netBook PsiMail's keys and the silkscreen were run side by side with
+Psion's own Email (psion-netbook's `tools/keytest`). The same: the
+silkscreen's Menu, Clipboard (Cut, Copy, Paste), Infrared, Zoom in and Zoom
+out; Ctrl+C, X, V and (1.06) Z in text; Ctrl+M and Shift+Ctrl+M, Ctrl+T and
+Shift+Ctrl+T, Ctrl+G, Ctrl+F, Ctrl+N, Ctrl+R, Ctrl+P and Shift+Ctrl+P,
+Ctrl+K, Ctrl+E, Esc, Enter, Tab and Shift with the arrows. Different, by
+design:
+- Ctrl+Q switches to the calendar and between its views (Email has no
+  calendar); Ctrl+U disconnects; Ctrl+S saves an attachment (Email: send)
+  and, while writing, sends; Ctrl+L while writing is Contacts (Email:
+  spelling); Ctrl+I goes to the Inbox; Ctrl+D deletes (in the calendar it
+  says events are changed in the Agenda).
+- Writing a message is a dialog filling the screen, so the silkscreen's
+  Menu does nothing there (Email's editor has a menu bar); Esc closes it,
+  asking first if anything would be lost.
+- Ctrl+Menu is Coda's (PsiHub), as everywhere on Coda.
 
 ### Writing a message
 

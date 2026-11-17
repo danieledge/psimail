@@ -113,7 +113,7 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.05");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.06");          // also pkg/psimail.pkg
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -3290,6 +3290,11 @@ TKeyResponse CPmComposeDialog::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEvent
 
 void CPmComposeDialog::PostLayoutDynInitL()
 	{
+	// (1.06) Ctrl+Z undoes the last cut, paste or typing in each line and in
+	// the text, as in Psion's own Email (found by the netBook's keys test)
+	const TInt ids[5] = { EPmDlgTo, EPmDlgCc, EPmDlgBcc, EPmDlgSubject, EPmDlgBody };
+	for (TInt i = 0; i < 5; i++)
+		((CEikEdwin*)Control(ids[i]))->SetAllowUndo(ETrue);
 	ShowAttachments();
 	// replies start in the text; new messages at To
 	((CEikEdwin*)Control(EPmDlgBody))->SetCursorPosL(0, EFalse);
