@@ -85,9 +85,12 @@ $(O)/zlib/%.o: $(CORE)/ssh/zlib/%.c
 $(O)/cal/%.o: $(CAL)/%.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(TFLAGS) -I$(CORE)/ssh $< -o $@
-$(O)/certcheck.o: $(TLSV)/certcheck.c $(TLSV)/roots.h $(HDRS)
+# (certcheck.c with -march=armv4: its ECDSA's 32 x 32 -> 64 bit products as
+# UMULL, which the 5mx's ARM710T and the netBook's SA-1100 both have; the
+# rest keeps -mcpu=arm710. ARMv4 without T: no BX, as the netBook needs)
+$(O)/certcheck.o: $(TLSV)/certcheck.c $(TLSV)/ecverify.h $(TLSV)/roots.h $(HDRS)
 	@mkdir -p $(dir $@)
-	$(CC) -c $(LTCFLAGS) -I$(CORE)/ssh $< -o $@
+	$(CC) -c $(subst -mcpu=arm710,-march=armv4,$(LTCFLAGS)) -I$(CORE)/ssh $< -o $@
 $(O)/pmupdate.o: engine/pmupdate.c $(HDRS)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(LTCFLAGS) $(if $(filter host,$(TARGET)),-DPM_TEST_KEY) -I$(CORE)/ssh $< -o $@

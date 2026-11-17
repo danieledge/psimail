@@ -551,12 +551,15 @@ file, so no message is held whole in memory (peak heap in the emulator:
 
 The Psion has no certificate store and PsiTerm's TLS doesn't check
 certificates (its downloads are signed instead). PsiMail sends a password,
-so it checks: the server's CertificateVerify signature (RSA-PSS) against its
-certificate, the chain up to a root built into PsiMail (ISRG Root X1 -
-Fastmail's - and nine other common RSA roots, `tools/mkroots.py`), the
-name, and the dates (when the Psion's clock looks set). A server that
-fails can be trusted by the user, which pins its key (`pins.txt`).
-Only RSA certificates can be checked; ECDSA would be too slow on the Psion.
+so it checks: the server's CertificateVerify signature (RSA-PSS, or ECDSA
+on P-256 and P-384) against its certificate, the chain up to a root built
+into PsiMail (ISRG Root X1 - Fastmail's - and the other common RSA and
+ECDSA roots in `tools/roots.pem`, `tools/mkroots.py`), the name, and the
+dates (when the Psion's clock looks set). A server that fails can be
+trusted by the user, which pins its key (`pins.txt`). RSA is offered first,
+as it costs the Psion less; a server with only an ECDSA certificate (Gmail's
+IMAP, for one) takes about 1 s more on a 5mx for a P-256 check and 4 s for
+P-384, and is remembered after the first time (`certs.txt`).
 
 Passwords are kept scrambled, not encrypted, in `C:\System\Apps\PsiMail\PsiMail.ini`
 (and `Calendar.ini`).
