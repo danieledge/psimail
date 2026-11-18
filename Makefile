@@ -31,7 +31,7 @@ LTM_SRCS := $(notdir $(basename $(shell sed -n 's|^libtommath/||p' $(CORE)/ssh/l
 ifeq ($(TARGET),host)
 CC      := cc
 ARCH    := -O1 -g
-DEFS    := -DTLS_VERIFY
+DEFS    := -DTLS_VERIFY -DPM_ALLOC_TEST
 TFLAGS  := $(ARCH) -w -std=gnu99 -D_DEFAULT_SOURCE $(DEFS) -I$(CORE)/mail/engine/cal
 LTCFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTC)/headers -DLTC_SOURCE
 LTMFLAGS := $(TFLAGS) -I$(MAIL)/tls -I$(LTM)

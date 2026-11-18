@@ -8,11 +8,12 @@
 #define MAX_NODES 3000
 static ImapNode g_nodes[MAX_NODES];
 static int g_nn;
+static int g_full;      /* the last response had more items than MAX_NODES (or nested too deep): its tree is cut short */
 
 static ImapNode *new_node(int type)
 {
 	ImapNode *n;
-	if (g_nn >= MAX_NODES) return 0;
+	if (g_nn >= MAX_NODES) { g_full = 1; return 0; }
 	n = &g_nodes[g_nn++];
 	memset(n, 0, sizeof(*n));
 	n->type = type;
@@ -47,7 +48,8 @@ static ImapNode *parse_item(int depth)
 	ImapNode *n;
 again:
 	skip_sp();
-	if (g_p >= g_end || depth > 40) return 0;
+	if (depth > 40) { g_full = 1; return 0; }
+	if (g_p >= g_end) return 0;
 	if (*g_p == '(') { g_p++; return parse_list(depth, ')'); }
 	if (*g_p == '"') {
 		/* quoted string: backslash escapes are left in place (rare in the
@@ -99,9 +101,12 @@ again:
 ImapNode *ip_parse(const char *buf, int len)
 {
 	g_nn = 0;
+	g_full = 0;
 	g_p = buf; g_end = buf + len;
 	return parse_list(0, 0);
 }
+
+int ip_cut_short(void) { return g_full; }
 
 int ip_eq(const ImapNode *n, const char *s)
 {

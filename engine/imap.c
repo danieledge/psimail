@@ -89,16 +89,23 @@ static int lost(char *why, int whymax, int r)
 }
 
 /* Reads one whole response (a line plus any literals and continuation
-   lines) into g_resp. Returns the length, or <0. */
+   lines) into g_resp. Returns the length, or <0. g_resp_cut says some of
+   it was dropped: a line longer than the buffer, or a literal too big to
+   keep with nothing to stream it to. */
+static int g_resp_cut;
 static int read_response(void)
 {
 	int r;
 	g_rlen = 0;
+	g_resp_cut = 0;
 	for (;;) {
-		int start = g_rlen, len;
-		r = pmn_readline(g_resp + g_rlen, RESP_MAX - g_rlen - 16, g_rd_timeout);
+		int start = g_rlen, len, room = RESP_MAX - g_rlen - 16;
+		r = pmn_readline(g_resp + g_rlen, room, g_rd_timeout);
 		if (r < 0) return r;
 		len = r;
+		/* (pmn_readline keeps room - 1 bytes and drops the rest of a longer
+		   line; one less if it then took off a CR) */
+		if (len >= room - 2) g_resp_cut = 1;
 		g_rlen += len;
 		/* literal? "... {123}" or "{123+}" */
 		if (len > 2 && g_resp[g_rlen - 1] == '}') {
@@ -124,6 +131,7 @@ static int read_response(void)
 				memcpy(g_resp + g_rlen, "{0}\r\n", 5);
 				g_rlen += 5;
 				g_stream_total = n;
+				if (!fn) g_resp_cut = 1;
 				while (left > 0) {
 					int k = pmn_read(chunk, left > (long)sizeof(chunk) ? (int)sizeof(chunk) : (int)left, g_rd_timeout);
 					if (k <= 0) return k == 0 ? -1 : k;
@@ -174,6 +182,11 @@ static void note_caps(const char *text)
 	}
 }
 
+/* untagged responses that came damaged (cut short by the buffer or the
+   parser): what fn was given is not all the server said. A folder sync
+   reads it before removing anything (imap_sync) */
+static int g_damaged;
+
 /* Sends a command and reads until its tagged reply. Untagged responses go
    to fn. Returns PM_RES_OK, PM_RES_FAILED (why = the server's words),
    PM_RES_OFFLINE or PM_RES_CANCELLED. */
@@ -221,6 +234,11 @@ static int vcmd(UntaggedFn fn, void *ctx, char *why, int whymax, const char *fmt
 			}
 			if (fn) {
 				t = ip_parse(g_resp + 2, g_rlen - 2);
+				if (!t || ip_cut_short() || g_resp_cut) {
+					g_damaged++;
+					pm_log("imap: a damaged answer (%d bytes%s%s): %.40s", g_rlen,
+						g_resp_cut ? ", cut" : "", t && ip_cut_short() ? ", too many items" : "", g_resp);
+				}
 				if (t) fn(t, ctx);
 			}
 		}
@@ -637,8 +655,11 @@ typedef struct
 	unsigned int *seen_uids;  /* flag sync: uids the server still has */
 	int nseen, capseen;
 	long exists;
+	int got_exists;           /* the server did say EXISTS (exists is not just 0 from memset) */
 	unsigned long uidvalidity, uidnext;
 	unsigned int first_seq;   /* UID FETCH x (UID) -> its sequence number */
+	int oom;                  /* a list could not grow: what it holds is not all the server sent */
+	int nouid;                /* FETCH answers without a UID while seen_uids was kept */
 	} SyncCtx;
 
 static void addr_str(ImapNode *list, char *out, int max, int many)
@@ -725,7 +746,7 @@ static void on_fetch_msg(ImapNode *r, void *ctx)
 	char f[12], raw[400];
 
 	if (!w || !w->next) return;
-	if (ip_eq(w->next, "EXISTS")) { sc->exists = ip_num(w); return; }
+	if (ip_eq(w->next, "EXISTS")) { sc->exists = ip_num(w); sc->got_exists = 1; return; }
 	if (ip_eq(w, "OK") && w->next && w->next->type == IT_ATOM) {
 		/* * OK [UIDVALIDITY 123] / [UIDNEXT 456] (one atom: brackets hold spaces) */
 		char t[40];
@@ -736,16 +757,24 @@ static void on_fetch_msg(ImapNode *r, void *ctx)
 	}
 	if (!ip_eq(w->next, "FETCH")) return;
 	items = w->next->next;
-	if (!(v = ip_get(items, "UID"))) return;
+	if (!(v = ip_get(items, "UID"))) {
+		/* (a UID FETCH's answers all carry the UID: one without may be a
+		   damaged answer, and in a flag sync that message would look gone) */
+		if (sc->seen_uids) sc->nouid++;
+		return;
+	}
 	uid = (unsigned int)ip_num(v);
 	if (!sc->first_seq) sc->first_seq = (unsigned int)ip_num(w);
 
 	if (sc->seen_uids) {
-		/* flag sync: record that it still exists, update its flags */
+		/* flag sync: record that it still exists, update its flags. If the
+		   list cannot grow, nothing may be removed this time (imap_sync):
+		   a uid missing from it is not a message the server has lost */
+		if (sc->oom) return;
 		if (sc->nseen >= sc->capseen) {
 			int nc = sc->capseen ? sc->capseen * 2 : 256;
 			unsigned int *n2 = (unsigned int *)realloc(sc->seen_uids, nc * sizeof(unsigned int));
-			if (!n2) return;
+			if (!n2) { sc->oom = 1; return; }
 			sc->seen_uids = n2; sc->capseen = nc;
 		}
 		sc->seen_uids[sc->nseen++] = uid;
@@ -759,7 +788,10 @@ static void on_fetch_msg(ImapNode *r, void *ctx)
 	}
 	if (!(env = ip_get(items, "ENVELOPE"))) return;
 	if (uid <= sc->minuid && sc->minuid) return;
-	if (!(m = st_index_add(sc->ix, uid))) return;
+	/* (after one could not be added, none after it is: the next sync
+	   fetches from the last one we have, and must not skip that one) */
+	if (sc->oom) return;
+	if (!(m = st_index_add(sc->ix, uid))) { sc->oom = 1; return; }
 	flags_from(ip_get(items, "FLAGS"), m->flags);
 	m->size = ip_num(ip_get(items, "RFC822.SIZE"));
 	ip_str(ip_get(items, "INTERNALDATE"), raw, sizeof(raw));
@@ -808,7 +840,11 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 	unsigned int maxuid, minuid;
 
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
-	st_index_load(acct, folder, "index.txt", &ix);
+	if (st_index_load(acct, folder, "index.txt", &ix) == ST_INDEX_BROKEN) {
+		/* (not "no list yet": a sync on half a list would save half a list) */
+		set_why(why, whymax, "Not enough memory to check %s", folder);
+		return PM_RES_FAILED;
+	}
 	memset(&sc, 0, sizeof(sc));
 	sc.ix = &ix;
 	pm_progress("Opening %s...", folder);
@@ -829,7 +865,10 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 	maxuid = ix.n ? ix.m[ix.n - 1].uid : 0;
 	minuid = ix.n ? ix.m[0].uid : 0;
 
-	if (sc.exists == 0) {
+	if (sc.got_exists && sc.exists == 0) {
+		/* (only when the server said "* 0 EXISTS": an EXISTS lost to a
+		   damaged answer goes the long way below, which removes nothing
+		   it has not checked) */
 		for (i = 0; i < ix.n; i++) remove_cached(acct, folder, ix.m[i].uid);
 		ix.n = 0;
 	} else if (older && ix.n) {
@@ -844,6 +883,12 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 			sc.ix = &ix;
 			sc.total = to - from + 1;
 			r = cmd(on_fetch_msg, &sc, why, whymax, "FETCH %u:%u " FETCH_ITEMS, from, to);
+			if (r != PM_RES_OK || sc.oom) {
+				/* some of them only: a gap below the ones we had would never
+				   be filled (the next "older" starts below the oldest), so
+				   none of them is kept; they come again next time */
+				while (ix.n && ix.m[0].uid < minuid) st_index_remove(&ix, ix.m[0].uid);
+			}
 		} else if (r == PM_RES_OK) {
 			set_why(why, whymax, "There are no older messages");
 		}
@@ -855,15 +900,28 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 		sc.total = (int)(ix.exists - from + 1);
 		r = cmd(on_fetch_msg, &sc, why, whymax, "FETCH %ld:* " FETCH_ITEMS, from);
 	} else {
-		/* 1. what has changed or gone among the ones we have */
+		/* 1. what has changed or gone among the ones we have. A message
+		   is removed here only on the server's own word: the whole answer
+		   came, every line of it whole, and each uid was kept. A list cut
+		   short (no memory, a damaged line, a lost connection) removes
+		   nothing; the next sync looks again */
 		SyncCtx s2;
+		int damaged;
 		memset(&s2, 0, sizeof(s2));
 		s2.ix = &ix;
 		s2.seen_uids = (unsigned int *)malloc(256 * sizeof(unsigned int));
 		s2.capseen = s2.seen_uids ? 256 : 0;
+		if (!s2.seen_uids) s2.oom = 1;
 		pm_progress("Checking %s for changes...", folder);
-		r = cmd(on_fetch_msg, &s2, why, whymax, "UID FETCH %u:%u (UID FLAGS)", minuid, maxuid);
-		if (r == PM_RES_OK && s2.seen_uids) {
+		damaged = g_damaged;
+		if (s2.seen_uids)
+			r = cmd(on_fetch_msg, &s2, why, whymax, "UID FETCH %u:%u (UID FLAGS)", minuid, maxuid);
+		damaged = g_damaged - damaged;
+		if (r == PM_RES_OK && (s2.oom || damaged || s2.nouid)) {
+			pm_log("imap: sync %s: the server's list is not all here (%s%d damaged, %d without a uid, %d of %d): nothing removed",
+				folder, s2.oom ? "no memory, " : "", damaged, s2.nouid, s2.nseen, ix.n);
+			if (s2.oom) sc.oom = 1;
+		} else if (r == PM_RES_OK) {
 			qsort(s2.seen_uids, s2.nseen, sizeof(unsigned int), cmp_uint);
 			for (i = ix.n - 1; i >= 0; i--) {
 				unsigned int u = ix.m[i].uid;
@@ -876,11 +934,18 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 		free(s2.seen_uids);
 		/* 2. new messages */
 		if (r == PM_RES_OK && (!sc.uidnext || sc.uidnext > maxuid + 1)) {
+			int oom = sc.oom;
 			memset(&sc, 0, sizeof(sc));
 			sc.ix = &ix;
 			sc.minuid = maxuid;
 			r = cmd(on_fetch_msg, &sc, why, whymax, "UID FETCH %u:* " FETCH_ITEMS, maxuid + 1);
+			sc.oom |= oom;
 		}
+	}
+	if (r == PM_RES_OK && sc.oom) {
+		/* (what came is kept; the rest comes at the next sync) */
+		set_why(why, whymax, "Not enough memory to check all of %s", folder);
+		r = PM_RES_FAILED;
 	}
 	/* keep the folder from growing without limit on the card */
 	while (ix.n > want * 4 && ix.n > 200) {

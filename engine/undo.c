@@ -299,7 +299,13 @@ static void restore_local(int acct, const UndoRec *u, unsigned int uid)
 {
 	static PmIndex ix;
 	PmMsg *m;
-	st_index_load(acct, u->folder, "index.txt", &ix);
+	if (st_index_load(acct, u->folder, "index.txt", &ix) == ST_INDEX_BROKEN) {
+		/* (saving from it would cut the folder's list short: its files
+		   go back, and the next sync lists it again) */
+		pm_log("undo: %s's list could not be read: %u not listed there yet", u->folder, uid);
+		stash(acct, u->folder, uid, u->id, 1);
+		return;
+	}
 	if ((m = st_index_add(&ix, uid)) != 0) {
 		*m = u->m;
 		m->uid = uid;

@@ -5,6 +5,17 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "../psimail.h"
+
+#ifdef PM_ALLOC_TEST
+/* the host build only (host/pmhost.c, PM_FAILALLOC): the engine's
+   allocations can be made to fail, to see that running out of memory
+   loses nothing */
+#include <stdlib.h>
+void *pm_t_malloc(size_t n);
+void *pm_t_realloc(void *p, size_t n);
+#define malloc(n) pm_t_malloc(n)
+#define realloc(p, n) pm_t_realloc(p, n)
+#endif
 /* the shared calendar engine's port (core/mail/engine/cal): pm_copy and
    the other helpers it shares with PsiMail are declared there too */
 #include "calport.h"
@@ -103,6 +114,7 @@ typedef struct ImapNode
 	} ImapNode;
 /* parses buf[0..len) (one response, literals inline as {n}CRLF<bytes>) */
 ImapNode *ip_parse(const char *buf, int len);
+int  ip_cut_short(void);   /* the last ip_parse ran out of nodes: some of the response is missing */
 int  ip_eq(const ImapNode *n, const char *s);           /* case-insensitive atom/string compare */
 void ip_str(const ImapNode *n, char *out, int max);     /* copy (NIL -> "") */
 long ip_num(const ImapNode *n);
@@ -241,6 +253,11 @@ typedef struct
 	int cap;
 	PmMsg *m;                /* sorted by uid */
 	} PmIndex;
+/* 0 loaded; ST_INDEX_NONE no such file (an empty list); ST_INDEX_BROKEN
+   the file is there but could not all be read (no memory, a read error):
+   ix is left empty, and nothing may be saved over the file from it */
+#define ST_INDEX_NONE   (-1)
+#define ST_INDEX_BROKEN (-2)
 int  st_index_load(int acct, const char *folder, const char *file, PmIndex *ix);
 int  st_index_save(int acct, const char *folder, const char *file, PmIndex *ix);
 void st_index_free(PmIndex *ix);

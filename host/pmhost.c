@@ -123,6 +123,28 @@ void pm_idle(int ms) { usleep(ms * 1000); }
 void pm_cpu_low(int low) { (void)low; }
 void pm_beat_reset(void) { }
 
+/* PM_FAILALLOC=N (tests): the engine's Nth allocation fails; N+ makes
+   that one and every later one fail. Each failure is logged */
+#undef malloc
+#undef realloc
+static long g_allocs;
+static int alloc_fails(size_t n)
+{
+	static long at = -1;
+	static int on;
+	if (at < 0) {
+		const char *v = getenv("PM_FAILALLOC");
+		at = v ? atol(v) : 0;
+		on = v && strchr(v, '+') != 0;
+	}
+	g_allocs++;
+	if (!at || g_allocs < at || (g_allocs > at && !on)) return 0;
+	pm_log("alloc test: allocation %ld (%lu bytes) fails", g_allocs, (unsigned long)n);
+	return 1;
+}
+void *pm_t_malloc(size_t n) { return alloc_fails(n) ? 0 : malloc(n); }
+void *pm_t_realloc(void *p, size_t n) { return alloc_fails(n) ? 0 : realloc(p, n); }
+
 static const char *env(const char *k, const char *d) { const char *v = getenv(k); return v ? v : d; }
 
 void pm_loop(int (*housekeeping)(void));

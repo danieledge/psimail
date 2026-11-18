@@ -170,10 +170,11 @@ int st_index_load(int acct, const char *folder, const char *file, PmIndex *ix)
 	char dir[160], path[190];
 	static char line[1024];
 	FILE *f;
+	int broken = 0;
 	memset(ix, 0, sizeof(*ix));
 	st_folder_dir(acct, folder, dir, sizeof(dir));
 	snprintf(path, sizeof(path), "%s%s", dir, file);
-	if (!(f = fopen(path, "r"))) return -1;
+	if (!(f = fopen(path, "r"))) return ST_INDEX_NONE;
 	while (fgets(line, sizeof(line), f)) {
 		char *p = line, *uid;
 		PmMsg *m;
@@ -188,7 +189,7 @@ int st_index_load(int acct, const char *folder, const char *file, PmIndex *ix)
 		uid = field(&p);
 		if (!*uid) continue;
 		m = st_index_add(ix, (unsigned int)strtoul(uid, 0, 10));
-		if (!m) break;
+		if (!m) { broken = 1; break; }
 		pm_copy(m->flags, field(&p), sizeof(m->flags));
 		m->date = strtol(field(&p), 0, 10);
 		m->size = strtol(field(&p), 0, 10);
@@ -199,7 +200,15 @@ int st_index_load(int acct, const char *folder, const char *file, PmIndex *ix)
 		pm_copy(m->inreplyto, field(&p), sizeof(m->inreplyto));
 		m->attach = st_flag_has(m->flags, 'T');
 	}
+	if (ferror(f)) broken = 2;
 	fclose(f);
+	if (broken) {
+		/* half a list read as the whole would be saved as the whole, and
+		   the rest of the folder's messages would be lost from it */
+		pm_log("store: could not read all of %s (%s)", path, broken == 1 ? "no memory" : "a read error");
+		st_index_free(ix);
+		return ST_INDEX_BROKEN;
+	}
 	return 0;
 }
 

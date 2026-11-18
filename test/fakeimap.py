@@ -3,7 +3,8 @@
 
   fakeimap.py PORT [--drop-at N[,N...]] [--drop-every N] [--slow MS_PER_KB]
               [--mute-noop] [--no-uidplus] [--arrive N[,N...]] [--invite]
-              [--user NAME] [--idle-arrive SECS]
+              [--user NAME] [--idle-arrive SECS] [--many N] [--hide UID,..]
+              [--fat-flags UID:N] [--cut-flags N]
 
 Serves an INBOX of a few messages: one whose text has "NO CARRIER" on a
 line of its own (as an email about modems would), one of 30 KB (several
@@ -31,6 +32,12 @@ DONE ends it (idletest.sh).
 --user NAME refuses LOGIN for any other user name, with "NO
 [AUTHENTICATIONFAILED] no such user" (as Proton Bridge answers a user name
 that is not the account's address): see logintest.sh.
+--many N adds N small messages (uids 1001...) after the five; --hide
+leaves those uids out of the INBOX (gone from the server). --fat-flags
+UID:N gives that message N keywords, sent before its UID: an answer too
+big for the client's buffer or parser. --cut-flags N drops the connection
+after N lines of the first flags-only UID FETCH (a list cut short). See
+synctest.sh.
 --news DIR adds the newsletters in test/html/ as messages 201-206, with
 pictures from DIR (made by newspics.py): 201 and 202 point at pictures on
 the web (http://pics.example/..., for a local web server: see newspics.py),
@@ -50,6 +57,10 @@ INVITE = False
 NEWS = None
 USER = None
 IDLE_ARRIVE = None
+MANY = 0
+HIDE = []
+FAT = None
+CUT_FLAGS = 0
 args = sys.argv[2:]
 while args:
     a = args.pop(0)
@@ -63,6 +74,10 @@ while args:
     elif a == '--news': NEWS = args.pop(0)
     elif a == '--user': USER = args.pop(0)
     elif a == '--idle-arrive': IDLE_ARRIVE = float(args.pop(0))
+    elif a == '--many': MANY = int(args.pop(0))
+    elif a == '--hide': HIDE = [int(x) for x in args.pop(0).split(',')]
+    elif a == '--fat-flags': FAT = [int(x) for x in args.pop(0).split(':')]
+    elif a == '--cut-flags': CUT_FLAGS = int(args.pop(0))
 CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE') + (' IDLE' if IDLE_ARRIVE is not None else '')
 
 def msg(uid, subject, text):
@@ -143,6 +158,9 @@ if NEWS:
             (attached('JPEG', 'cliffs.jpg'), pic('cliffs.jpg'))]),
     ]
 
+MSGS += [msg(1001 + i, 'note %d' % (i + 1), 'Note number %d.\n' % (i + 1)) for i in range(MANY)]
+MSGS[:] = [m for m in MSGS if m['uid'] not in HIDE]
+
 # the messages in each folder (others are made empty when first selected)
 BOXES = {'INBOX': dict(validity=1, next=MSGS[-1]['uid'] + 1, msgs=MSGS)}
 def box(name):
@@ -194,8 +212,11 @@ def bodystructure(m):
 
 def fetch_items(m, seq, items):
     out = []
+    if FAT and m['uid'] == FAT[0] and 'FLAGS' in items:
+        # (FLAGS before the UID, as a server may send them)
+        out.append('FLAGS (%s)' % ' '.join('$k%d' % i for i in range(FAT[1])))
     if 'UID' in items or True: out.append('UID %d' % m['uid'])
-    if 'FLAGS' in items: out.append('FLAGS (%s)' % ('\\Deleted' if m.get('deleted') else ''))
+    if 'FLAGS' in items and not (FAT and m['uid'] == FAT[0]): out.append('FLAGS (%s)' % ('\\Deleted' if m.get('deleted') else ''))
     if 'INTERNALDATE' in items: out.append('INTERNALDATE "01-Jan-2024 10:00:00 +0000"')
     if 'RFC822.SIZE' in items: out.append('RFC822.SIZE %d' % (len(m['text']) + 200))
     if 'ENVELOPE' in items: out.append('ENVELOPE ' + envelope(m))
@@ -359,12 +380,20 @@ def handle(conn, addr):
                     send(data)
                     send(')\r\n%s OK fetched\r\n' % tag)
                 else:
+                    global CUT_FLAGS
                     lo, hi = rng.split(':') if ':' in rng else (rng, rng)
+                    lines = 0
                     for seq, m in enumerate(sel['msgs'], 1):
                         key = m['uid'] if cmd == 'UID' else seq
                         lo_v = int(lo)
                         hi_v = 10 ** 9 if hi == '*' else int(hi)
-                        if lo_v <= key <= hi_v: send(fetch_items(m, seq, items))
+                        if lo_v <= key <= hi_v:
+                            if CUT_FLAGS and items.strip() == '(UID FLAGS)' and lines == CUT_FLAGS:
+                                CUT_FLAGS = 0
+                                log('dropping the connection after %d lines of the flags' % lines)
+                                raise Drop()
+                            send(fetch_items(m, seq, items))
+                            lines += 1
                     send('%s OK fetched\r\n' % tag)
             elif cmd == 'UID' and rest.upper().startswith('STORE'):
                 uid = int(rest.split()[1])

@@ -107,7 +107,7 @@ core/tools/docker/psibuild "cd test && bash foldertest.sh"
 ```
 
 Host tests (`test/`, after `bash build.sh host` or `make TARGET=host`):
-`foldertest.sh`, `undotest.sh`, `logintest.sh`, `invtest.py`, `invitehost.py`, `htmltest.py`,
+`foldertest.sh`, `undotest.sh`, `logintest.sh`, `synctest.sh`, `invtest.py`, `invitehost.py`, `htmltest.py`,
 `imgtest.py` (ASan/UBSan, fuzzing the picture decoders), `pictest.sh` (pictures
 in greys and in colour, and the old cache), `parsefuzz.py`
 (MIME/IMAP/ICS/XML/HTML fuzzer), `certtest.py`. `fakeimap.py` is a

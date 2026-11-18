@@ -95,6 +95,22 @@ NAME`, `delfolder FOLDER`. It checks the names go as modified UTF-7 under
 the right parent, that folders.txt and the store directories follow, and
 that the Inbox, a standard folder and a folder with children are refused.
 
+## Nothing lost to a sync cut short (no server needed, 1.08)
+
+`synctest.sh` runs `sync INBOX` against `fakeimap.py --many 300` (305
+messages, three with their text downloaded) and checks that a message is
+removed from the Psion only on the server's own word. `PM_FAILALLOC=N`
+makes the host engine's Nth allocation fail (`N+`: that one and every
+later one; the host build only): each allocation of a sync is failed in
+turn, and every message and text must still be there, with "Not enough
+memory" said. A first sync out of memory part way must leave no gap: the
+next sync brings every message. `--fat-flags UID:N` sends one message's
+answer with N keywords before its UID (too big for the parser, or for the
+48 KB buffer): the log says "nothing removed". `--cut-flags N` and
+`--drop-at` (every 250 bytes of a sync) cut the connection part way:
+nothing goes. And `--hide 104,1150` (gone from the server) still removes
+those two, and only those.
+
 ## A refused login (no server needed)
 
 `logintest.sh` runs `fakeimap.py --user dan@example.com` and logs in as
