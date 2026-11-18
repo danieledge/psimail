@@ -114,6 +114,17 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KVersion, "1.07");          // also pkg/psimail.pkg
+
+// Coda's debug mode (the netBook's Control panel > Diagnostics, or
+// the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
+// engine keeps psimail.log as with Keep a log, and Coda's PsiDiag.exe copies
+// its new lines into the system log. Nothing more is logged than Keep a log
+// logs (never a password or a message's text).
+static TBool PmDiagOn()
+	{
+	TEntry e;
+	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
+	}
 _LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
@@ -499,7 +510,7 @@ void CPmView::CopySettingsToShared()
 	s->net.rtscts = iSettings->iRtsCts;
 	s->net.net_mode = iSettings->iNetMode;
 	s->net.modem_tls = (iSettings->iSpare[0] & KPmModemTlsBit) ? 1 : 0;
-	s->net.log_on = LogOn() ? 1 : 0;          // (0.93) Keep a log: else the engine writes no psimail.log
+	s->net.log_on = LogOn() || PmDiagOn() ? 1 : 0;   // (0.93) Keep a log: else the engine writes no psimail.log; or Coda's debug mode
 	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), ppp);
 	s->offline = iSettings->iOffline;
 	s->prefetch = PrefetchCount(*iSettings);
@@ -6298,7 +6309,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		// engine reads the setting on every line, so it takes effect at once
 		iSettings.iSpare[0] ^= KPmLogBit;
 		SaveSettings();
-		iView->Shared()->net.log_on = iView->LogOn() ? 1 : 0;
+		iView->Shared()->net.log_on = iView->LogOn() || PmDiagOn() ? 1 : 0;
 		iView->Toast(iView->LogOn() ? _L("Keeping a log") : _L("Not keeping a log"));
 		break;
 	case EPmCmdBack:
