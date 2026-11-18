@@ -59,6 +59,7 @@ extern void pg_link_suspect(void);        /* psiglue: PPP may be dead although N
 
 static unsigned long g_last_use;
 static int  g_open, g_tls, g_dead, g_suspect;
+static int g_clean;               /* pmn_clean_end (below) */
 static char g_tail[16];
 static unsigned char g_buf[2048];
 static int g_bpos, g_blen;
@@ -155,6 +156,7 @@ int pmn_connect(const char *host, int port, int tls, char *why, int whymax)
 	g_open = 1;
 	g_connid++;
 	g_dead = 0;
+	g_clean = 0;
 	g_suspect = 0;
 	g_tls = 0;
 	memset(g_tail, 0, sizeof(g_tail));
@@ -242,6 +244,18 @@ static int carrier_lost(void)
 	return 1;
 }
 
+/* (1.08) the connection ended cleanly: the server's FIN on Psion Internet
+   (psiglue's pg_net_closed_why 0), TLS's close_notify or a FIN between
+   records; never on the modem route without close_notify (its NO CARRIER is
+   the same for a close and a drop). The calendar engine (http.c) takes an
+   answer with no length read to the close as whole only then */
+extern int pg_net_closed_why(void);
+#ifndef PM_NO_TLS
+extern int tls_end(void);
+#endif
+static int tcp_clean(void) { return !modem() && pg_net_closed_why() == 0; }
+int pmn_clean_end(void) { return g_clean; }
+
 static int raw_read(void *buf, int max, int timeout_ms)
 {
 	int n;
@@ -254,11 +268,13 @@ static int raw_read(void *buf, int max, int timeout_ms)
 			if (pg_net_avail() == 0) {
 				if (carrier_lost()) return 0;
 				pm_copy(g_err, (m & 1) ? "line closed" : "timeout", sizeof(g_err));
+				if (m & 1) g_clean = g_clean || tcp_clean();
 				return (m & 1) ? 0 : PMN_TIMEOUT;
 			}
 		}
 		n = tls_read(buf, max, 10000);   /* mid-record: silence means bytes were lost */
 		if (n == -2) return PMN_CANCEL;
+		if (n <= 0) g_clean = tls_end() == 2 || (tls_end() == 1 && tcp_clean());
 		if (n <= 0) snprintf(g_err, sizeof(g_err), "tls: %s", n == 0 ? "closed" : tls_error());
 		if (n < 0 && modem() && pg_net_avail() == 0) {
 			/* on a modem line what is not TLS is the modem talking: after
@@ -283,6 +299,7 @@ static int raw_read(void *buf, int max, int timeout_ms)
 				return 0;
 			}
 			if (!(m & 1)) pm_copy(g_err, "timeout", sizeof(g_err));
+			if (m & 1) g_clean = tcp_clean();
 			return (m & 1) ? 0 : PMN_TIMEOUT;
 		}
 	}

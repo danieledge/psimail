@@ -80,6 +80,7 @@ void pg_link_close(void) { emu_hc(HP_HANGUP, 0, 0, 0, 0); }
 int pg_link_is_open(void) { return 0; }
 int pg_link_keep(void) { return 0; }
 int pg_net_closed(void) { return 0; }
+int pg_net_closed_why(void) { return 0; }         /* (the emulator stand-in: as a clean end) */
 void pg_link_suspect(void) { }
 int pg_net_avail(void) { return emu_hc(HP_AVAIL, 0, 0, 0, 0); }
 int pg_net_read(void *b, int m) { return emu_hc(HP_READ, (int)b, m, 0, 0); }

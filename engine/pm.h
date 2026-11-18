@@ -83,6 +83,7 @@ int  pmn_read(void *buf, int max, int timeout_ms); /* >0, 0 closed, <0 */
 int  pmn_getc(int timeout_ms);                     /* byte, or <0 */
 int  pmn_readline(char *buf, int max, int timeout_ms); /* length without CRLF, <0 error */
 void pmn_close(int hangup);
+int  pmn_clean_end(void);      /* after a read of 0 or <0: the server ended the connection cleanly (calport.h) */
 void pmn_close_why(int hangup, const char *why);   /* the same, saying why in the log */
 int  pm_update(const char *src, const char *save, char *why, int whymax);
 int  pm_version_newer(const char *remote, const char *local);
