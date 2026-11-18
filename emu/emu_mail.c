@@ -27,6 +27,7 @@ void pm_rmtree(const char *p) { emu_hc(HM_RMTREE, (int)p, 0, 0, 0); }
 void pm_idle(int ms) { (void)ms; }
 void pm_cpu_low(int low) { (void)low; }
 void pm_beat_reset(void) { }
+int pm_app_gone(void) { return 0; }
 int unlink(const char *p);
 int pm_replace(const char *tmp, const char *path) { unlink(path); return rename(tmp, path); }
 long pm_free_kb(const char *path) { (void)path; return -1; }

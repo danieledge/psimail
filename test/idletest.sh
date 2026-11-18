@@ -3,7 +3,9 @@
 # engine/imap.c imap_idle): IDLE on the Inbox until the server says EXISTS,
 # then DONE and a sync that brings the message; with nothing coming, DONE
 # when the time is up and "No new mail"; a server without IDLE is told
-# apart ("Not available").
+# apart ("Not available"). (1.08) PsiMail.app ending during the IDLE
+# (PM_APP_PID names a process standing for it) is noticed within seconds:
+# DONE, and no second IDLE.
 set -u
 export LC_ALL=C
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -30,6 +32,22 @@ t0=$(date +%s)
 check "idle: OK No new mail" "$(run idle 3)"
 d=$(( $(date +%s) - t0 ))
 [ $d -ge 3 ] && [ $d -lt 12 ] && echo "ok: waited the time ($d s)" || { echo "FAIL: waited $d s"; fail=1; }
+server --idle-arrive 0
+sleep 300 & APP=$!
+t0=$(date +%s)
+( sleep 2; kill $APP ) &
+out=$(PM_APP_PID=$APP run idle 120)
+d=$(( $(date +%s) - t0 ))
+wait $APP 2>/dev/null
+check "idle: CANCELLED PsiMail has ended" "$out"
+[ $d -lt 10 ] && echo "ok: the app's end noticed in $d s" || { echo "FAIL: the app's end took $d s"; fail=1; }
+grep -q "< DONE" "$STORE/server.log" && echo "ok: DONE sent" || { echo "FAIL: no DONE"; fail=1; }
+[ "$(grep -c '< P[0-9]* IDLE' "$STORE/server.log")" = 1 ] && echo "ok: one IDLE" || { echo "FAIL: IDLE sent again"; fail=1; }
+sleep 300 & APP=$!
+t0=$(date +%s)
+check "idle: OK No new mail" "$(PM_APP_PID=$APP run idle 4)"
+d=$(( $(date +%s) - t0 )); kill $APP; wait $APP 2>/dev/null
+[ $d -ge 4 ] && echo "ok: with the app there, waited the time ($d s)" || { echo "FAIL: left after $d s with the app there"; fail=1; }
 server
 check "idle: FAILED Not available - the server cannot say at once" "$(run idle 3)"
 [ $fail = 0 ] && echo "idletest: all passed" || { echo "idletest: FAILED"; exit 1; }

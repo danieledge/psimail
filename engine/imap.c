@@ -1758,7 +1758,12 @@ int imap_search(int acct, const char *folder, const char *words, char *why, int 
    for the engine, Esc, or maxsec is up (the app asks again; servers drop
    an IDLE after 30 minutes). Then DONE and the tagged answer. Lines are
    read a byte at a time with a short wait, so that the app's commands
-   are seen within a second and nothing of a line is lost between waits. */
+   are seen within a second and nothing of a line is lost between waits.
+   (1.08) The same wait looks for PsiMail.app having ended (killed, or
+   crashed): the engine's loop, which would notice, does not run during a
+   command, so a dead app went unnoticed for up to 25 minutes. Then DONE,
+   and PM_RES_CANCELLED: the loop then quits and logs out. Nothing more
+   goes to the server for it than the DONE. */
 static int idle_line(char *buf, int max, int *k)
 {
 	for (;;) {
@@ -1779,7 +1784,7 @@ int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
 	static char line[300];
 	PmShared *s = pm_shared();
 	char tag[12], out[24];
-	int r, n, k = 0, done = 0;
+	int r, n, k = 0, done = 0, gone = 0;
 	unsigned long t0;
 	*arrived = 0;
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
@@ -1791,9 +1796,17 @@ int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
 	t0 = pm_ms();
 	pm_progress("Waiting for new mail...");
 	for (;;) {
-		if (!done && (*arrived || s->cmd_head != s->cmd_tail || s->quitting || s->offline ||
+		if (!done && !gone && pm_app_gone()) {
+			pm_log("imap: idle: PsiMail.app has ended: DONE");
+			gone = 1;
+		}
+		if (!done && (*arrived || gone || s->cmd_head != s->cmd_tail || s->quitting || s->offline ||
 		              pm_ms() - t0 > (unsigned long)maxsec * 1000UL)) {
-			if (pmn_write("DONE\r\n", 6) != 0) return lost(why, whymax, -1);
+			if (pmn_write("DONE\r\n", 6) != 0) {
+				r = lost(why, whymax, -1);
+				if (gone) set_why(why, whymax, "PsiMail has ended");
+				return gone ? PM_RES_CANCELLED : r;
+			}
 			done = 1;
 			t0 = pm_ms();                      /* (now the tagged answer's own time) */
 		}
@@ -1804,15 +1817,18 @@ int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
 			done = 1;
 			continue;
 		}
-		if (r < 0) return lost(why, whymax, r);
-		if (r == 0) {
-			if (done && pm_ms() - t0 > 30000UL) return lost(why, whymax, PMN_TIMEOUT);
-			continue;
+		if (r < 0 || (r == 0 && done && pm_ms() - t0 > (gone ? 10000UL : 30000UL))) {
+			/* (with the app gone, the tagged answer is waited for 10 s, not 30) */
+			r = lost(why, whymax, r < 0 ? r : PMN_TIMEOUT);
+			if (gone) set_why(why, whymax, "PsiMail has ended");
+			return gone ? PM_RES_CANCELLED : r;
 		}
+		if (r == 0) continue;
 		k = 0;
 		g_last_cmd = pm_ms();
 		if (!strncmp(line, tag, strlen(tag)) && line[strlen(tag)] == ' ') {
 			const char *p = line + strlen(tag) + 1;
+			if (gone) { set_why(why, whymax, "PsiMail has ended"); return PM_RES_CANCELLED; }
 			if (pm_strncasecmp(p, "OK", 2)) { set_why(why, whymax, "%.100s", p); return PM_RES_FAILED; }
 			set_why(why, whymax, *arrived ? "New mail" : "No new mail");
 			return PM_RES_OK;

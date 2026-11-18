@@ -391,6 +391,31 @@ static TBool AppGone(PmShared* s)
 	return gone;
 	}
 
+// (1.08) the same question from inside a long command (imap_idle): the
+// heartbeat is read first, which costs nothing; only once it has stopped
+// for 2 s is the process opened, and then at most once a second
+static TUint gGoneBeat = 0;
+static TUint gGoneBeatSeen = 0;
+static TUint gGoneChecked = 0;
+
+extern "C" int pm_app_gone()
+	{
+	PmShared* s = pm_shared();
+	TUint now = User::TickCount();          // 1/64 s
+	if (!s->app_pid)
+		return 0;
+	if (s->app_beat != gGoneBeat || gGoneBeatSeen == 0)
+		{
+		gGoneBeat = s->app_beat;
+		gGoneBeatSeen = now;
+		return 0;
+		}
+	if (now - gGoneBeatSeen < 64 * 2 || now - gGoneChecked < 64)
+		return 0;
+	gGoneChecked = now;
+	return AppGone(s) ? 1 : 0;
+	}
+
 static int Housekeeping()
 	{
 	PmShared* s = pm_shared();

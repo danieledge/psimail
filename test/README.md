@@ -326,7 +326,12 @@ moved to Archive, a sender's mail marked read, a bad line skipped.
 `idletest.sh`: `fakeimap.py --idle-arrive SECS` offers IDLE and sends
 EXISTS SECS into it; the engine's `idle` ends with DONE and syncs the new
 message, waits the whole time when nothing comes, and says "Not available"
-to a server without IDLE.
+to a server without IDLE. (1.08) With `PM_APP_PID` naming a process that
+stands for PsiMail.app, the IDLE ends with DONE within seconds of that
+process ending (CANCELLED, "PsiMail has ended"), with no second IDLE; while
+it runs, the IDLE waits its time as before. On the Psion the engine reads
+the app's heartbeat each second and opens the app's process only once the
+heartbeat has stopped for 2 s (`pm_app_gone`, engine/pmepoc.cpp).
 
 On the 5mx the tours open PsiMail from Extras at 45 s (`MX_LAUNCH_AT`), not
 run.sh's 37 s: with 1.03's bigger program on the card the System screen was

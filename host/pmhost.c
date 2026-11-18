@@ -145,6 +145,26 @@ static int alloc_fails(size_t n)
 void *pm_t_malloc(size_t n) { return alloc_fails(n) ? 0 : malloc(n); }
 void *pm_t_realloc(void *p, size_t n) { return alloc_fails(n) ? 0 : realloc(p, n); }
 
+/* PM_APP_PID=pid (tests): that process stands for PsiMail.app; once it
+   has ended (or is a zombie) the app has gone */
+int pm_app_gone(void)
+{
+	const char *v = getenv("PM_APP_PID");
+	char path[40], st[200];
+	FILE *f;
+	int n;
+	if (!v || !*v) return 0;
+	snprintf(path, sizeof(path), "/proc/%d/stat", atoi(v));
+	if (!(f = fopen(path, "r"))) return 1;
+	n = (int)fread(st, 1, sizeof(st) - 1, f);
+	fclose(f);
+	st[n > 0 ? n : 0] = 0;
+	{
+		char *e = strrchr(st, ')');            /* "pid (name) S ..." */
+		return e && e[1] == ' ' && (e[2] == 'Z' || e[2] == 'X');
+	}
+}
+
 static const char *env(const char *k, const char *d) { const char *v = getenv(k); return v ? v : d; }
 
 void pm_loop(int (*housekeeping)(void));

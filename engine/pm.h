@@ -47,6 +47,12 @@ void pm_cpu_low(int low);
 /* the engine has just been working (a command, a download ahead): the time
    since the app's last heartbeat starts again (see pmepoc.cpp Housekeeping) */
 void pm_beat_reset(void);
+/* PsiMail.app's process has ended (killed, or it crashed): for a command
+   that waits a long time, IDLE above all, which keeps the engine from its
+   loop's own check (pmepoc.cpp Housekeeping). Free while the app's
+   heartbeat goes on; once it has stopped for 2 s the process is looked
+   at, at most once a second. A silent heartbeat alone is never "gone". */
+int  pm_app_gone(void);
 
 /* ---- files (pmmain.c) */
 int  pm_fclose(FILE *f);                   /* fclose that also checks the error flag: 0 = all written */
