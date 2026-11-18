@@ -373,6 +373,9 @@ void pmn_close_why(int hangup, const char *why)
 		   cost 2.5 s */
 		else if (hangup && !g_dead) pg_hangup();
 	}
+#ifndef PM_NO_TLS
+	if (g_tls) tls_close();          /* the keys go, and TLS's buffers back to the Psion */
+#endif
 	g_open = 0;
 	g_dead = 0;
 	g_suspect = 0;

@@ -687,6 +687,7 @@ void pm_loop(int (*housekeeping)(void))
 		}
 		if (housekeeping && housekeeping()) break;
 		if (pf_step()) { pm_beat_reset(); continue; }
+		imap_trim();                         /* (nothing to do: a closed mailbox's buffers go back) */
 		pm_idle(100);
 	}
 	pm_log("net: quitting: releasing the line");

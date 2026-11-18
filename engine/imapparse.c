@@ -6,14 +6,29 @@
 #include "pm.h"
 
 #define MAX_NODES 3000
-static ImapNode g_nodes[MAX_NODES];
+/* The tree's nodes are work memory (core/ssh/psiwork.h), 60 KB: taken when
+   a response is first parsed, given back by ip_work(0) once the mailbox is
+   closed (imap_trim). They were a static, part of psimail.exe's RAM for as
+   long as PsiMail ran. */
+#include "../core/ssh/psiwork.h"
+static ImapNode *g_nodes;
 static int g_nn;
+
+int ip_work(int on)
+{
+	if (on) {
+		if (!g_nodes) g_nodes = (ImapNode *)psi_work_alloc(sizeof(ImapNode) * MAX_NODES);
+		return g_nodes ? 0 : -1;
+	}
+	if (g_nodes) { psi_work_free(g_nodes); g_nodes = 0; g_nn = 0; return 1; }   /* (1: something went) */
+	return 0;
+}
 static int g_full;      /* the last response had more items than MAX_NODES (or nested too deep): its tree is cut short */
 
 static ImapNode *new_node(int type)
 {
 	ImapNode *n;
-	if (g_nn >= MAX_NODES) { g_full = 1; return 0; }
+	if (g_nn >= MAX_NODES || ip_work(1) != 0) { g_full = 1; return 0; }   /* (no memory: as a tree cut short) */
 	n = &g_nodes[g_nn++];
 	memset(n, 0, sizeof(*n));
 	n->type = type;

@@ -121,6 +121,7 @@ typedef struct ImapNode
 	} ImapNode;
 /* parses buf[0..len) (one response, literals inline as {n}CRLF<bytes>) */
 ImapNode *ip_parse(const char *buf, int len);
+int  ip_work(int on);      /* the parser's nodes (work memory): 1 take (0 ok, -1 none), 0 give back */
 int  ip_cut_short(void);   /* the last ip_parse ran out of nodes: some of the response is missing */
 int  ip_eq(const ImapNode *n, const char *s);           /* case-insensitive atom/string compare */
 void ip_str(const ImapNode *n, char *out, int max);     /* copy (NIL -> "") */
@@ -194,6 +195,7 @@ typedef struct
 
 int  imap_open(int acct, char *why, int whymax);        /* connect + login (reuses) */
 void imap_logout(void);
+int  imap_trim(void);      /* no mailbox open: its buffers back to the Psion (1 if any went) */
 int  imap_drops(void);                    /* connections lost mid-command so far */
 int  imap_list_folders(int acct, char *why, int whymax);
 int  imap_sync(int acct, const char *folder, int older, char *why, int whymax);

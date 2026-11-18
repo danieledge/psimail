@@ -28,7 +28,11 @@ static int  g_conn = -1;       /* pmn_conn_id() of our connection */
 static char g_caps[600];
 static char g_sel[128];        /* selected folder, "" = none */
 static int  g_tagno;
-static char g_resp[RESP_MAX];
+/* One response being read: work memory (core/ssh/psiwork.h), 48 KB, taken
+   by imap_open and given back by imap_trim once the mailbox is closed (with
+   the parser's 60 KB). Both were statics. */
+#include "../core/ssh/psiwork.h"
+static char *g_resp;
 static int  g_rlen;
 static unsigned long g_last_cmd;
 
@@ -98,6 +102,7 @@ static int read_response(void)
 	int r;
 	g_rlen = 0;
 	g_resp_cut = 0;
+	if (!g_resp) return -1;                 /* (imap_open takes it) */
 	for (;;) {
 		int start = g_rlen, len, room = RESP_MAX - g_rlen - 16;
 		r = pmn_readline(g_resp + g_rlen, room, g_rd_timeout);
@@ -284,6 +289,21 @@ void imap_logout(void)
 	g_sel[0] = 0;
 }
 
+/* With no mailbox open (logged out, the line released or lost), the two
+   buffers a mailbox needs go back to the Psion, and the heap is given back
+   as far as it goes. Called from the engine's loop when it has nothing to
+   do, never while a response is in use. Returns 1 if anything went. */
+int imap_trim(void)
+{
+	if (g_acct >= 0 && pmn_is_open() && pmn_conn_id() == g_conn) return 0;
+	{
+		int went = ip_work(0);
+		if (g_resp) { psi_work_free(g_resp); g_resp = 0; g_rlen = 0; went = 1; }
+		if (went) psi_work_trim();
+		return went;
+	}
+}
+
 int imap_open(int acct, char *why, int whymax)
 {
 	PmShared *s = pm_shared();
@@ -291,6 +311,11 @@ int imap_open(int acct, char *why, int whymax)
 	char qu[200], qp[140];
 	int r;
 
+	if (!g_resp) g_resp = (char *)psi_work_alloc(RESP_MAX);
+	if (!g_resp || ip_work(1) != 0) {
+		set_why(why, whymax, "Not enough memory to open the mailbox");
+		return PM_RES_FAILED;
+	}
 	if (g_acct >= 0 && pmn_conn_id() != g_conn) { g_acct = -1; g_sel[0] = 0; }   /* SMTP took the line */
 	if (g_acct == acct && pmn_is_open()) {
 		/* still there? (a modem link or the server may have dropped it) */
