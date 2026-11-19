@@ -200,8 +200,13 @@ static const char *k_res[] = { "OK", "FAILED", "OFFLINE", "CANCELLED", "UNTRUSTE
 
 int main(int argc, char **argv)
 {
-	PmAccount *a = &g_sh.acct[0];
-	int i = 1, rc = 0;
+	/* PM_ACCT=n: the commands are for slot n (0); PM_USER0..PM_USER3: the
+	   other slots set up for those users on PM_HOST (tests of the store's
+	   account checks, 1.11) */
+	int slot = atoi(env("PM_ACCT", "0")) & 3;
+	PmAccount *a = &g_sh.acct[slot];
+	int i = 1, rc = 0, j;
+	unsigned int noted = 0;
 	const char *store = "/tmp/psimail-store/";
 	if (i + 1 < argc && !strcmp(argv[i], "-s")) { store = argv[i + 1]; i += 2; }
 	signal(SIGPIPE, SIG_IGN);
@@ -237,6 +242,13 @@ int main(int argc, char **argv)
 	a->sync_count = atoi(env("PM_COUNT", "50"));
 	a->max_body_kb = atoi(env("PM_BODY_KB", "64"));
 	a->save_sent = atoi(env("PM_SAVE_SENT", "1"));
+	for (j = 0; j < PM_MAX_ACCOUNTS; j++) {
+		char k[12];
+		snprintf(k, sizeof(k), "PM_USER%d", j);
+		if (j == slot || !getenv(k)) continue;
+		g_sh.acct[j] = *a;
+		pm_copy(g_sh.acct[j].user, getenv(k), sizeof(g_sh.acct[j].user));
+	}
 	g_sh.cal.enabled = 1;
 	pm_copy(g_sh.cal.host, env("PM_CAL_HOST", "caldav.fastmail.com"), sizeof(g_sh.cal.host));
 	g_sh.cal.port = atoi(env("PM_CAL_PORT", "443"));
@@ -302,8 +314,10 @@ int main(int argc, char **argv)
 			continue;
 		}
 		else { fprintf(stderr, "unknown command %s\n", op); return 2; }
+		c.acct = slot;
 		pm_do_command(&c);
 		printf("%s: %s %s\n", op, k_res[g_sh.last_res], g_sh.last_msg);
+		if (g_sh.store_note_seq != noted) { noted = g_sh.store_note_seq; printf("  note: %s\n", g_sh.store_note); }
 		if (c.op == PM_CMD_UPDATE && g_sh.update_ready) printf("  ready: %s\n", g_sh.last_file);
 		if (c.op == PM_CMD_UNDO && g_sh.last_file[0]) printf("  back as uid %s\n", g_sh.last_file);
 		if (g_sh.last_res == PM_RES_UNTRUSTED)

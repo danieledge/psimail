@@ -490,7 +490,7 @@ static int run(PmCmd *c, char *why, int whymax)
 	}
 	if (c->op == PM_CMD_UPDATE) return pm_update(c->arg, c->folder, why, whymax);
 	if (a < 0 || a >= PM_MAX_ACCOUNTS || !s->acct[a].used) { snprintf(why, whymax, "No such account"); return PM_RES_FAILED; }
-	st_check_account(a);
+	if (st_check_account(a, why, whymax) != 0) return PM_RES_FAILED;
 	switch (c->op) {
 	case PM_CMD_FOLDERS:
 		replay(a, why, whymax);

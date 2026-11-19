@@ -33,6 +33,7 @@
 #include "psilink.h"
 #include "pglinktest.h"
 #include "psigreyui.h"
+#include "psikeep.h"           // (1.11) settings kept on the card, without passwords
 
 // how many of the newest messages to download ahead after a sync
 static TInt PrefetchCount(const TPmSettings& aSettings)
@@ -113,7 +114,10 @@ static void SaveSharedLink(RFs& aFs, const TPmSettings& aSettings, const TDesC& 
 
 _LIT(KEngineExe, "psimail.exe");
 _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
-_LIT(KVersion, "1.10");          // also pkg/psimail.pkg
+_LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
+_LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
+_LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
+_LIT(KVersion, "1.11");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -2306,6 +2310,22 @@ void CPmView::TickL()
 		iChangedSeen = s->changed_seq;
 		ReloadL();
 		}
+	// (1.11) the engine's news of the store, once it is done: another
+	// login's unsent mail kept aside, or a login's brought back (store.c)
+	if (s->store_note_seq != iStoreNoteSeen && !s->busy && !iInResults && !iClosing)
+		{
+		iStoreNoteSeen = s->store_note_seq;
+		TBuf<200> note;
+		FromC(note, s->store_note);
+		TInt tab = note.Locate('\t');
+		if (tab > 0)
+			{
+			iInResults = ETrue;
+			TRAPD(ne, iEikonEnv->InfoWinL(note.Left(tab), note.Mid(tab + 1)));
+			iInResults = EFalse;
+			(void)ne;
+			}
+		}
 	// progress
 	TBuf<128> prog;
 	FromC(prog, s->progress);
@@ -3869,9 +3889,26 @@ void CPmAppUi::ConstructL()
 	// (0.96) the screen: colour and 480 lines on the netBook and Series 7
 	iColour = iCoeEnv->ScreenDevice()->DisplayMode() >= EColor16;
 	iTall = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	// (1.11) a new C: (a new image, a cold start, a flat battery): the
+	// settings back from the card's copy, before anything looks at them
+	// (passwords are never on the card: psikeep.h)
+	{
+	RFs& fs = iCoeEnv->FsSession();
+	TFileName bak(KIniFile);
+	bak.Append(_L(".bak"));
+	TEntry e;
+	if (fs.Entry(bak, e) != KErrNone && PsiKeepRestore(fs, KIniFile))
+		iKeptBack = ETrue;
+	if (PsiKeepRestore(fs, KCalIniFile))
+		iKeptBack = ETrue;
+	PsiKeepRestore(fs, KUpdIniFile);
+	PsiKeepRestore(fs, KPrintIniFile);
+	PsiKeepRestore(fs, KPsiLinkFile);
+	}
 	iFirstStart = CPgSetupDialog::FirstRun(iCoeEnv->FsSession(), KIniFile);   // (1.03, before anything is saved)
 	LoadSettings();
 	LoadCalSettings();
+	KeepOnCard();                            // (a card copy for settings made before 1.11, or on another card)
 	TRAPD(mbm, iMbm = CPmMbm::NewL(iCoeEnv->FsSession(), Application()->BitmapStoreName()));
 	(void)mbm;                               // (NULL: the pictures load one by one)
 	TRAPD(pics, ToolbarPicturesL());
@@ -3900,6 +3937,8 @@ void CPmAppUi::ConstructL()
 		iAccountSetup = EFalse;
 		(void)su;
 		}
+	if (iKeptBack)
+		EmailButtonSoon();                   // (1.11) said once the window is up, before the Email icon question
 	if (!iSettings.iAccounts[iSettings.iAcct].used)
 		{
 		iAccountSetup = ETrue;               // (the Email icon question waits for this)
@@ -3981,13 +4020,25 @@ void CPmAppUi::EmailButtonSoon()
 TInt CPmAppUi::EmailButtonCallback(TAny* aSelf)
 	{
 	CPmAppUi* self = (CPmAppUi*)aSelf;
+	// (1.11) not again from inside its own dialog (the view's start asks
+	// for it too, and a dialog's wait runs this idle object once more)
+	if (self->iSoonBusy)
+		return EFalse;
+	self->iSoonBusy = ETrue;
 	TRAPD(err, self->EmailButtonStartL());
+	self->iSoonBusy = EFalse;
 	(void)err;
 	return EFalse;                            // (once)
 	}
 
 void CPmAppUi::EmailButtonStartL()
 	{
+	// (1.11) the settings came back from the card's copy at this start
+	if (iKeptBack && !iAccountSetup)
+		{
+		iKeptBack = EFalse;
+		iEikonEnv->InfoWinL(_L("Settings put back from the card"), _L("Passwords are not kept there: PsiMail asks for each"));
+		}
 	// (not on top of the first account's dialog: asked when that is closed)
 	if (!(iSettings.iView & KPmViewEmailButtonAsked) && !iAccountSetup)
 		{
@@ -4536,11 +4587,12 @@ void CPmAppUi::SaveSettings()
 		Scramble(iSettings.iAccounts[i2]);
 	if (r != KErrNone)
 		iEikonEnv->InfoMsg(r == KErrDiskFull ? _L("Settings not saved - no room left on C:") : _L("Settings not saved - C: could not be written"));
+	else
+		KeepOnCard();
 	}
 
 // ----- calendar settings (a file of their own, so mail settings stay put)
 
-_LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 const TUint32 KCalIniMagic = 0x31435350;   // 'PSC1'
 
 static void ScrambleCal(PmCalendar& aCal)
@@ -4628,6 +4680,56 @@ void CPmAppUi::SaveCalSettings()
 	ScrambleCal(iCalSettings.iCal);
 	if (r != KErrNone)
 		iEikonEnv->InfoMsg(_L("Calendar settings not saved - C: could not be written"));
+	else
+		KeepOnCard();
+	}
+
+// (1.11) the card's copies (psikeep.h): PsiMail.ini and Calendar.ini as
+// they are on C:, but every password empty. Put back on a new C:, the
+// accounts and the calendar are there and each password is asked for when
+// it is next needed. Written only when they differ from the card's.
+void CPmAppUi::KeepOnCard()
+	{
+	RFs& fs = iCoeEnv->FsSession();
+	if (!PsiKeepCard(fs))
+		return;
+	const TInt KHead = 8;
+	TInt n = KHead + Max((TInt)sizeof(TPmSettings), (TInt)sizeof(TPmCalSettings));
+	HBufC8* buf = HBufC8::New(n);
+	TAny* copy = User::Alloc(n);
+	if (buf && copy)
+		{
+		TPtr8 p(buf->Des());
+		TPmSettings* m = (TPmSettings*)copy;
+		Mem::Copy(m, &iSettings, sizeof(TPmSettings));
+		for (TInt i = 0; i < PM_MAX_ACCOUNTS; i++)
+			{
+			Mem::FillZ(m->iAccounts[i].pass, sizeof(m->iAccounts[i].pass));
+			Scramble(m->iAccounts[i]);       // (as the file holds it: empty when read)
+			}
+		p.Append(TPckgBuf<TUint32>(KIniMagic));
+		p.Append(TPckgBuf<TInt>(sizeof(TPmSettings)));
+		p.Append(TPtrC8((const TUint8*)m, sizeof(TPmSettings)));
+		PsiKeepData(fs, KIniFile, p);
+		TEntry e;
+		if (fs.Entry(KCalIniFile, e) == KErrNone)
+			{
+			TPmCalSettings* c = (TPmCalSettings*)copy;
+			Mem::Copy(c, &iCalSettings, sizeof(TPmCalSettings));
+			Mem::FillZ(c->iCal.pass, sizeof(c->iCal.pass));
+			ScrambleCal(c->iCal);
+			p.Zero();
+			p.Append(TPckgBuf<TUint32>(KCalIniMagic));
+			p.Append(TPckgBuf<TInt>(sizeof(TPmCalSettings)));
+			p.Append(TPtrC8((const TUint8*)c, sizeof(TPmCalSettings)));
+			PsiKeepData(fs, KCalIniFile, p);
+			}
+		}
+	User::Free(copy);
+	delete buf;
+	PsiKeepFile(fs, KUpdIniFile);
+	PsiKeepFile(fs, KPrintIniFile);
+	PsiKeepFile(fs, KPsiLinkFile);
 	}
 
 void CPmAppUi::EditCalendarL()
@@ -5187,7 +5289,6 @@ void CPmView::StartInstallerL(const TDesC& aFile)
 	StartEngineL();
 	}
 
-_LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 
 // Tools > Update PsiMail: where from, then the engine fetches and checks it
 void CPmAppUi::UpdateL()
@@ -5235,6 +5336,7 @@ void CPmAppUi::UpdateL()
 	b.Copy(src);
 	const TDesC8* parts[1] = { &b };
 	SafeWriteFile(fs, KUpdIniFile, parts, 1, EFalse);   // (temp + Replace; the choice is asked again if it fails)
+	PsiKeepFile(fs, KUpdIniFile);                       // (1.11) and the card's copy
 	}
 	// saved to the CF card if there is one: C: is small
 	TVolumeInfo vol;
@@ -5692,7 +5794,22 @@ void CPmAppUi::DeleteAccountL()
 	qn.Append('"');
 	qn.Append(n.Left(n.Length() < 60 ? n.Length() : 60));
 	qn.Append('"');
-	if (!iEikonEnv->QueryWinL(qn, _L("Remove this account from PsiMail?")))
+	// (1.11) its unsent mail is not lost (engine/store.c keeps it aside when
+	// the slot is used for another account): said, so nobody fears it is
+	TInt unsent = 0;
+	{
+	TFileName spec;
+	iView->StoreDirectory(spec);
+	spec.AppendFormat(_L("A%d\\outbox\\*.txt"), iSettings.iAcct);
+	CDir* list = NULL;
+	if (iCoeEnv->FsSession().GetDir(spec, KEntryAttNormal, ESortByName, list) == KErrNone && list)
+		unsent = list->Count();
+	delete list;
+	}
+	TBuf<60> q(_L("Remove this account from PsiMail?"));
+	if (unsent)
+		q.Format(unsent == 1 ? _L("Its unsent message is kept. Remove it?") : _L("Its %d unsent messages are kept. Remove it?"), unsent);
+	if (!iEikonEnv->QueryWinL(qn, q))
 		return;
 	Mem::FillZ(&a, sizeof(a));
 	// its files go when the slot is next used (the engine checks account.txt)

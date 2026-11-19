@@ -40,7 +40,13 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "PsiMail talks to a server it shows the server's key and asks whether to trust it.\n"
 	  "\n"
 	  "PsiMail opens where you closed it - the folder, the Outbox or the calendar - with your accounts, "
-	  "folders and preferences as you left them." },
+	  "folders and preferences as you left them.\n"
+	  "\n"
+	  "Passwords are kept on this Psion only (in its internal memory, scrambled but not encrypted), "
+	  "never on the card. The rest of the settings are copied to the card as well "
+	  "(\\System\\Data\\Kept\\): if the internal memory is ever cleared, PsiMail puts them back "
+	  "and asks for each password again. Unsent mail is never removed when an account is set up "
+	  "again in another order." },
 
 	{ "Ways to connect",
 	  "PsiMail needs only a way onto the Internet. Everything else is optional.\n"

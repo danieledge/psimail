@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include "pm.h"
 
 static unsigned long fnv(const char *s)
@@ -68,7 +69,229 @@ static int st_fetched(int acct)
 	return 0;
 }
 
-int st_check_account(int acct)
+/* ---- (1.11) another login in a slot: nothing unsent is lost (review R11)
+ *
+ *   <store>\K<hash>\                 a login's files kept aside (hash: fnv of
+ *                                    "user@host"; K<hash>2..9 if taken), with
+ *                                    their own account.txt
+ *
+ * Before 1.11 a slot set up for another login lost its whole folder, the
+ * Outbox (drafts are kept there) and pending.txt with it: after a cleared C:
+ * two accounts typed in again the other way round lost their unsent mail.
+ * Now the new login's files are found first (another slot not set up for
+ * that login now, or a kept folder) and swapped or brought back; the old
+ * login's go aside if anything of them is unsent, and are only removed when
+ * nothing is (what is left is a copy of the server's). The app is told
+ * (store_note).
+ */
+
+/* the first line of dir's account.txt ("" none) */
+static void st_login_of(const char *dir, char *have, int max)
+{
+	char path[200];
+	FILE *f;
+	snprintf(path, sizeof(path), "%saccount.txt", dir);
+	have[0] = 0;
+	if ((f = fopen(path, "r")) != 0) {
+		if (!fgets(have, max, f)) have[0] = 0;
+		fclose(f);
+		have[strcspn(have, "\r\n")] = 0;
+	}
+}
+
+/* user@host: a real login, not a damaged line */
+static int st_is_login(const char *s)
+{
+	const char *at = strchr(s, '@');
+	return at && at > s && at[1];
+}
+
+static void st_count_cb(const char *name, void *ctx)
+{
+	(void)name;
+	(*(int *)ctx)++;
+}
+
+/* messages in dir's Outbox (drafts among them); with pending, +1 for a
+   pending.txt of changes not yet sent */
+static int st_unsent(const char *dir, int *pending)
+{
+	char path[200];
+	FILE *f;
+	int n = 0;
+	snprintf(path, sizeof(path), "%soutbox%s", dir, PM_SEP);
+	pm_list_dir(path, ".txt", st_count_cb, &n);
+	snprintf(path, sizeof(path), "%spending.txt", dir);
+	*pending = 0;
+	if ((f = fopen(path, "r")) != 0) {
+		*pending = fgetc(f) != EOF;
+		fclose(f);
+	}
+	return n;
+}
+
+/* a folder renamed: both names end in the separator, which rename() must
+   not have */
+static int st_move_dir(const char *from, const char *to)
+{
+	char a[180], b[180];
+	pm_copy(a, from, sizeof(a));
+	pm_copy(b, to, sizeof(b));
+	if (a[0]) a[strlen(a) - 1] = 0;
+	if (b[0]) b[strlen(b) - 1] = 0;
+	return rename(a, b);
+}
+
+/* the k'th kept folder's name for a login (k 1: K<hash>, then K<hash>2..) */
+static void st_kept_dir(const char *login, int k, char *out, int max)
+{
+	if (k <= 1) snprintf(out, max, "%sK%08lX%s", pm_shared()->store_dir, fnv(login), PM_SEP);
+	else snprintf(out, max, "%sK%08lX%d%s", pm_shared()->store_dir, fnv(login), k, PM_SEP);
+}
+
+#define ST_KEPT_MAX 9
+
+/* a kept folder of this login -> 1 and its name */
+static int st_find_kept(const char *login, char *out, int max)
+{
+	char have[180];
+	int k;
+	for (k = 1; k <= ST_KEPT_MAX; k++) {
+		st_kept_dir(login, k, out, max);
+		st_login_of(out, have, sizeof(have));
+		if (!strcmp(have, login)) return 1;
+	}
+	return 0;
+}
+
+/* what the app shows once: "title TAB line" */
+static void st_note(const char *title, const char *fmt, ...)
+{
+	PmShared *s = pm_shared();
+	va_list ap;
+	int n;
+	snprintf(s->store_note, sizeof(s->store_note), "%s\t", title);
+	n = (int)strlen(s->store_note);
+	va_start(ap, fmt);
+	vsnprintf(s->store_note + n, sizeof(s->store_note) - n, fmt, ap);
+	va_end(ap);
+	s->store_note_seq++;
+	pm_log("store: %s", s->store_note);
+}
+
+static const char *st_plural(int n) { return n == 1 ? "" : "s"; }
+
+/* a login as the user knows it: the user name, without "@host" */
+static const char *st_shown(const char *login)
+{
+	static char buf[44];
+	const char *at = strrchr(login, '@');
+	int n = at ? (int)(at - login) : (int)strlen(login);
+	if (n > 40) n = 40;
+	memcpy(buf, login, n);
+	buf[n] = 0;
+	return buf;
+}
+
+/* another slot holding want's files and not set up for want now -> its
+   number, or -1 */
+static int st_slot_with(int acct, const char *want)
+{
+	PmShared *s = pm_shared();
+	char other[160], login[180], theirs[180];
+	int j;
+	for (j = 0; j < PM_MAX_ACCOUNTS; j++) {
+		if (j == acct) continue;
+		st_acct_dir(j, other, sizeof(other));
+		st_login_of(other, login, sizeof(login));
+		if (strcmp(login, want)) continue;
+		if (s->acct[j].used) {
+			snprintf(theirs, sizeof(theirs), "%s@%s", s->acct[j].user, s->acct[j].imap_host);
+			if (!strcmp(theirs, want)) continue;        /* (the same login in two slots: theirs) */
+		}
+		return j;
+	}
+	return -1;
+}
+
+/* dir and slot j's folder change places -> 0 */
+static int st_swap(int acct, const char *dir, int j)
+{
+	char other[160], tmp[160];
+	st_acct_dir(j, other, sizeof(other));
+	snprintf(tmp, sizeof(tmp), "%sA%d.swp%s", pm_shared()->store_dir, acct, PM_SEP);
+	pm_rmtree(tmp);                                   /* (a swap cut short earlier: only ever empty) */
+	if (st_move_dir(dir, tmp) != 0) return -1;        /* (dir may not be there: then plainly moved) */
+	if (st_move_dir(other, dir) != 0) { st_move_dir(tmp, dir); return -1; }
+	if (st_move_dir(tmp, other) != 0) { st_move_dir(dir, other); st_move_dir(tmp, dir); return -1; }
+	return 0;
+}
+
+/* the slot's folder has nothing of its own (none, or nothing fetched or
+   unsent): want's files from another slot or kept aside, if there are
+   any, take its place -> 1 if they did */
+static int st_adopt(int acct, const char *dir, const char *want)
+{
+	char kept[160], other[160];
+	int j = st_slot_with(acct, want), pending = 0, n;
+	if (j >= 0) {
+		st_acct_dir(j, other, sizeof(other));
+		pm_rmtree(dir);
+		if (st_move_dir(other, dir) != 0) return 0;
+		pm_log("store: A%d has %s's files now (from A%d)", acct, want, j);
+	} else if (st_find_kept(want, kept, sizeof(kept))) {
+		pm_rmtree(dir);
+		if (st_move_dir(kept, dir) != 0) return 0;
+		pm_log("store: A%d: %s's kept files back", acct, want);
+	} else
+		return 0;
+	if ((n = st_unsent(dir, &pending)) > 0)
+		st_note("Unsent mail back", "%d message%s for %s in the Outbox again", n, st_plural(n), st_shown(want));
+	return 1;
+}
+
+/* the slot's folder holds have's files (mail came for that login), the
+   slot is now set up for want -> 0, or -1 and why (nothing changed: the
+   old files must not be taken for the new login's, nor sent from it) */
+static int st_new_login(int acct, const char *dir, const char *have, const char *want, char *why, int whymax)
+{
+	char kept[160], login[180];
+	int j, k, pending = 0, unsent;
+
+	/* 1. the new login's files in another slot that is not set up for it
+	   now (accounts typed in again in another order): the two swap */
+	if ((j = st_slot_with(acct, want)) >= 0 && st_swap(acct, dir, j) == 0) {
+		pm_log("store: A%d has %s's files now, A%d %s's", acct, want, j, have);
+		return 0;
+	}
+
+	/* 2. the old login's files: put aside if anything is unsent, else
+	   removed (what is left is a copy of the server's) */
+	unsent = st_unsent(dir, &pending);
+	if (unsent || pending) {
+		for (k = 1; k <= ST_KEPT_MAX; k++) {
+			st_kept_dir(have, k, kept, sizeof(kept));
+			st_login_of(kept, login, sizeof(login));
+			if (!login[0] && (pm_rmtree(kept), st_move_dir(dir, kept) == 0)) break;
+		}
+		if (k > ST_KEPT_MAX) {
+			pm_log("store: A%d: %s's unsent mail could not be put aside", acct, have);
+			snprintf(why, whymax, "Unsent mail of %.60s is in the way: send or delete it first", have);
+			return -1;
+		}
+		pm_log("store: A%d: %s's files kept as %s (%d unsent, pending %d)", acct, have, kept, unsent, pending);
+		if (unsent)
+			st_note("Unsent mail kept", "%d message%s for %s: set it up again to send",
+				unsent, st_plural(unsent), st_shown(have));
+	} else
+		pm_rmtree(dir);
+
+	/* 3. the new login's files kept aside earlier: back in this slot */
+	st_adopt(acct, dir, want);
+	return 0;
+}
+
+int st_check_account(int acct, char *why, int whymax)
 {
 	char dir[160], path[180], want[180], have[180];
 	PmAccount *a = &pm_shared()->acct[acct];
@@ -76,30 +299,32 @@ int st_check_account(int acct)
 	st_acct_dir(acct, dir, sizeof(dir));
 	snprintf(want, sizeof(want), "%s@%s", a->user, a->imap_host);
 	snprintf(path, sizeof(path), "%saccount.txt", dir);
-	have[0] = 0;
-	if ((f = fopen(path, "r")) != 0) {
-		if (!fgets(have, sizeof(have), f)) have[0] = 0;
-		fclose(f);
-		have[strcspn(have, "\r\n")] = 0;
-	}
+	st_login_of(dir, have, sizeof(have));
 	if (strcmp(have, want)) {
 		char tmp[190];
-		/* another account's mail: start afresh. Only when the file really
-		   names one (user@host): a short or odd line is a damaged file, not
-		   another account, and must not throw the outbox and pending.txt away.
-		   Nor when nothing ever came from that server under the old name (no
-		   folder list, no Inbox): a user name put right after the server
-		   refused it (issue 1) keeps what was written meanwhile */
-		if (strchr(have, '@') && strchr(have, '@') > have && strchr(have, '@')[1] && st_fetched(acct))
-			pm_rmtree(dir);
-		pm_mkdir(pm_shared()->store_dir);
-		pm_mkdir(dir);
-		/* written whole, then put in place: a partial file would read as
-		   "another account" at the next start */
-		snprintf(tmp, sizeof(tmp), "%saccount.new", dir);
-		if ((f = fopen(tmp, "w")) != 0) {
-			fprintf(f, "%s\n", want);
-			if (pm_fclose(f) != 0 || pm_replace(tmp, path) != 0) { remove(tmp); pm_log("store: could not write %s", path); }
+		int pending = 0;
+		/* another account's mail (1.11: swapped, kept aside or brought
+		   back, never simply removed: st_new_login). Only when the file
+		   really names one (user@host): a short or odd line is a damaged
+		   file, not another account. Nor when nothing ever came from that
+		   server under the old name (no folder list, no Inbox): a user name
+		   put right after the server refused it (issue 1) keeps what was
+		   written meanwhile */
+		if (st_is_login(have) && st_fetched(acct)) {
+			if (st_new_login(acct, dir, have, want, why, whymax) != 0) return -1;
+		} else if (!st_fetched(acct) && !st_unsent(dir, &pending) && !pending)
+			st_adopt(acct, dir, want);            /* (a new or empty slot: the login's own files, if any) */
+		st_login_of(dir, have, sizeof(have));
+		if (strcmp(have, want)) {
+			pm_mkdir(pm_shared()->store_dir);
+			pm_mkdir(dir);
+			/* written whole, then put in place: a partial file would read as
+			   "another account" at the next start */
+			snprintf(tmp, sizeof(tmp), "%saccount.new", dir);
+			if ((f = fopen(tmp, "w")) != 0) {
+				fprintf(f, "%s\n", want);
+				if (pm_fclose(f) != 0 || pm_replace(tmp, path) != 0) { remove(tmp); pm_log("store: could not write %s", path); }
+			}
 		}
 		st_changed();
 	}

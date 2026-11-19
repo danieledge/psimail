@@ -560,6 +560,7 @@ private:
 	PmCmd iSent[PM_CMDQ];
 	TUint iDoneSeen;
 	TUint iChangedSeen;
+	TUint iStoreNoteSeen;            // (1.11) the engine's store_note last shown
 	TBuf<128> iStatus;
 	TUint iStatusUntil;              // tick count when it goes
 	TBuf<128> iLastProgress;
@@ -1254,7 +1255,10 @@ public:
 	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }
 	void HelpTopicL(TInt aTopic) { HelpL(aTopic); }   // (1.05) Help at a topic (a picture's Help on pictures)
 	TBool RunSetupL();                             // (1.03) the setup assistant; ETrue if it saved
-	TBool iFirstStart;                             // (1.03) a new user: no settings of any program yet   // (1.00) a command from the view's own controls (the preview's actions)
+	TBool iFirstStart;                             // (1.03) a new user: no settings of any program yet
+	TBool iKeptBack;                               // (1.11) settings put back from the card's copy (psikeep.h) at this start
+	TBool iSoonBusy;                               // (1.11) EmailButtonStartL is running (its dialogs)
+	void KeepOnCard();                             // (1.11) the card's copies of PsiMail.ini and Calendar.ini, without passwords   // (1.00) a command from the view's own controls (the preview's actions)
 	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
 	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7

@@ -187,6 +187,12 @@ typedef struct
 	   pictures for it); "" before the app has said */
 	char machine[32];
 	char screen[16];
+
+	/* (1.11, engine) news of the store the app shows once, in a dialog:
+	   "title TAB line" ("Unsent mail kept", "3 messages of dan@...: set
+	   that account up again to send them"); +1 on store_note_seq each time */
+	volatile unsigned int store_note_seq;
+	char store_note[200];
 	} PmShared;
 
 #endif

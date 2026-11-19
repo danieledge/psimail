@@ -44,9 +44,10 @@ check "folders: OK " "$(run folders)"
 check "sync: OK 5 new" "$(run sync INBOX)"
 [ -f "$STORE/A0/outbox/1.txt" ] && echo "ok: the draft is still in the Outbox" || { echo "FAIL: the store was started afresh"; fail=1; }
 
-echo "== another user name once mail has come: another account, started afresh"
-check "sync: LOGIN_FAILED no such user" "$(PM_USER=someone run sync INBOX)"
-[ ! -f "$STORE/A0/outbox/1.txt" ] && echo "ok: another account's files" || { echo "FAIL: kept another account's files"; fail=1; }
+echo "== another user name once mail has come: another account, its unsent mail kept aside (1.11)"
+check "sync: LOGIN_FAILED no such user" "$(PM_USER=someone run sync INBOX | sed -n 1p)"
+[ ! -f "$STORE/A0/outbox/1.txt" ] && echo "ok: not in the other account's Outbox" || { echo "FAIL: the draft is in another account's Outbox"; fail=1; }
+ls "$STORE"/K*/outbox/1.txt > /dev/null 2>&1 && echo "ok: the draft is kept aside" || { echo "FAIL: the draft is gone"; fail=1; }
 
 [ $fail = 0 ] && echo "logintest: all passed" || echo "logintest: FAILED"
 exit $fail

@@ -252,7 +252,7 @@ int  compose_mime(int acct, const char *outbox_path, const char *mime_path,
 /* ---- local store (store.c) */
 void st_acct_dir(int acct, char *out, int max);
 void st_folder_dir(int acct, const char *folder, char *out, int max);
-int  st_check_account(int acct);                         /* wipes a stale account's files */
+int  st_check_account(int acct, char *why, int whymax);  /* the slot's files are its login's (1.11: another login's kept aside, never lost); -1 and why: not */
 typedef struct
 	{
 	unsigned long uidvalidity;
