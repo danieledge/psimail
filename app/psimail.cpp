@@ -1487,7 +1487,10 @@ void CPmView::OpenCurrentL()
 		}
 	if (iMode == EOutbox)
 		{
-		// edited in the app UI (compose dialog)
+		// edited in the app UI (compose dialog). Nothing chosen (an empty
+		// Outbox): nothing to open, as EPmCmdOpen would only come back here
+		if (!CurrentRow())
+			return;
 		iEikonEnv->EikAppUi()->HandleCommandL(EPmCmdOpen);
 		return;
 		}
