@@ -139,7 +139,8 @@ static int request(const char *name, const char *query, long rfrom, long rlen, c
 			if (n == 0 && !H.status) continue;      /* modem CONNECT leftovers */
 			if (n == 0) {
 				if (H.status == 200 || H.status == 206) return 0;
-				snprintf(why, whymax, "The server said %d for %.40s", H.status, name);
+				if (H.status == 404) snprintf(why, whymax, "%.40s is not on the server", name);
+				else snprintf(why, whymax, "The server said %d for %.40s", H.status, name);   /* (an HTTP status, not an EPOC error) */
 				pmn_close(1);
 				g_conn = -1;
 				return -1;
@@ -264,9 +265,13 @@ static int verify_file(const char *file, const char *ver, const unsigned char si
 }
 
 /* src: "host:port" or "github"; save: where PsiMail.sis goes */
-int pm_update(const char *src, const char *save, char *why, int whymax)
+int pm_update(const char *src, const char *final, char *why, int whymax)
 {
 	PmShared *s = pm_shared();
+	/* (1.12, review R86) the download goes to <name>.part and takes its
+	   name only once its signature checks out: a file under the final name
+	   is always a checked one. psimail.exe sweeps a .part a reset left. */
+	char save[80];
 	char remote[24], sigtxt[300], sigver[24], q[48];
 	unsigned char sig[64];
 	unsigned char *buf = 0;
@@ -277,6 +282,7 @@ int pm_update(const char *src, const char *save, char *why, int whymax)
 	s->update_ready = 0;
 	s->update_version[0] = 0;
 	why[0] = 0;
+	snprintf(save, sizeof(save), "%.70s.part", final);
 	g_conn = -1;
 	if (route(src, why, whymax)) return PM_RES_FAILED;
 	pm_progress("Looking for a new PsiMail (%s)...", R.local ? R.host : "GitHub");
@@ -376,11 +382,17 @@ int pm_update(const char *src, const char *save, char *why, int whymax)
 	pm_progress("Checking the release signature...");
 	if (verify_file(save, remote, sig) != 0) {
 		remove(save);
-		snprintf(why, whymax, "SIGNATURE CHECK FAILED - the download was deleted");
+		snprintf(why, whymax, "The release signature does not match - the download was deleted");
+		return PM_RES_FAILED;
+	}
+	remove(final);
+	if (rename(save, final) != 0) {
+		remove(save);
+		snprintf(why, whymax, "The download could not be put in place - the disk may be full");
 		return PM_RES_FAILED;
 	}
 	s->update_ready = 1;
-	pm_copy(s->last_file, save, sizeof(s->last_file));
+	pm_copy(s->last_file, final, sizeof(s->last_file));
 	snprintf(why, whymax, "PsiMail %s is downloaded and its signature checks out", remote);
 	return PM_RES_OK;
 

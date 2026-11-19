@@ -19,6 +19,7 @@
 #include <psimail.rsg>
 #include "psimail.hrh"
 #include "pmcontacts.h"
+void PmErrMsg(TDes& aMsg, const TDesC& aWhat, TInt aErr);   // (1.12, pmstore.cpp: pmapp.h is not for this file)
 
 const TInt KPmMaxName = 60;
 const TInt KPmMaxAddr = 90;
@@ -181,7 +182,7 @@ TBool CPmContacts::Ready()
 		if (err == KErrInUse || err == KErrLocked)
 			t = _L("The Contacts file is in use - close Contacts and try again");
 		else
-			t.Format(_L("The Contacts file can't be read (%d)"), err);
+			PmErrMsg(t, _L("The Contacts file can't be read"), err);
 		env->InfoMsg(t);
 		return EFalse;
 		}

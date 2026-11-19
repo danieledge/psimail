@@ -235,7 +235,7 @@ void CPmView::SaveAsWordL()
 		if (err == KErrDiskFull) t = _L("No room left on the disk for the Word file");
 		else if (err == KErrInUse || err == KErrAccessDenied) t = _L("The Word file is in use or read-only");
 		else if (err == KErrNotSupported) t = _L("No printer drivers - Word files need one for their page setup");
-		else t.Format(_L("The Word file could not be written (%d)"), err);
+		else PmErrMsg(t, _L("The Word file could not be written"), err);
 		Toast(t);
 		return;
 		}

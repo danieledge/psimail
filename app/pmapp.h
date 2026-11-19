@@ -170,6 +170,9 @@ struct TPmRow
 	};
 
 // a message being written
+// (1.12, review R105) "<what> - <why>" in words, the number to Store.log (pmstore.cpp)
+void PmErrMsg(TDes& aMsg, const TDesC& aWhat, TInt aErr);
+
 class CPmDraft : public CBase
 	{
 public:
@@ -190,6 +193,7 @@ public:
 	TInt iQuoteLen;            //   "> " lines) is in iBody, to show folded; 0 none
 	HBufC* iQuote;             // the quote while it is folded in the editor (compose)
 	TBuf<80> iFoldLine;        // the line that stands in for it there
+	TInt iAutoNo;              // (1.12) the Outbox file the compose window's minute copy went to, or 0
 	};
 
 class CPmView;
@@ -324,7 +328,8 @@ public:
 	void ViewAsWebPageL();
 	void OpenWebL(const TDesC& aUrl);
 	void DraftFromOutboxL(CPmDraft& aDraft);
-	void SaveDraftL(CPmDraft& aDraft, TBool aSend);
+	void SaveDraftL(CPmDraft& aDraft, TBool aSend, TBool aQuiet = EFalse);   // (1.12) aQuiet: the minute copy, nothing said
+	void DeleteOutboxFile(TInt aNo);          // (1.12) one Outbox file, by number, without asking
 	void DeleteOutboxL();
 	TInt OutboxCount();
 	void Toast(const TDesC& aText);
@@ -737,6 +742,7 @@ public:
 	TBool WebPicturesOn() const;             // this message's web pictures are shown (asked for, or Always)
 	void SendLog();                          // Tools > Send log to server (PM_CMD_PUTLOG, 0.86)
 	void ProxyToShared();                    // (0.87) the shared proxy (PsiLink.ini) into the chunk
+	void LinkToShared();                     // (1.12) PsiLink.ini into the chunk (review R60)
 	TBool ProxyUsable();                     // ... and is it on, with a host?
 	TBool WebPicturesViaProxy() const;       // fetch them through the "psiproxy" HTTP proxy (iSpare[0] bit 2)
 	TBool LogOn() const { return (iSettings->iSpare[0] & KPmLogBit) != 0; }   // Keep a log (0.93)
@@ -1086,7 +1092,10 @@ class CPmComposeDialog : public CEikDialog
 	{
 public:
 	CPmComposeDialog(CPmDraft& aDraft, const TDesC& aTitle) : iDraft(aDraft), iTitle(aTitle) {}
+	~CPmComposeDialog();
 private:
+	static TInt AutoSaveTick(TAny* aSelf);
+	void AutoSave();                         // (1.12) a changed message copied to the Outbox each minute
 	void SetSizeAndPositionL(const TSize& aSize);   // never larger than the screen
 	void PreLayoutDynInitL();
 	void PostLayoutDynInitL();
@@ -1103,6 +1112,8 @@ private:
 	TPtrC iTitle;
 	TInt iRuns;                  // formatting runs in the text (Collect)
 	TUint iSum0;                 // the message as it was opened (Close asks only if it changed)
+	TUint iSumKept;              // (1.12) the message as the last minute copy had it
+	CPeriodic* iAuto;            // (1.12) the minute copy's timer
 	};
 
 class CPmAccountDialog : public CEikDialog

@@ -472,7 +472,7 @@ static void AgendaTrouble(CPmView& aView, TInt aErr)
 	TBuf<80> t;
 	if (aErr == KErrNotFound) t = _L("No Agenda file where Calendar settings say");
 	else if (aErr == KErrInUse || aErr == KErrLocked) t = _L("The Agenda file is in use - try again");
-	else t.Format(_L("The Agenda could not be changed (%d)"), aErr);
+	else PmErrMsg(t, _L("The Agenda could not be changed"), aErr);
 	aView.Toast(t);
 	}
 
@@ -590,7 +590,7 @@ void CPmView::AnswerInviteL(TInt aChoice)
 		if (err != KErrNone)
 			{
 			TBuf<80> t;
-			t.Format(_L("The reply could not be written (%d)"), err);
+			PmErrMsg(t, _L("The reply could not be written"), err);
 			Toast(t);
 			reply = EFalse;
 			}

@@ -30,6 +30,7 @@
 
 #include <eikenv.h>
 #include "pmapp.h"
+#include "psierr.h"           // (1.12) Coda's words for an error (review R105)
 
 _LIT(KOldStore, "?:\\PsiMail");
 _LIT(KNewStore, "?:\\System\\Data\\PsiMail");
@@ -90,6 +91,21 @@ static void StoreLog(RFs& aFs, const TDesC& aText, TBool aOn)
 		f.Write(line);
 		}
 	f.Close();
+	}
+
+// (1.12, review R105) a failure in words for a message: "<what> - <why>",
+// the reason from Coda's one table (psierr.h), never a bare number. The
+// number goes to Store.log (only with Keep a log ticked), for a report.
+void PmErrMsg(TDes& aMsg, const TDesC& aWhat, TInt aErr)
+	{
+	PsiErrMsg(aMsg, aWhat, aErr);
+	CPmAppUi* ui = (CPmAppUi*)CEikonEnv::Static()->EikAppUi();
+	if (!ui || !ui->View() || !ui->View()->LogOn())
+		return;
+	TBuf<120> log;
+	log.Copy(aWhat.Left(Min(aWhat.Length(), 100)));
+	log.AppendFormat(_L(" (error %d)"), aErr);
+	StoreLog(CEikonEnv::Static()->FsSession(), log, ETrue);
 	}
 
 // The store's folder on a disk (ending with '\'), moving an old one there

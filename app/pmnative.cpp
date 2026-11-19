@@ -9,6 +9,7 @@
 #include "pmicons.h"
 #include "pgsetup.h"
 #include "pmpict.h"
+#include "psisafe.h"           // (1.12) the hidden-calendars list written whole (review R104)
 #include <eiktxlbx.h>
 #include <eiktxlbm.h>
 #include <eikclb.h>
@@ -3649,15 +3650,11 @@ void CPmView::ToggleCalendarL(TInt aIndex)
 	TBuf<120> path;
 	StoreDir(path);
 	path.Append(_L("cal\\hidden.txt"));
-	RFile f;
 	RFs& fs = iCoeEnv->FsSession();
 	if (!out.Length())
 		fs.Delete(path);
-	else if (f.Replace(fs, path, EFileWrite) == KErrNone)
-		{
-		f.Write(out);
-		f.Close();
-		}
+	else
+		PsiSafeWrite(fs, path, out);         // (1.12, review R104: the old list stays if it fails)
 	LoadCalendarL();
 	DrawNow();
 	}

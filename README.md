@@ -399,7 +399,8 @@ PsiMail on the netBook (1.04: the inbox, the pictures in colour and the calendar
 * Addresses from the Psion's Contacts: type the start of a name and press
   Tab, or the Contacts button (Ctrl+L) to pick several. Edit > Add to
   Contacts > Sender adds the sender of a message.
-* Drafts are kept in the Outbox to finish later.
+* Drafts are kept in the Outbox to finish later. While you write, a copy goes
+  to the Outbox each minute, so a reset loses at most a minute of it.
 
 **New mail and the Email icon**
 

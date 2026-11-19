@@ -18,6 +18,7 @@
 #include <eikedwin.h>
 #include <eikenv.h>
 #include <f32file.h>
+#include "psisafe.h"           // (1.12) settings written whole (review R104)
 #include "pmapp.h"
 
 static void AcctFile(CPmView& aView, TInt aAcct, const TDesC& aName, TDes& aPath)
@@ -106,11 +107,9 @@ void CPmRulesDialog::SaveL()
 		fs.Delete(path);
 		return;
 		}
-	RFile f;
-	User::LeaveIfError(f.Replace(fs, path, EFileWrite));
-	TInt err = f.Write(out);
-	f.Close();
-	User::LeaveIfError(err);
+	// (1.12, review R104) written beside itself and put in place whole: a
+	// full disk or a reset leaves the old rules, never half of them
+	User::LeaveIfError(PsiSafeWrite(fs, path, out));
 	}
 
 CPmRulesDialog::~CPmRulesDialog()
@@ -273,13 +272,9 @@ TBool CPmSigDialog::OkToExitL(TInt /*aButtonId*/)
 		fs.Delete(path);
 	else
 		{
-		RFile f;
-		User::LeaveIfError(f.Replace(fs, path, EFileWrite));
 		TBuf8<200> r8;
 		r8.Copy(reply);
-		TInt err = f.Write(r8);
-		f.Close();
-		User::LeaveIfError(err);
+		User::LeaveIfError(PsiSafeWrite(fs, path, r8));   // (1.12, R104: never a short file)
 		}
 	if (((CEikChoiceList*)Control(EPmDlgSigWhere))->CurrentItem() == 1)
 		iSettings.iSpare[0] |= KPmSigBelowBit;

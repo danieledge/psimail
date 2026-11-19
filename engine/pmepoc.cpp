@@ -463,6 +463,102 @@ extern "C" int housekeeping_c()
 	return Housekeeping();
 	}
 
+// (1.12, review R86) the temporary files a reset can leave: a message or
+// list half written (*.new, *.raw), an Outbox draft half written (*.tmp),
+// a download not yet checked (*.part). Each is written beside the real
+// file and put in its place in one step, so a leftover is never wanted.
+// The engine marks the store while it runs ("engine.run"); finding the
+// mark at the start means the last one ended without its clean-up, and
+// only then is the store searched (it may hold thousands of files).
+_LIT(KRunMark, "engine.run");
+
+static TBool IsTempName(const TDesC& aName)
+	{
+	TParsePtrC p(aName);
+	TPtrC ext = p.Ext();
+	return ext.CompareF(_L(".new")) == 0 || ext.CompareF(_L(".raw")) == 0
+		|| ext.CompareF(_L(".tmp")) == 0 || ext.CompareF(_L(".part")) == 0;
+	}
+
+static void SweepTemps(PmShared* aPm)
+	{
+	if (!gFs && (Fs(), !gFs))
+		return;
+	RFs& fs = Fs();
+	// the update's download, on either disk: used at once or never (a
+	// checked one left behind only takes room; the installer, if it still
+	// has it open, keeps it: Delete fails)
+	static const char* const KUpd[4] = { "C:\\PsiMail-update.sis.part", "D:\\PsiMail-update.sis.part",
+		"C:\\PsiMail-update.sis", "D:\\PsiMail-update.sis" };
+	for (TInt u = 0; u < 4; u++)
+		{
+		TFileName n;
+		ToName(n, KUpd[u]);
+		fs.Delete(n);
+		}
+	TFileName root;
+	ToName(root, aPm->store_dir);
+	if (root.Length() < 3 || root[root.Length() - 1] != '\\')
+		return;
+	TFileName mark(root);
+	mark.Append(KRunMark);
+	TEntry e;
+	TBool unclean = fs.Entry(mark, e) == KErrNone;
+	if (unclean)
+		{
+		TInt gone = 0;
+		CDirScan* scan = NULL;
+		TRAPD(err, scan = CDirScan::NewL(fs));
+		if (err == KErrNone && scan)
+			{
+			TRAP(err, scan->SetScanDataL(root, KEntryAttNormal, ESortNone));
+			CDir* dir = NULL;
+			for (TInt guard = 0; err == KErrNone && guard < 4000; guard++)
+				{
+				TRAP(err, scan->NextL(dir));
+				if (err != KErrNone || !dir)
+					break;
+				for (TInt i = 0; i < dir->Count(); i++)
+					{
+					const TEntry& f = (*dir)[i];
+					if (f.IsDir() || !IsTempName(f.iName))
+						continue;
+					TFileName n(scan->FullPath());
+					if (n.Length() + f.iName.Length() <= n.MaxLength())
+						{
+						n.Append(f.iName);
+						if (fs.Delete(n) == KErrNone)
+							gone++;
+						}
+					}
+				delete dir;
+				dir = NULL;
+				}
+			delete scan;
+			}
+		pm_log("the last engine did not end cleanly: %d temporary files cleared", gone);
+		}
+	// the mark for this run (an empty file; a full disk only means no mark)
+	RFile f;
+	if (unclean || f.Replace(fs, mark, EFileWrite) == KErrNone)
+		{
+		if (!unclean)
+			f.Close();
+		}
+	}
+
+static void UnmarkRun(PmShared* aPm)
+	{
+	if (!gFs)
+		return;
+	TFileName mark;
+	ToName(mark, aPm->store_dir);
+	if (mark.Length() < 3)
+		return;
+	mark.Append(KRunMark);
+	gFs->Delete(mark);
+	}
+
 int main(int, char**)
 	{
 	CTrapCleanup* cleanup = CTrapCleanup::New();
@@ -479,8 +575,10 @@ int main(int, char**)
 	}
 	if (gPm->app_note[0])
 		pm_log("the last mail engine ended: %s", gPm->app_note);
+	SweepTemps(gPm);
 	pm_loop(housekeeping_c);
 	pm_log("psimail.exe ends (%s)", gPm->quitting ? "PsiMail asked" : "PsiMail.app has gone or said quit");
+	UnmarkRun(gPm);
 	if (gLog)
 		fclose(gLog);
 	if (gFs)

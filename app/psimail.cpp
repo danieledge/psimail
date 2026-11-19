@@ -117,7 +117,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.11");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.12");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -484,6 +484,27 @@ TBool CPmView::ProxyUsable()
 	return iShared->use_proxy != 0;
 	}
 
+// The shared connection settings (PsiLink.ini: the route, the speed, flow
+// control, the PPP start, the proxy) into the chunk, read again because
+// another program may have changed them. (1.12, review R60) also each time
+// PsiMail comes to the front: the engine takes the route up at its next
+// dial (psiglue's pg_dial, with no link open), so a route changed in PsiWeb,
+// PsiTerm or Connection settings is used without restarting PsiMail.
+void CPmView::LinkToShared()
+	{
+	PmShared* s = iShared;
+	if (!s)
+		return;
+	TBuf<40> ppp;
+	UseSharedLink(iCoeEnv->FsSession(), *iSettings, &ppp);
+	s->net.baud_index = iSettings->iBaudIndex;
+	s->net.rtscts = iSettings->iRtsCts;
+	s->net.net_mode = iSettings->iNetMode;
+	s->net.modem_tls = (iSettings->iSpare[0] & KPmModemTlsBit) ? 1 : 0;
+	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), ppp);
+	ProxyToShared();
+	}
+
 void CPmView::CopySettingsToShared()
 	{
 	PmShared* s = iShared;
@@ -508,18 +529,11 @@ void CPmView::CopySettingsToShared()
 		scr.Format(_L("%dx%dx256"), sz.iWidth, sz.iHeight);
 	CopyToC(s->screen, sizeof(s->screen), scr);
 	}
-	TBuf<40> ppp;
-	UseSharedLink(iCoeEnv->FsSession(), *iSettings, &ppp);   // may have changed in another app
-	s->net.baud_index = iSettings->iBaudIndex;
-	s->net.rtscts = iSettings->iRtsCts;
-	s->net.net_mode = iSettings->iNetMode;
-	s->net.modem_tls = (iSettings->iSpare[0] & KPmModemTlsBit) ? 1 : 0;
+	LinkToShared();
 	s->net.log_on = LogOn() || PmDiagOn() ? 1 : 0;   // (0.93) Keep a log: else the engine writes no psimail.log; or Coda's debug mode
-	CopyToC(s->net.ppp_start, sizeof(s->net.ppp_start), ppp);
 	s->offline = iSettings->iOffline;
 	s->prefetch = PrefetchCount(*iSettings);
 	s->web_pic_proxy = (iSettings->iSpare[0] & KPmWebProxyBit) ? 1 : 0;
-	ProxyToShared();
 	CopyToC(s->net.version, sizeof(s->net.version), KVersion);
 	Mem::Copy(s->acct, iSettings->iAccounts, sizeof(s->acct));
 	Mem::Copy(&s->cal, &iCal->iCal, sizeof(s->cal));
@@ -655,7 +669,7 @@ void CPmView::StartEngineL()
 	if (r != KErrNone)
 		{
 		TBuf<80> e;
-		e.Format(_L("psimail.exe did not start (%d)"), r);
+		PmErrMsg(e, _L("psimail.exe did not start"), r);
 		iEikonEnv->InfoWinL(_L("Could not start the mail engine"), e);
 		return;
 		}
@@ -750,9 +764,9 @@ void CPmView::EngineEnded()
 	if (type == EExitPanic)
 		PsiLinkTimersBack();             // (0.68) the crash skipped the engine's own clean-up
 	if (type == EExitPanic)
-		why.Format(_L("The mail engine stopped (%S %d) - use Tools > Restart mail engine"), &cat, reason);
+		why = _L("The mail engine stopped - use Tools > Restart mail engine");   // (1.12: the panic is in the log, iEngineNote)
 	else
-		why.Format(_L("The mail engine closed (%d) - use Tools > Restart mail engine"), reason);
+		why = _L("The mail engine closed - use Tools > Restart mail engine");
 	SetStatus(why);
 	// (0.75) the reader stops waiting, and the engine starts again (pmrecover.cpp)
 	TBuf<60> note;
@@ -1921,7 +1935,7 @@ void CPmView::LaunchFileL(const TDesC& aPath)
 	else
 		{
 		TBuf<80> t;
-		t.Format(_L("The file can't be opened (%d)"), r);
+		PmErrMsg(t, _L("The file can't be opened"), r);
 		iEikonEnv->InfoWinL(t, Clip(aPath, 120));
 		}
 	}
@@ -2093,7 +2107,7 @@ void CPmView::DraftFromOutboxL(CPmDraft& aDraft)
 	}
 
 // writes a draft to the outbox; aSend = not a draft: the engine will send it
-void CPmView::SaveDraftL(CPmDraft& aDraft, TBool aSend)
+void CPmView::SaveDraftL(CPmDraft& aDraft, TBool aSend, TBool aQuiet)
 	{
 	RFs& fs = iCoeEnv->FsSession();
 	TBuf<120> dir;
@@ -2219,7 +2233,7 @@ void CPmView::SaveDraftL(CPmDraft& aDraft, TBool aSend)
 			Working(_L("Sending..."));
 			}
 		}
-	else
+	else if (!aQuiet)
 		Toast(_L("Saved in the Outbox"));
 	if (iMode == EOutbox)
 		LoadOutboxL();
@@ -2238,6 +2252,13 @@ void CPmView::DeleteOutboxL()
 	subj.Append('"');
 	if (!iEikonEnv->QueryWinL(subj, _L("Delete this message?")))
 		return;
+	DeleteOutboxFile(no);
+	}
+
+// one Outbox file and its markers, by number (either width of number)
+void CPmView::DeleteOutboxFile(TInt aNo)
+	{
+	TInt no = aNo;
 	TBuf<120> dir;
 	OutboxDir(dir);
 	RFs& fs = iCoeEnv->FsSession();
@@ -2254,7 +2275,8 @@ void CPmView::DeleteOutboxL()
 	// (and the "may have been sent" marker, engine/smtp.c)
 	p = dir; p.AppendFormat(_L("%04d.snt"), no); fs.Delete(p);
 	p = dir; p.AppendNum(no); p.Append(_L(".snt")); fs.Delete(p);
-	LoadOutboxL();
+	if (iMode == EOutbox)
+		LoadOutboxL();
 	Render();
 	}
 
@@ -3335,6 +3357,47 @@ void CPmComposeDialog::PostLayoutDynInitL()
 	// discarding it only if that has changed
 	Collect();
 	iSum0 = StateSum();
+	iSumKept = iSum0;
+	// (1.12, review R86) what is written is copied to the Outbox as a draft
+	// once a minute while it changes, so a reset or a flat battery loses at
+	// most a minute of it. The copy is a draft of its own (never sent), and
+	// goes when the window closes; after a reset it is in the Outbox.
+	iAuto = CPeriodic::New(CActive::EPriorityLow);
+	if (iAuto)
+		iAuto->Start(60000000, 60000000, TCallBack(AutoSaveTick, this));
+	}
+
+CPmComposeDialog::~CPmComposeDialog()
+	{
+	delete iAuto;                            // (CPeriodic cancels itself)
+	}
+
+TInt CPmComposeDialog::AutoSaveTick(TAny* aSelf)
+	{
+	((CPmComposeDialog*)aSelf)->AutoSave();
+	return 0;
+	}
+
+void CPmComposeDialog::AutoSave()
+	{
+	CPmAppUi* ui = (CPmAppUi*)iEikonEnv->EikAppUi();
+	if (!ui || !ui->View() || ui->Exiting())
+		return;
+	Collect();
+	TUint sum = StateSum();
+	if (sum == iSum0 || sum == iSumKept)
+		return;                              // nothing new written
+	// the minute copy has its own Outbox number: the message it was opened
+	// from (a draft) stays as it was until Save
+	TInt own = iDraft.iFileNo;
+	iDraft.iFileNo = iDraft.iAutoNo;
+	TRAPD(err, ui->View()->SaveDraftL(iDraft, EFalse, ETrue));
+	if (err == KErrNone)
+		{
+		iDraft.iAutoNo = iDraft.iFileNo;
+		iSumKept = sum;
+		}
+	iDraft.iFileNo = own;
 	}
 
 // a checksum of the message as written (the addresses, the subject, the
@@ -4191,6 +4254,8 @@ void CPmAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 	TInt type = aEvent.Type();
 	if (type == EEventFocusGained || type == EEventFocusLost)
 		iForeground = type == EEventFocusGained;
+	if (type == EEventFocusGained && iView && !iExiting)
+		iView->LinkToShared();               // (1.12, review R60) a route changed elsewhere
 	if (type == EEventFocusGained || type == EEventFocusLost || type == EEventKey || type == EEventPointer)
 		UpdateReading();
 	}
@@ -4586,7 +4651,15 @@ void CPmAppUi::SaveSettings()
 	for (TInt i2 = 0; i2 < PM_MAX_ACCOUNTS; i2++)
 		Scramble(iSettings.iAccounts[i2]);
 	if (r != KErrNone)
-		iEikonEnv->InfoMsg(r == KErrDiskFull ? _L("Settings not saved - no room left on C:") : _L("Settings not saved - C: could not be written"));
+		{
+		// (1.12, review R114/R105) the Internal disk, as the style guide names C:
+		TBuf<80> m;
+		if (r == KErrDiskFull)
+			m = _L("Settings not saved - the Internal disk is full");
+		else
+			PmErrMsg(m, _L("Settings not saved"), r);
+		iEikonEnv->InfoMsg(m);
+		}
 	else
 		KeepOnCard();
 	}
@@ -4679,7 +4752,14 @@ void CPmAppUi::SaveCalSettings()
 	TInt r = SafeWriteFile(fs, KCalIniFile, parts, 3, EFalse);   // (temp + Replace: never a short file)
 	ScrambleCal(iCalSettings.iCal);
 	if (r != KErrNone)
-		iEikonEnv->InfoMsg(_L("Calendar settings not saved - C: could not be written"));
+		{
+		TBuf<80> m;
+		if (r == KErrDiskFull)
+			m = _L("Calendar settings not saved - the Internal disk is full");
+		else
+			PmErrMsg(m, _L("Calendar settings not saved"), r);
+		iEikonEnv->InfoMsg(m);
+		}
 	else
 		KeepOnCard();
 	}
@@ -4935,9 +5015,14 @@ void CPmAppUi::ComposeL(CPmDraft* aDraft, const TDesC& aTitle)
 		else if (err == KErrNotReady || err == KErrPathNotFound)
 			why = _L("The disk is not present - is the card in?");
 		else
-			why.Format(_L("Not saved (%d) - try again"), err);
+			PmErrMsg(why, _L("Not saved"), err);
+		why.Append(_L(" - try again"));     // (room: "Not saved - " and the longest reason fit 100)
 		iEikonEnv->InfoWinL(_L("Message not saved"), why);
 		}
+	// (1.12) the minute copy is not wanted once the message is sent, saved
+	// or discarded: only a reset leaves it
+	if (aDraft->iAutoNo && aDraft->iAutoNo != aDraft->iFileNo)
+		iView->DeleteOutboxFile(aDraft->iAutoNo);
 	CleanupStack::PopAndDestroy();          // the draft
 	}
 
@@ -5284,7 +5369,10 @@ void CPmView::StartInstallerL(const TDesC& aFile)
 		return;
 		}
 	TBuf<KMaxFileName + 80> m;               // (aFile is a TFileName: Format panics rather than clips)
-	m.Format(_L("Could not start the installer (%d) - open %S from the System screen"), err, &aFile);
+	PmErrMsg(m, _L("Could not start the installer"), err);   // (1.12: in words, review R105)
+	m.Append(_L(" - open "));
+	m.Append(aFile.Left(Min(aFile.Length(), m.MaxLength() - m.Length() - 23)));
+	m.Append(_L(" from the System screen"));
 	iEikonEnv->InfoWinL(_L("Update downloaded"), m);
 	StartEngineL();
 	}

@@ -125,7 +125,7 @@ void CPmView::NewEventL()
 		{
 		TBuf<80> t;
 		if (err == KErrNotFound) t = _L("No Agenda file where Calendar settings say");
-		else t.Format(_L("Could not add it to the Agenda (%d)"), err);
+		else PmErrMsg(t, _L("Could not add it to the Agenda"), err);
 		Toast(t);
 		return;
 		}
