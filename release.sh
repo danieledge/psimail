@@ -24,6 +24,24 @@ CUR=$(git -C "$TOP/core" rev-parse HEAD 2>/dev/null)
 [ -n "$REC" ] && [ "$REC" = "$CUR" ] || { echo "core is at ${CUR:-?}, this checkout records ${REC:-?}: commit the submodule pointer, rebuild, then sign"; exit 1; }
 [ -z "$(git -C "$TOP/core" status --porcelain --untracked-files=no)" ] || { echo "core has changes not committed: commit them in psion-core first"; exit 1; }
 grep -q "TESTSEED" "$TOP/app/psimail.cpp" && { echo "app/psimail.cpp still has the TESTSEED block: core/tools/emu/seed.py off, then rebuild"; exit 1; }
+# (1.13) the built .sis itself, not only the source: a seeded test build
+# (core/tools/emu/seed.py) leaves its marker and the folders it copies in
+# PsiMail.app, and a .sis made from an old seeded object would pass the grep
+# above. An EPOC R5 .sis holds its files as they are, so a byte scan finds them.
+python3 - "$SIS" <<'PY' || exit 1
+import sys
+data = open(sys.argv[1], 'rb').read()
+found = [w for w in (b'CODA-TEST-SEED', b'TESTSEED', b'D:\\SEED\\', b'D:\\SEEDA0\\', b'imap.example.com', b'SyncSeed') if w in data]
+if found:
+	print("dist/PsiMail.sis is a seeded test build (%s): seed.py off, delete the build's objects, rebuild" % ', '.join(w.decode() for w in found))
+	sys.exit(1)
+PY
+# and Coda's guard for its public card, when a Coda checkout is beside this
+# one ($CODA_NETBOOK): what must never be in a public build, seeds included
+GUARD=${CODA_NETBOOK:-$TOP/../psion-netbook}/tools/publicguard.mts
+if [ -f "$GUARD" ]; then
+	node --experimental-strip-types "$GUARD" --no-webpass-check "$SIS" || { echo "publicguard refused dist/PsiMail.sis"; exit 1; }
+fi
 python3 "$CORE/tools/release/sign.py" --product PsiMail "$SIS" "$VERSION"
 echo "$VERSION" > "$TOP/dist/PsiMail-version.txt"
 echo "signed: dist/PsiMail.sis, dist/PsiMail.sis.sig, dist/PsiMail-version.txt ($VERSION)"
