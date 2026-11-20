@@ -568,7 +568,7 @@ void CPmView::CopySettingsToShared()
 	CopyToC(s->attach_dir, sizeof(s->attach_dir), att);
 	TBuf<100> dir;
 	StoreDir(dir);
-	iCoeEnv->FsSession().MkDirAll(dir);
+	PsiMkDirsClean(iCoeEnv->FsSession(), dir);   // (1.13) on the card made clean (psion-core's psizero.h)
 	}
 
 // psimail.exe, named like this one, that is not ours: the last PsiMail's

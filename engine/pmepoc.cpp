@@ -7,6 +7,7 @@
 #include <e32base.h>
 #include <e32hal.h>
 #include <f32file.h>
+#include "psizero.h"                      // (1.13) the store's folders on a card made clean
 
 extern "C" {
 #include "psimail.h"
@@ -94,7 +95,7 @@ extern "C" int pm_mkdir(const char* aPath)
 	ToName(n, aPath);
 	if (n.Length() && n[n.Length() - 1] != '\\')
 		n.Append('\\');
-	TInt r = Fs().MkDirAll(n);
+	TInt r = PsiMkDirsClean(Fs(), n);       // (1.13) on a card, made clean (psion-core's psizero.h)
 	return (r == KErrNone || r == KErrAlreadyExists) ? 0 : -1;
 	}
 
