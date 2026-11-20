@@ -5,7 +5,9 @@
 #    random.da~ beside it;
 #  - each later run's seed is new (made from the pool, which took in the
 #    last one);
-#  - a store that cannot be written does not stop the connection.
+#  - a store that cannot be written does not stop the connection;
+#  - with the clock not set (PM_NOW in 2001) a refused certificate says
+#    "set the date first", not "untrusted" (no Trust this server's key?).
 set -u
 export LC_ALL=C
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -46,6 +48,14 @@ run "$R"
 chmod u+w "$R"
 grep -qi "certificate\|trust\|key" "$R.out" && echo "ok: TLS with a read-only store" || { echo "FAIL: read-only store: $(tail -2 "$R.out")"; fail=1; }
 check "" "$(ls "$R" | grep random)"
+
+# the clock not set
+C=$T/clk
+mkdir -p "$C"
+PM_NOW=1000000000 run "$C"
+if grep -q "clock is not set - set the date first" "$C.out" && ! grep -q "untrusted" "$C.out"; then echo "ok: clock not set: set the date first"
+else echo "FAIL: clock not set: $(grep -v '^\[' "$C.out" | tail -2)"; fail=1; fi
+grep -q "untrusted" "$S.out" && echo "ok: clock set: untrusted, as before" || { echo "FAIL: clock set: $(tail -2 "$S.out")"; fail=1; }
 
 [ $fail = 0 ] && echo "randomtest: all passed" || echo "randomtest: FAILED"
 exit $fail

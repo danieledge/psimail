@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include "pm.h"
 #include "cal.h"
+#include "calmerge.h"      /* cal_clock_ok, CAL_BUILD_YEAR */
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -646,6 +647,16 @@ void pm_do_command(PmCmd *c)
 	s->progress[0] = 0;
 	r = run(c, why, sizeof(why));
 	if (pm_cancelled() && r != PM_RES_OK) { r = PM_RES_CANCELLED; if (!why[0]) pm_copy(why, "Stopped", sizeof(why)); }
+	/* (1.13) with the clock not set (a year before this was built: the
+	   backup cell flat) no certificate is trusted (core's certcheck.c):
+	   the date is what needs setting, so that is said, and "Trust this
+	   server's key?" is not offered for a refusal that only the date made
+	   (mail, sending and the calendar alike) */
+	if (r == PM_RES_UNTRUSTED && !cal_clock_ok(pm_time(), CAL_BUILD_YEAR)) {
+		pm_log("cmd %d: %s refused with the clock not set", c->op, s->trust_host);
+		pm_copy(why, "The Psion's clock is not set - set the date first", sizeof(why));
+		r = PM_RES_FAILED;
+	}
 	pm_log("cmd %d acct %d %s uid %u -> %d %s (%lu ms, heap %u KB)", c->op, c->acct, c->folder, c->uid, r, why,
 		pm_ms() - t0, s->heap_used / 1024);
 	s->last_op = c->op;
