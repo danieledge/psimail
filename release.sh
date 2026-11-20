@@ -14,6 +14,15 @@ TOP=$(cd "$(dirname "$0")" && pwd)
 CORE=${PSION_CORE:-$TOP/core}
 SIS=$TOP/dist/PsiMail.sis
 [ -f "$SIS" ] || { echo "no $SIS: build first (bash build.sh)"; exit 1; }
+# (1.13, review CR-18) the published source must be what the .sis was built
+# from: core is the submodule itself (not a link to another checkout, not
+# $PSION_CORE), clean, and at the commit this checkout records for it
+[ -z "${PSION_CORE:-}" ] || { echo "PSION_CORE is set: build and sign with the core/ submodule"; exit 1; }
+[ -L "$TOP/core" ] && { echo "core is a link to $(readlink "$TOP/core"): check out the submodule (git submodule update --init) and rebuild"; exit 1; }
+REC=$(git -C "$TOP" ls-tree HEAD core | awk '{print $3}')
+CUR=$(git -C "$TOP/core" rev-parse HEAD 2>/dev/null)
+[ -n "$REC" ] && [ "$REC" = "$CUR" ] || { echo "core is at ${CUR:-?}, this checkout records ${REC:-?}: commit the submodule pointer, rebuild, then sign"; exit 1; }
+[ -z "$(git -C "$TOP/core" status --porcelain --untracked-files=no)" ] || { echo "core has changes not committed: commit them in psion-core first"; exit 1; }
 grep -q "TESTSEED" "$TOP/app/psimail.cpp" && { echo "app/psimail.cpp still has the TESTSEED block: core/tools/emu/seed.py off, then rebuild"; exit 1; }
 python3 "$CORE/tools/release/sign.py" --product PsiMail "$SIS" "$VERSION"
 echo "$VERSION" > "$TOP/dist/PsiMail-version.txt"
