@@ -89,7 +89,7 @@ static void decode_2231(const char *v, char *out, int max)
 	const char *q1 = strchr(v, '\''), *q2 = q1 ? strchr(q1 + 1, '\'') : 0;
 	char cs[32], raw[160];
 	int k = 0;
-	if (!q2) { pm_copy(out, v, max); return; }
+	if (!q2) { pm_copy(out, v, max); cs_no_controls(out); return; }
 	{
 		int cl = (int)(q1 - v);
 		if (cl > 31) cl = 31;
@@ -100,6 +100,7 @@ static void decode_2231(const char *v, char *out, int max)
 		else raw[k++] = *v;
 	}
 	cs_to_cp1252(cs, raw, k, out, max);
+	cs_no_controls(out);                  /* (review CR-23: %0A in a file name) */
 }
 
 /* looks up a parameter in a ("key" "value" ...) list */
@@ -158,6 +159,7 @@ static void add_part(PmStructure *st, ImapNode *b, const char *id)
 	ip_str(ip_nth(b, 0), type, sizeof(type)); lower(type);
 	ip_str(ip_nth(b, 1), sub, sizeof(sub)); lower(sub);
 	snprintf(p->type, sizeof(p->type), "%s/%s", type, sub);
+	cs_no_controls(p->type);              /* (a column of the .att list: review CR-23) */
 	param(ip_nth(b, 2), "charset", p->charset, sizeof(p->charset));
 	{
 		char fl[16];

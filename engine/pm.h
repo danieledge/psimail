@@ -102,6 +102,7 @@ unsigned int cs_cp1252_to_ucs(unsigned char c);
 int  cs_ucs_to_cp1252(unsigned int u);             /* -1 if none */
 /* RFC 2047 encoded-words in a header -> cp1252 */
 void cs_decode_header(const char *in, char *out, int max);
+void cs_no_controls(char *s);            /* control characters to spaces (review CR-23) */
 /* header text (cp1252) -> RFC 2047 if needed, for sending */
 void cs_encode_header(const char *in, char *out, int max);
 /* IMAP modified UTF-7 folder name -> cp1252 for display */
@@ -252,6 +253,7 @@ int  compose_mime(int acct, const char *outbox_path, const char *mime_path,
 /* ---- local store (store.c) */
 void st_acct_dir(int acct, char *out, int max);
 void st_folder_dir(int acct, const char *folder, char *out, int max);
+const char *st_store_dir(void);          /* PsiMail's folder (ends with the separator) */
 int  st_check_account(int acct, char *why, int whymax);  /* the slot's files are its login's (1.11: another login's kept aside, never lost); -1 and why: not */
 typedef struct
 	{

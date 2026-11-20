@@ -117,7 +117,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.12");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.13");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -4432,8 +4432,38 @@ static void OneLine(TDes& aText)
 			aText[i] = ' ';
 	}
 
+// (1.13, review CR-28) a file another program's mailto: link may attach: what
+// Coda's Share icon can send, and nothing else. Share never sends a file in
+// a \System\ folder or the ROM (it says there is no file to send), only
+// its own copies of open files in C:\System\Temp\PsiShare\. So a link
+// from anywhere else (a web page, one day) cannot attach PsiMail's settings,
+// a mail store, PsiSync's or PsiTerm's keys: a full name with a drive, not
+// on Z:, no . or .. folders, outside \System\ but for Share's folder.
+static TBool ShareableFile(const TDesC& aName)
+	{
+	TParse p;
+	if (p.Set(aName, NULL, NULL) != KErrNone || !p.DrivePresent() || !p.PathPresent() || !p.NameOrExtPresent())
+		return EFalse;
+	TPtrC drive = p.Drive();
+	TPtrC path = p.Path();
+	if (drive.Length() < 1 || path.Length() < 1 || path[0] != '\\')
+		return EFalse;
+	TChar d(drive[0]);
+	d.UpperCase();
+	if (d == 'Z')
+		return EFalse;
+	if (aName.Find(_L("\\..")) >= 0 || aName.Find(_L("\\.\\")) >= 0)
+		return EFalse;
+	_LIT(KSys, "\\System\\");
+	_LIT(KShareSnap, "\\System\\Temp\\PsiShare\\");
+	if (Clip(path, KSys().Length()).CompareF(KSys) != 0)
+		return ETrue;
+	return d == 'C' && path.Length() > KShareSnap().Length() && path.Left(KShareSnap().Length()).CompareF(KShareSnap) == 0;
+	}
+
 // aFiles: its attach= files are taken (not from a link in a message, which
-// could name any file on the Psion to be sent back to its writer)
+// could name any file on the Psion to be sent back to its writer), and then
+// only those Share could have sent (ShareableFile)
 void CPmAppUi::MailtoL(const TDesC& aUrl, TBool aFiles)
 	{
 	TPtrC u = aUrl;
@@ -4476,7 +4506,7 @@ void CPmAppUi::MailtoL(const TDesC& aUrl, TBool aFiles)
 			TFileName f;
 			UrlDecode(f, val, EFalse);
 			TEntry e;
-			if (d->iAttach->Count() < 8 && f.Length() && iEikonEnv->FsSession().Entry(f, e) == KErrNone && !e.IsDir())
+			if (d->iAttach->Count() < 8 && f.Length() && ShareableFile(f) && iEikonEnv->FsSession().Entry(f, e) == KErrNone && !e.IsDir())
 				d->iAttach->AppendL(f);
 			}
 		}

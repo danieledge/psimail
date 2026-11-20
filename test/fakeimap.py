@@ -4,7 +4,7 @@
   fakeimap.py PORT [--drop-at N[,N...]] [--drop-every N] [--slow MS_PER_KB]
               [--mute-noop] [--no-uidplus] [--arrive N[,N...]] [--invite]
               [--user NAME] [--idle-arrive SECS] [--many N] [--hide UID,..]
-              [--fat-flags UID:N] [--cut-flags N]
+              [--fat-flags UID:N] [--cut-flags N] [--crafted]
 
 Serves an INBOX of a few messages: one whose text has "NO CARRIER" on a
 line of its own (as an email about modems would), one of 30 KB (several
@@ -38,6 +38,11 @@ UID:N gives that message N keywords, sent before its UID: an answer too
 big for the client's buffer or parser. --cut-flags N drops the connection
 after N lines of the first flags-only UID FETCH (a list cut short). See
 synctest.sh.
+--crafted adds three messages for savetest.sh (PsiMail 1.13): 301 with an
+encoded-word subject and an RFC 2231 file name that each decode to a
+newline and a tab, and a 400 KB attachment; 302 whose attachment is far
+bigger than its BODYSTRUCTURE says (2000 octets); 303 with a small
+attachment called dup.txt.
 --news DIR adds the newsletters in test/html/ as messages 201-206, with
 pictures from DIR (made by newspics.py): 201 and 202 point at pictures on
 the web (http://pics.example/..., for a local web server: see newspics.py),
@@ -55,6 +60,7 @@ NO_UIDPLUS = False
 ARRIVE = []
 INVITE = False
 NEWS = None
+CRAFTED = False
 USER = None
 IDLE_ARRIVE = None
 MANY = 0
@@ -78,6 +84,7 @@ while args:
     elif a == '--hide': HIDE = [int(x) for x in args.pop(0).split(',')]
     elif a == '--fat-flags': FAT = [int(x) for x in args.pop(0).split(':')]
     elif a == '--cut-flags': CUT_FLAGS = int(args.pop(0))
+    elif a == '--crafted': CRAFTED = True
 CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE') + (' IDLE' if IDLE_ARRIVE is not None else '')
 
 def msg(uid, subject, text):
@@ -125,6 +132,21 @@ if INVITE:
     MSGS.append(dict(uid=107, subject='My card', text='', msgid='<107@example.com>', deleted=False, parts=[
         ('("TEXT" "PLAIN" ("CHARSET" "utf-8") NIL NIL "7BIT" %d 1 NIL NIL NIL NIL)', 'Here is my card.\r\n'),
         ('("TEXT" "VCARD" ("CHARSET" "utf-8" "NAME" "bob.vcf") NIL NIL "7BIT" %d 8 NIL ("attachment" ("FILENAME" "bob.vcf")) NIL NIL)', VCF)]))
+
+if CRAFTED:
+    big = base64.encodebytes(bytes(range(256)) * 1200).decode().replace('\n', '\r\n')   # 300 KB, 400 KB encoded
+    PLAIN = '("TEXT" "PLAIN" ("CHARSET" "utf-8") NIL NIL "7BIT" %d 1 NIL NIL NIL NIL)'
+    MSGS += [
+        dict(uid=301, subject='=?utf-8?q?Hello=0AX-Injected:_yes=09tab?=', text='', msgid='<301@example.com>', deleted=False, parts=[
+            (PLAIN, 'See the file.\r\n'),
+            ('("APPLICATION" "OCTET-STREAM" NIL NIL NIL "BASE64" %d NIL ("ATTACHMENT" ("FILENAME*" "utf-8\'\'evil%%0Aline%%09col.bin")) NIL NIL)', big)]),
+        dict(uid=302, subject='liar', text='', msgid='<302@example.com>', deleted=False, parts=[
+            (PLAIN, 'Small, it says.\r\n'),
+            ('("APPLICATION" "OCTET-STREAM" ("NAME" "liar.bin") NIL NIL "BASE64" 2000 NIL ("ATTACHMENT" ("FILENAME" "liar.bin")) NIL NIL)', big)]),
+        dict(uid=303, subject='dup', text='', msgid='<303@example.com>', deleted=False, parts=[
+            (PLAIN, 'One more.\r\n'),
+            ('("TEXT" "PLAIN" ("CHARSET" "us-ascii" "NAME" "dup.txt") NIL NIL "7BIT" %d 1 NIL ("ATTACHMENT" ("FILENAME" "dup.txt")) NIL NIL)', 'new copy\r\n')]),
+    ]
 
 if NEWS:
     import os
@@ -207,7 +229,8 @@ def envelope(m):
 
 def bodystructure(m):
     if m.get('parts'):
-        return '(' + ''.join(bs % len(t) for bs, t in m['parts']) + ' "MIXED" ("BOUNDARY" "b") NIL NIL NIL)'
+        # (a part with no %d states its own size: --crafted's 302)
+        return '(' + ''.join(bs % len(t) if '%d' in bs else bs for bs, t in m['parts']) + ' "MIXED" ("BOUNDARY" "b") NIL NIL NIL)'
     return '("TEXT" "PLAIN" ("CHARSET" "us-ascii") NIL NIL "7BIT" %d %d)' % (len(m['text']), m['text'].count('\n'))
 
 def fetch_items(m, seq, items):

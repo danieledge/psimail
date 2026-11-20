@@ -147,6 +147,18 @@ scratch folder) against a pretend proxy: PsiProxy's "Log saved: ..." is
 "X-PsiConnect: no-psiproxy") and an older Atom's status page (200, HTML)
 are "Needs PsiProxy on a computer"; PsiProxy's 413 is "the log is too big".
 
+## A full disk, crafted names, the random seed (no server needed, 1.13)
+
+`savetest.sh` runs `fakeimap.py --crafted`: an attachment's download stops
+at the first write that fails (a 64 KB file size limit stands in for a
+full disk), one far bigger than its BODYSTRUCTURE says is cut off, a
+subject and a file name that decode to a newline stay on one line in the
+`.txt`, the `.att` list and the index, and a 101st file of one name is
+refused rather than written over `name(99)`. `randomtest.sh` connects to
+`openssl s_server` and checks that `random.dat` (the seed kept between
+runs) is written whole and new each time, and that a read-only store
+does not stop the connection.
+
 ## Certificates
 
 `certtest.c` + `certtest.py` check the chain code on a saved chain, e.g.

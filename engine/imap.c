@@ -36,8 +36,10 @@ static char *g_resp;
 static int  g_rlen;
 static unsigned long g_last_cmd;
 
-/* a literal to stream instead of keeping (message text, attachments) */
-typedef void (*StreamFn)(const char *data, int n, void *ctx);
+/* a literal to stream instead of keeping (message text, attachments); a
+   non-zero return (a write failed, more came than the part's size) stops
+   fetch_part after the piece on the line, which is read to its end */
+typedef int (*StreamFn)(const char *data, int n, void *ctx);
 static StreamFn g_stream;
 static void *g_stream_ctx;
 static long g_stream_total;
@@ -700,6 +702,7 @@ static void addr_str(ImapNode *list, char *out, int max, int many)
 		cs_decode_header(raw, name, sizeof(name));
 		ip_str(ip_nth(a, 2), box, sizeof(box));
 		ip_str(ip_nth(a, 3), host, sizeof(host));
+		cs_no_controls(box); cs_no_controls(host);   /* (a literal can hold a newline: review CR-23) */
 		if (!box[0] && !host[0]) continue;       /* group syntax */
 		if (k) { out[k++] = ','; out[k++] = ' '; }
 		if (name[0]) k += snprintf(out + k, max - k, "%s <%s@%s>", name, box, host);
@@ -1003,13 +1006,15 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 
 extern PsiShared *pg_shared(void);
 
-typedef struct { StreamFn fn; void *ctx; long got; } Piece;
+typedef struct { StreamFn fn; void *ctx; long got; int stop; } Piece;
 
-static void piece_stream(const char *d, int n, void *ctx)
+static int piece_stream(const char *d, int n, void *ctx)
 {
 	Piece *p = (Piece *)ctx;
 	p->got += n;
-	p->fn(d, n, p->ctx);
+	if (p->stop) return p->stop;          /* (the rest of this piece goes by) */
+	p->stop = p->fn(d, n, p->ctx);
+	return p->stop;
 }
 
 static ImapNode *body_item(ImapNode *r);
@@ -1071,7 +1076,7 @@ static int fetch_part(int acct, const char *folder, unsigned int uid, const char
 	long step;
 	int again = 0, drops = 0, r;
 	int max_drops = g_ahead ? 2 : 12;     /* ahead: the line is bad, stop dialling for it */
-	p.fn = fn; p.ctx = ctx; p.got = 0;
+	p.fn = fn; p.ctx = ctx; p.got = 0; p.stop = 0;
 	if (s_step <= 0 || s_step > piece_size()) s_step = piece_size();
 	for (;;) {
 		step = s_step;
@@ -1102,6 +1107,9 @@ static int fetch_part(int acct, const char *folder, unsigned int uid, const char
 			continue;
 		}
 		if (r != PM_RES_OK) return r;
+		/* (review CR-22) the stream function said stop - the disk is full,
+		   say: no more pieces over the line; the caller says why */
+		if (p.stop) return PM_RES_OK;
 		if (p.got > before) again = 0;
 		/* a clean run earns the piece size back (a one-off drop must not
 		   leave 2 KB pieces for the rest of the session) */
@@ -1268,10 +1276,18 @@ static void out_text(const char *s, int n, void *ctx)
 	}
 }
 
-/* the raw text, on its way to a file */
+/* (review CR-22) more than a part's size (its BODYSTRUCTURE octets) with
+   room for a server that counts a little wrong: past this the server is
+   sending something else, and nothing more is fetched */
+static int over_size(long got, long size)
+{
+	return size > 0 && got > size + size / 2 + 65536L;
+}
+
+/* the raw text, on its way to a file (err: 1 a write failed, 2 too much came) */
 typedef struct { FILE *f; long got, total; int percent, err; const char *label; } Spool;
 
-static void spool_stream(const char *data, int n, void *ctx)
+static int spool_stream(const char *data, int n, void *ctx)
 {
 	Spool *s = (Spool *)ctx;
 	s->got += n;
@@ -1281,8 +1297,10 @@ static void spool_stream(const char *data, int n, void *ctx)
 		pc -= pc % 5;                     /* (each update redraws the screen) */
 		if (pc != s->percent) { s->percent = pc; body_progress(s->label, "Downloading", pc); }
 	}
-	if (s->err) return;                       /* (the rest goes by; the failure is reported once) */
-	if (fwrite(data, 1, n, s->f) != (size_t)n) s->err = 1;
+	if (s->err) return s->err;                /* (the failure is reported once) */
+	if (over_size(s->got, s->total)) s->err = 2;
+	else if (fwrite(data, 1, n, s->f) != (size_t)n) s->err = 1;
+	return s->err;
 }
 
 static void body_stream(const char *data, int n, void *ctx)
@@ -1342,6 +1360,7 @@ static void on_fetch_struct(ImapNode *r, void *ctx)
 		int j;
 		b->have = 1;
 		ip_str(ip_nth(env, 0), raw, sizeof(raw));
+		cs_no_controls(raw);                     /* (review CR-23: one line each) */
 		k += snprintf(b->hdr + k, sizeof(b->hdr) - k, "Date: %s\n", raw);
 		for (j = 0; j < 4; j++) {
 			addr_str(ip_nth(env, hs[j].i), tmp, sizeof(tmp), 1);
@@ -1354,6 +1373,7 @@ static void on_fetch_struct(ImapNode *r, void *ctx)
 		snprintf(b->label, sizeof(b->label), "'%.36s%s'", tmp[0] ? tmp : "(no subject)", strlen(tmp) > 36 ? ".." : "");
 		if (k >= (int)sizeof(b->hdr)) k = sizeof(b->hdr) - 1;
 		ip_str(ip_nth(env, 9), raw, sizeof(raw));
+		cs_no_controls(raw);
 		if (raw[0]) k += snprintf(b->hdr + k, sizeof(b->hdr) - k, "Message-ID: %s\n", raw);
 		if (k >= (int)sizeof(b->hdr)) k = sizeof(b->hdr) - 1;
 	}
@@ -1457,7 +1477,8 @@ static int imap_body_1(int acct, const char *folder, unsigned int uid, int full,
 				if (!(sp.f = fopen(raw, "wb"))) { pm_write_why(why, whymax, "the message", path); r = PM_RES_FAILED; }
 				else {
 					r = fetch_part(acct, folder, uid, tp->id, (full || tp->size <= limit) ? 0 : limit, spool_stream, &sp, why, whymax);
-					if (pm_fclose(sp.f) != 0) sp.err = 1;
+					if (pm_fclose(sp.f) != 0 && !sp.err) sp.err = 1;
+					if (r == PM_RES_OK && sp.err == 2) { set_why(why, whymax, "The server sent more than the message holds"); r = PM_RES_FAILED; }
 					if (r == PM_RES_OK && sp.err) { pm_write_why(why, whymax, "the message", path); r = PM_RES_FAILED; }
 					if (r == PM_RES_OK && (sp.f = fopen(raw, "rb")) != 0) {
 						static char buf[1024];
@@ -1535,11 +1556,11 @@ typedef struct
 	PmDecoder dec;
 	long got, total;
 	int percent;
-	int err;
+	int err;                 /* 1 a write failed, 2 more came than the part's size */
 	const char *label;       /* "the attachment", or a picture's */
 	} AttCtx;
 
-static void att_stream(const char *data, int n, void *ctx)
+static int att_stream(const char *data, int n, void *ctx)
 {
 	AttCtx *c = (AttCtx *)ctx;
 	static char dec[1100];
@@ -1553,10 +1574,12 @@ static void att_stream(const char *data, int n, void *ctx)
 	/* (a streamed literal comes in 1 KB pieces and a quoted body is sliced
 	   to the same - dec_feed writes up to n + 2 bytes - so this is only
 	   against a caller that forgets) */
-	if (n > PIECE_SLICE) { c->err = 1; return; }
+	if (n > PIECE_SLICE) { c->err = 1; return c->err; }
+	if (c->err) return c->err;
+	if (over_size(c->got, c->total)) { c->err = 2; return c->err; }
 	dn = dec_feed(&c->dec, data, n, dec);
-	if (c->err) return;
 	if (dn && fwrite(dec, 1, dn, c->f) != (size_t)dn) c->err = 1;
+	return c->err;
 }
 
 static void safe_name(const char *in, char *out, int max)
@@ -1604,6 +1627,13 @@ int imap_attach(int acct, const char *folder, unsigned int uid, const char *part
 			fclose(t);
 			snprintf(path, sizeof(path), "%s%s(%d)%s", dir, base, i, ext);
 		}
+		/* (review CR-24) name(99) was taken as free without a look: with a
+		   hundred of that name already there, nothing is overwritten */
+		if (i >= 100 && (t = fopen(path, "r")) != 0) {
+			fclose(t);
+			set_why(why, whymax, "There are already 100 files called %.40s%s in %.60s", base, ext, dir);
+			return PM_RES_FAILED;
+		}
 	}
 	memset(&c, 0, sizeof(c));
 	if (!(c.f = fopen(path, "wb"))) { pm_write_why(why, whymax, "the attachment", path); return PM_RES_FAILED; }
@@ -1611,7 +1641,8 @@ int imap_attach(int acct, const char *folder, unsigned int uid, const char *part
 	c.total = p->size;
 	c.percent = -1;
 	r = fetch_part(acct, folder, uid, part, 0, att_stream, &c, why, whymax);
-	if (pm_fclose(c.f) != 0) c.err = 1;
+	if (pm_fclose(c.f) != 0 && !c.err) c.err = 1;
+	if (r == PM_RES_OK && c.err == 2) { set_why(why, whymax, "The server sent more than the attachment holds"); r = PM_RES_FAILED; }
 	if (r == PM_RES_OK && c.err) { pm_write_why(why, whymax, "the attachment", path); r = PM_RES_FAILED; }
 	if (r == PM_RES_OK && c.got == 0 && p->size > STREAM_MIN) { set_why(why, whymax, "The server sent nothing"); r = PM_RES_FAILED; }
 	if (r != PM_RES_OK) { remove(path); return r; }
@@ -1634,7 +1665,8 @@ int imap_part_to_file(int acct, const char *folder, unsigned int uid, const char
 	c.percent = -1;
 	c.label = label;
 	r = fetch_part(acct, folder, uid, part, 0, att_stream, &c, why, whymax);
-	if (pm_fclose(c.f) != 0) c.err = 1;
+	if (pm_fclose(c.f) != 0 && !c.err) c.err = 1;
+	if (r == PM_RES_OK && c.err == 2) { set_why(why, whymax, "The server sent more than %s holds", label); r = PM_RES_FAILED; }
 	if (r == PM_RES_OK && c.err) { pm_write_why(why, whymax, label, path); r = PM_RES_FAILED; }
 	if (r == PM_RES_OK && c.got == 0 && size > STREAM_MIN) { set_why(why, whymax, "The server sent nothing"); r = PM_RES_FAILED; }
 	if (r != PM_RES_OK) remove(path);

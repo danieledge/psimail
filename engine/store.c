@@ -33,6 +33,12 @@ static unsigned long fnv(const char *s)
 	return h;
 }
 
+/* PsiMail's folder, for tls/pmrandom.c's seed (it does not see PmShared) */
+const char *st_store_dir(void)
+{
+	return pm_shared()->store_dir;
+}
+
 void st_acct_dir(int acct, char *out, int max)
 {
 	snprintf(out, max, "%sA%d%s", pm_shared()->store_dir, acct, PM_SEP);

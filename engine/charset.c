@@ -89,6 +89,15 @@ static int ew_decode(int b, const char *t, int tn, char *raw, int rmax)
 	return k;
 }
 
+/* (review CR-23) a decoded header word or file name can carry any byte - a
+   newline from =?utf-8?q?a=0Ab?= or %0A in an RFC 2231 name - which in a
+   .txt header, the .att list or the index would start a line of its own:
+   every control character becomes a space */
+void cs_no_controls(char *s)
+{
+	for (; *s; s++) if ((unsigned char)*s < 32 || *s == 127) *s = ' ';
+}
+
 void cs_decode_header(const char *in, char *out, int max)
 {
 	int k = 0, last_was_ew = 0;
@@ -146,6 +155,7 @@ void cs_decode_header(const char *in, char *out, int max)
 	if (rn && k < max - 1) k += cs_to_cp1252(rcs, raw, rn, out + k, max - k);
 	if (k > max - 1) k = max - 1;        /* (a converted run can fill out to the brim) */
 	out[k] = 0;
+	cs_no_controls(out);
 }
 
 void cs_encode_header(const char *in, char *out, int max)
