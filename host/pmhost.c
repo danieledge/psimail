@@ -66,6 +66,23 @@ int pm_list_dir(const char *dir, const char *suffix, void (*cb)(const char *name
 	return n;
 }
 
+int pm_list_subdirs(const char *dir, void (*cb)(const char *name, void *ctx), void *ctx)
+{
+	DIR *d = opendir(dir);
+	struct dirent *e;
+	int n = 0;
+	if (!d) return -1;
+	while ((e = readdir(d)) != 0) {
+		char p[600];
+		struct stat st;
+		if (e->d_name[0] == '.') continue;
+		snprintf(p, sizeof(p), "%s/%s", dir, e->d_name);
+		if (stat(p, &st) == 0 && S_ISDIR(st.st_mode)) { cb(e->d_name, ctx); n++; }
+	}
+	closedir(d);
+	return n;
+}
+
 void pm_rmtree(const char *dir)
 {
 	char cmd[400];
@@ -88,6 +105,24 @@ int pm_write_whole(const char *path, const void *data, long n)
 	if (fclose(f) != 0) ok = 0;
 	if (!ok) remove(path);
 	return ok ? 0 : -1;
+}
+
+int pm_write_parts(const char *path, const void *head, long hn, const void *data, long n)
+{
+	FILE *f = fopen(path, "wb");
+	int ok;
+	if (!f) return -1;
+	ok = (long)fwrite(head, 1, hn, f) == hn && (n <= 0 || (long)fwrite(data, 1, n, f) == n);
+	if (fclose(f) != 0) ok = 0;
+	if (!ok) remove(path);
+	return ok ? 0 : -1;
+}
+
+/* (1.15) tests: PM_FREE_RAM_KB pretends; else unknown */
+long pm_free_ram_kb(void)
+{
+	const char *fake = getenv("PM_FREE_RAM_KB");
+	return fake ? atol(fake) : -1;
 }
 
 long pm_free_kb(const char *path)

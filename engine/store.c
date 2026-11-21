@@ -406,6 +406,23 @@ int st_index_load(int acct, const char *folder, const char *file, PmIndex *ix)
 	st_folder_dir(acct, folder, dir, sizeof(dir));
 	snprintf(path, sizeof(path), "%s%s", dir, file);
 	if (!(f = fopen(path, "r"))) return ST_INDEX_NONE;
+	{
+		/* (1.15) the lines counted first and the list taken at its size in
+		   one go: it grew by doubling (35, 70, 140 KB... each copy leaving
+		   a hole in the engine's heap), and was loaded for every small job */
+		int lines = 0, k;
+		size_t got;
+		while ((got = fread(line, 1, sizeof(line), f)) > 0)
+			for (k = 0; k < (int)got; k++) if (line[k] == '\n') lines++;
+		if (ferror(f) || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return ST_INDEX_BROKEN; }
+		ix->cap = lines + 16;               /* (room for a few new ones before any copy) */
+		if (!(ix->m = (PmMsg *)malloc(ix->cap * sizeof(PmMsg)))) {
+			fclose(f);
+			memset(ix, 0, sizeof(*ix));
+			pm_log("store: could not read all of %s (no memory)", path);
+			return ST_INDEX_BROKEN;
+		}
+	}
 	while (fgets(line, sizeof(line), f)) {
 		char *p = line, *uid;
 		PmMsg *m;
@@ -441,6 +458,39 @@ int st_index_load(int acct, const char *folder, const char *file, PmIndex *ix)
 		return ST_INDEX_BROKEN;
 	}
 	return 0;
+}
+
+/* (1.15) the newest uid in a folder's list (its last line: the list is in
+   uid order) without reading it all; 0 if none */
+unsigned int st_index_last_uid(int acct, const char *folder)
+{
+	char dir[160], path[190];
+	static char tail[1100];
+	FILE *f;
+	long size, from;
+	size_t n;
+	unsigned int u = 0;
+	char *p, *e;
+	st_folder_dir(acct, folder, dir, sizeof(dir));
+	snprintf(path, sizeof(path), "%sindex.txt", dir);
+	if (!(f = fopen(path, "rb"))) return 0;
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	from = size > (long)sizeof(tail) - 1 ? size - (long)sizeof(tail) + 1 : 0;
+	fseek(f, from, SEEK_SET);
+	n = fread(tail, 1, sizeof(tail) - 1, f);
+	fclose(f);
+	tail[n] = 0;
+	/* the last whole line that is not the header */
+	e = tail + n;
+	while (e > tail && (e[-1] == '\n' || e[-1] == '\r')) e--;
+	*e = 0;
+	p = e;
+	while (p > tail && p[-1] != '\n') p--;
+	if (p == tail && from > 0) return 0;     /* (a line longer than the tail: cannot say) */
+	if (*p == '#' || !*p) return 0;
+	u = (unsigned int)strtoul(p, 0, 10);
+	return u;
 }
 
 static void clean(char *s)

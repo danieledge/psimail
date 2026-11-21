@@ -13,6 +13,7 @@
 #include "pm.h"
 #include "cal.h"
 #include "calmerge.h"      /* cal_clock_ok, CAL_BUILD_YEAR */
+#include "../core/ssh/psiwork.h"
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -95,6 +96,7 @@ static void local_update(int acct, const char *folder, unsigned int uid, const c
 		st_msg_path(acct, folder, uid, "att", p, sizeof(p)); remove(p);
 		st_msg_path(acct, folder, uid, "htm", p, sizeof(p)); remove(p);
 		pic_remove(acct, folder, uid);
+		st_extras_remove(acct, folder, uid);     /* (1.15) opened attachments, invitation files */
 	}
 }
 
@@ -158,12 +160,8 @@ static int rules_load(int acct, PmRule *r)
 /* the Inbox's newest uid as the store has it (0: none yet) */
 static unsigned int inbox_top(int acct)
 {
-	static PmIndex ix;
-	unsigned int u = 0;
-	if (st_index_load(acct, "INBOX", "index.txt", &ix) != 0) return 0;
-	if (ix.n) u = ix.m[ix.n - 1].uid;
-	st_index_free(&ix);
-	return u;
+	/* (1.15) only the last line of the list, not the whole list parsed */
+	return st_index_last_uid(acct, "INBOX");
 }
 
 static void rules_run(int acct, unsigned int after)
@@ -523,9 +521,11 @@ static int run(PmCmd *c, char *why, int whymax)
 	}
 	case PM_CMD_PICTURES:
 		r = pic_fetch(a, c->folder, c->uid, c->arg, why, whymax);
+		pic_prune(a, c->folder, c->uid);
 		break;
 	case PM_CMD_WEBPICS:
 		r = web_fetch(a, c->folder, c->uid, why, whymax);
+		pic_prune(a, c->folder, c->uid);
 		break;
 	/* A flag change or a move is noted in pending.txt BEFORE the local files
 	   change, and the note taken out again once the server has it: an engine
@@ -687,6 +687,7 @@ void pm_do_command(PmCmd *c)
 void pm_loop(int (*housekeeping)(void))
 {
 	PmShared *s = pm_shared();
+	int worked = 0, idles = 0, low_idles = 0, level = -1;
 	s->state = PM_STATE_READY;
 	while (!s->quitting) {
 		if (s->cmd_tail != s->cmd_head) {
@@ -694,11 +695,35 @@ void pm_loop(int (*housekeeping)(void))
 			s->cmd_tail++;
 			if (c.op == PM_CMD_QUIT) break;
 			pm_do_command(&c);
+			worked = 1;
 			continue;
 		}
 		if (housekeeping && housekeeping()) break;
-		if (pf_step()) { pm_beat_reset(); continue; }
-		imap_trim();                         /* (nothing to do: a closed mailbox's buffers go back) */
+		if (pf_step()) { pm_beat_reset(); worked = 1; continue; }
+		/* nothing to do: a closed mailbox's buffers go back; and (1.15)
+		   once after any work, or when the app asks (short of memory),
+		   the heap's free end goes back too, also with the mailbox still
+		   open: an ER5 heap never shrinks by itself, so after a sync or a
+		   picture it stayed at its peak for as long as the line was up */
+		{
+			/* (the watcher's level read once a second: a look up of a chunk by name) */
+			if (!(idles % 10)) level = psi_mem_level();
+			if (!imap_trim() && (worked || s->trim_req || (level >= 1 && !(idles % 50))))
+				psi_work_trim();
+			worked = 0;
+			s->trim_req = 0;
+			/* low (under 1.5 MB free) with nothing to do and nothing the
+			   app wants of it (PsiMail behind, no timed check or new
+			   mail at once): the engine ends, as on "sleep"; the app
+			   starts it again when it is next needed */
+			if (level >= 2 && !s->keep_awake && s->cmd_tail == s->cmd_head && ++low_idles >= 30) {
+				pm_log("memory: low (level %d) and nothing to do: the engine ends until needed", level);
+				s->slept = 1;
+				break;
+			}
+			if (level < 2) low_idles = 0;
+			idles++;
+		}
 		pm_idle(100);
 	}
 	pm_log("net: quitting: releasing the line");

@@ -349,6 +349,8 @@ private:
 	void SizeChanged();
 	void CreateNativeL();
 	void DestroyNative();
+	void DropMessage();                      // (1.15) a message closed: its text and pictures go
+	void DropPreview();
 	void LayoutNative();
 	void ShowNative(TBool aShow);
 	void ApplyZoomL();
@@ -485,7 +487,7 @@ private:
 	void LoadListL();
 	void LoadOutboxL();
 	void LoadMessageL();
-	void ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax);
+	void ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax, TBool aTail = EFalse);
 	void StoreDir(TDes& aDir) const;
 	void FolderDir(const TDesC8& aImap, TDes& aDir) const;
 	void MsgPath(TUint aUid, const TDesC& aExt, TDes& aPath) const;
@@ -736,6 +738,17 @@ private:
 public:
 	void EngineStoppedL(const TDesC& aWhy);  // from EngineEnded: the reader stops waiting, the engine starts again
 	TBool EngineBackL();                     // from Cmd with no engine: start it again, ETrue if it is running
+	// (1.15) short of memory (core/ssh/psimem.h, pmauto.cpp): the memory
+	// watcher's words, and the engine put to sleep (it ends) and woken
+	// (started again, quietly) on the next command or return to the front
+	void MemWordL(TInt aWord, TBool aFront, TDes& aWhy);
+	TBool WakeEngineL();
+	TBool KeepEngine() const;                // the engine must stay: new mail at once, a timed check, the calendar, an update
+	TBool MemBusy() const;                   // a transfer or an update running: not to be slept or closed
+	void MemTick(TBool aFront);              // from TickL: keep_awake for the engine, PsiMemBusy
+	TBool iEngineAsleep;                     // (1.15) ended for the memory: woken quietly
+	TBool iPicRelayoutDue;                   // (1.15, MEM-59) pictures came: the reader laid out again at most every 2 s
+	TUint iPicRelayoutAt;                    // ... the tick count of the last
 	void KillStrayEngines();                 // a psimail.exe that is not ours and would not quit (FinishStartL)
 	void PicturesDoneL(const PmCmd& aCmd);   // a PICTURES / WEBPICS command ended: frames still waiting say so
 	TInt WebPicturesPref() const;            // 0 ask, 1 always, 2 never
@@ -1268,6 +1281,8 @@ public:
 	TBool Exiting() const { return iExiting; }     // Close has begun (BeginExitL)
 	TBool EditCurrentAccountL();                   // Tools > Accounts > Settings..., from the login dialog's Account... (pmlogin.cpp)
 	CPmView* View() { return iView; }
+	TBool InFront() const { return iForeground; }  // (1.15)
+	void SetMemBusy(TBool aViewBusy);              // (1.15) PsiMemBusy: a transfer, or a command running
 	void CommandL(TInt aCommand) { HandleCommandL(aCommand); }
 	void HelpTopicL(TInt aTopic) { HelpL(aTopic); }   // (1.05) Help at a topic (a picture's Help on pictures)
 	TBool RunSetupL();                             // (1.03) the setup assistant; ETrue if it saved
@@ -1288,7 +1303,13 @@ private:
 	static TInt EmailButtonCallback(TAny* aSelf);
 	void EmailButtonStartL();
 	void HandleCommandL(TInt aCommand);
-	void ProcessMessageL(TUid aUid, const TDesC8& aParams);           // PsiWeb's mailto: links
+	void DoCommandL(TInt aCommand);                // (1.15) HandleCommandL's work, with PsiMail busy meanwhile
+	static void CommandDone(TAny* aSelf);
+	RChunk iMemChunk;                              // (1.15) registered with the memory watcher (psimemlvl.h)
+	TInt iCommands;                                // ... commands running (a dialog up)
+	TBool iViewBusy;                               // ... a transfer (CPmView::MemBusy, from the tick)
+	TBool iMemBusyNow;                             // ... what the watcher was last told
+	void ProcessMessageL(TUid aUid, const TDesC8& aParams);           // PsiWeb's mailto: links; (1.15) the memory watcher's words
 	TBool ProcessCommandParametersL(TApaCommand aCommand, TFileName& aDocumentName, const TDesC8& aTail);
 	void AttachmentL(TBool aOpen);                 // Message > Attachments > Open / Save
 	void AddSenderL();                             // Edit > Add sender to Contacts

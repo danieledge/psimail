@@ -48,19 +48,22 @@ static char *read_all(const char *path, long max, int *len)
 static void write_summary(int acct, const char *folder, unsigned int uid, const char *ext, int kind,
                           const char *text, int len)
 {
-	static PmInvite iv;
-	static PmCard cards[VCF_MAX_CARDS];
+	/* (1.15) 17 KB taken for the one message that has an invitation or a
+	   card, not statics for as long as the engine runs */
+	struct { PmInvite iv; PmCard cards[VCF_MAX_CARDS]; } *w;
 	PmShared *s = pm_shared();
 	char path[200], tmp[210];
 	FILE *f;
 	int n = 0;
-	if (kind == 1 && inv_parse(text, len, s->cal.zone, s->acct[acct].email, &iv) != 0) return;
-	if (kind == 2 && (n = vcf_parse(text, len, cards, VCF_MAX_CARDS)) <= 0) return;
+	if (!(w = malloc(sizeof(*w)))) { pm_log("invite: not enough memory"); return; }
+	if ((kind == 1 && inv_parse(text, len, s->cal.zone, s->acct[acct].email, &w->iv) != 0) ||
+	    (kind == 2 && (n = vcf_parse(text, len, w->cards, VCF_MAX_CARDS)) <= 0)) { free(w); return; }
 	st_msg_path(acct, folder, uid, ext, path, sizeof(path));
 	snprintf(tmp, sizeof(tmp), "%s.new", path);
-	if (!(f = fopen(tmp, "w"))) return;
-	if (kind == 1) inv_write(f, &iv); else vcf_write(f, cards, n);
+	if (!(f = fopen(tmp, "w"))) { free(w); return; }
+	if (kind == 1) inv_write(f, &w->iv); else vcf_write(f, w->cards, n);
 	if (pm_fclose(f) != 0 || pm_replace(tmp, path) != 0) { remove(tmp); pm_log("invite: could not write %s", path); }
+	free(w);
 }
 
 void inv_fetch(int acct, const char *folder, unsigned int uid, const PmStructure *st)

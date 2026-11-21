@@ -178,7 +178,9 @@ static void rm_cb(const char *name, void *ctx)
 {
 	RmCtx *c = (RmCtx *)ctx;
 	char p[220];
+	int n = (int)strlen(name);
 	if (strncmp(name, c->prefix, strlen(c->prefix))) return;
+	if (n < 4 || (strcmp(name + n - 4, ".pmi") && strcmp(name + n - 4, ".img") && strcmp(name + n - 4, ".dec"))) return;
 	snprintf(p, sizeof(p), "%s%s", c->dir, name);
 	remove(p);
 }
@@ -191,9 +193,8 @@ void pic_remove(int acct, const char *folder, unsigned int uid)
 	remove(path);
 	st_folder_dir(acct, folder, c.dir, sizeof(c.dir));
 	snprintf(c.prefix, sizeof(c.prefix), "%u_", uid);
-	pm_list_dir(c.dir, ".pmi", rm_cb, &c);
-	pm_list_dir(c.dir, ".img", rm_cb, &c);
-	pm_list_dir(c.dir, ".dec", rm_cb, &c);
+	/* (1.15) one look at the folder, not three */
+	pm_list_dir(c.dir, "", rm_cb, &c);
 }
 
 /* ---------------------------------------------------------- decoding */
@@ -230,8 +231,7 @@ static int write_pmi(const char *path, const PmImage *img, const char *reason)
 {
 	char tmp[210];
 	PmiHeader h;
-	unsigned char *buf;
-	long n, body;
+	long body;
 	int ok;
 	snprintf(tmp, sizeof(tmp), "%s.new", path);
 	memset(&h, 0, sizeof(h));
@@ -247,13 +247,10 @@ static int write_pmi(const char *path, const PmImage *img, const char *reason)
 		h.status = 2;
 		body = (long)strlen(reason) + 1;
 	}
-	/* the whole file in one write (see pm_write_whole) */
-	n = (long)sizeof(h) + body;
-	if (!(buf = (unsigned char *)malloc(n))) return -1;
-	memcpy(buf, &h, sizeof(h));
-	memcpy(buf + sizeof(h), img ? (const void *)img->bits : (const void *)reason, body);
-	ok = pm_write_whole(tmp, buf, n) == 0 && pm_replace(tmp, path) == 0;
-	free(buf);
+	/* (1.15) the header and the picture in two writes, straight from the
+	   decoder's copy: no second whole copy of the picture in the heap */
+	ok = pm_write_parts(tmp, &h, (long)sizeof(h), img ? (const void *)img->bits : (const void *)reason, body) == 0 &&
+	     pm_replace(tmp, path) == 0;
 	if (!ok) remove(tmp);
 	return ok ? 0 : -1;
 }
@@ -352,6 +349,13 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 		o.prog_colour = 1;
 		o.max_full_bytes = 1536L * 1024L;
 	}
+	{
+		/* (1.15, MEM-40) the whole-picture buffer of an interlaced or
+		   progressive picture fitted to the memory free now (core
+		   pmimg_opts_room: half of what is free above 1.5 MB) */
+		long kb = pm_free_ram_kb();
+		if (kb > 0) pmimg_opts_room(&o, kb * 1024L);
+	}
 	o.abort = pic_abort;
 	o.abort_ctx = &a;
 	pic_greys(&o);
@@ -362,11 +366,13 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 	{
 		/* over the message's budget before it is even decoded? (the size is
 		   in the first bytes; the JPEG header may be too long to say) */
-		static unsigned char head[4096];
-		FILE *f = fopen(img_path, "rb");
-		int n = f ? (int)fread(head, 1, sizeof(head), f) : 0, sw, sh;
+		unsigned char *head = (unsigned char *)malloc(4096);   /* (1.15: not a static) */
+		FILE *f = head ? fopen(img_path, "rb") : 0;
+		int n = f ? (int)fread(head, 1, 4096, f) : 0, sw = 0, sh = 0, known;
 		if (f) fclose(f);
-		if (n > 0 && pmimg_size(head, n, &sw, &sh) == 0 && sw > 0 && sh > 0) {
+		known = n > 0 && pmimg_size(head, n, &sw, &sh) == 0;
+		free(head);
+		if (known && sw > 0 && sh > 0) {
 			pm_log("picture %s: %dx%d", label, sw, sh);
 			int fw = (sw + o.max_w - 1) / o.max_w, fh = (sh + o.max_h - 1) / o.max_h, fs = fw > fh ? fw : fh;
 			long ow = (sw + fs - 1) / fs, oh = (sh + fs - 1) / fs;
@@ -403,9 +409,90 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 	return w ? -1 : 0;
 }
 
+/* (1.15) The pictures set out are kept so a message shows them again at
+   once - but there was no limit beyond the one per message, so ten
+   newsletters read could leave 6 MB (12 MB in colour) on the store, which
+   with no card is C:, the Psion's memory. Now a folder keeps at most 1 MB
+   of them on C: (8 MB on a card); past that the older messages' (lower
+   uid) go first, never the one just read. One that has gone is asked for
+   again when its message is next read, as if never fetched. */
+#define PIC_KEEP_C   (1024L * 1024L)
+#define PIC_KEEP_D   (8L * 1024L * 1024L)
+#define PIC_PRUNE_MAX 400
+typedef struct { unsigned int uid; long size; char name[40]; } PruneEnt;
+typedef struct { const char *dir; PruneEnt *e; int n; long total; } PruneCtx;
+
+static void prune_cb(const char *name, void *ctx)
+{
+	PruneCtx *c = (PruneCtx *)ctx;
+	char p[220];
+	unsigned int uid = 0;
+	const char *q = name;
+	long sz;
+	if (strlen(name) >= sizeof(c->e[0].name)) return;
+	while (*q >= '0' && *q <= '9') uid = uid * 10 + (unsigned)(*q++ - '0');
+	if (*q != '_' || !uid) return;
+	snprintf(p, sizeof(p), "%s%s", c->dir, name);
+	if ((sz = file_size(p)) <= 0) return;
+	c->total += sz;
+	if (c->n >= PIC_PRUNE_MAX) return;
+	c->e[c->n].uid = uid;
+	c->e[c->n].size = sz;
+	pm_copy(c->e[c->n].name, name, sizeof(c->e[0].name));
+	c->n++;
+}
+
+static int prune_cmp(const void *a, const void *b)
+{
+	unsigned int x = ((const PruneEnt *)a)->uid, y = ((const PruneEnt *)b)->uid;
+	return x < y ? -1 : x > y;
+}
+
+void pic_prune(int acct, const char *folder, unsigned int keep)
+{
+	char dir[160], p[220];
+	const char *sd = st_store_dir();
+	long limit = (sd[0] == 'C' || sd[0] == 'c') ? PIC_KEEP_C : PIC_KEEP_D;
+	PruneCtx c;
+	int i, gone = 0;
+#ifdef PM_ALLOC_TEST
+	if (getenv("PM_PIC_KEEP_KB")) limit = atol(getenv("PM_PIC_KEEP_KB")) * 1024L;   /* (host tests) */
+#endif
+	st_folder_dir(acct, folder, dir, sizeof(dir));
+	memset(&c, 0, sizeof(c));
+	c.dir = dir;
+	if (!(c.e = (PruneEnt *)malloc(PIC_PRUNE_MAX * sizeof(PruneEnt)))) return;
+	pm_list_dir(dir, ".pmi", prune_cb, &c);
+	if (c.total > limit) {
+		qsort(c.e, c.n, sizeof(PruneEnt), prune_cmp);
+		for (i = 0; i < c.n && c.total > limit; i++) {
+			if (c.e[i].uid == keep) continue;
+			snprintf(p, sizeof(p), "%s%s", dir, c.e[i].name);
+			if (remove(p) == 0) { c.total -= c.e[i].size; gone++; }
+		}
+		if (gone) {
+			pm_log("pictures: %d older set out pictures removed (the folder keeps %ld KB)", gone, limit / 1024);
+			st_changed();
+		}
+	}
+	free(c.e);
+}
+
+static int pic_fetch_e(PicEntry *e, int acct, const char *folder, unsigned int uid, const char *parts, char *why, int whymax);
+
+/* (1.15) the parts' list taken for the command, not a static */
 int pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts, char *why, int whymax)
 {
-	static PicEntry e[PIC_MAX_PARTS];
+	PicEntry *e = (PicEntry *)malloc(PIC_MAX_PARTS * sizeof(PicEntry));
+	int r;
+	if (!e) { snprintf(why, whymax, "Not enough memory for the pictures"); return PM_RES_FAILED; }
+	r = pic_fetch_e(e, acct, folder, uid, parts, why, whymax);
+	free(e);
+	return r;
+}
+
+static int pic_fetch_e(PicEntry *e, int acct, const char *folder, unsigned int uid, const char *parts, char *why, int whymax)
+{
 	PmShared *s = pm_shared();
 	int n, i, r = PM_RES_OK, done = 0, shown = 0, notshown = 0, wanted = 0, k;
 	long budget = pic_budget();

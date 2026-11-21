@@ -2271,7 +2271,7 @@ void CPmView::AskForPicturesL()
 	{
 	// (offline too: a part downloaded but not yet decoded is still turned
 	// into a picture; the engine fetches nothing then)
-	if (iPictures->Asked() || !iRunning)
+	if (iPictures->Asked() || (!iRunning && !iEngineAsleep))
 		return;
 	TBuf8<PM_ARG_MAX> arg;
 	TInt total = 0;
@@ -2313,8 +2313,18 @@ void CPmView::RefreshPicturesL()
 		if (iPictures->LoadReadyL(iCoeEnv->FsSession(), i))
 			any = ETrue;
 		}
-	if (!any)
+	// (1.15, MEM-59) each picture laid the whole message out again (about
+	// three times its text in passing): now at most every 2 s while the
+	// engine is still setting pictures out, and once when it has done
+	if (any)
+		iPicRelayoutDue = ETrue;
+	if (!iPicRelayoutDue)
 		return;
+	TUint now = User::TickCount();
+	if ((OpInFlight(PM_CMD_PICTURES) || OpInFlight(PM_CMD_WEBPICS)) && iPicRelayoutAt && now - iPicRelayoutAt < 128)
+		return;                                    // (TickL comes back to it)
+	iPicRelayoutDue = EFalse;
+	iPicRelayoutAt = now ? now : 1;
 	RelayoutReaderL();
 	}
 
@@ -3354,7 +3364,7 @@ void CPmView::StatusInfoL()
 		lines[6].Append(Clip(iStatus, 60));
 		}
 	else
-		lines[6] = iRunning ? _L("The mail engine is ready") : _L("The mail engine is not running");
+		lines[6] = iRunning ? _L("The mail engine is ready") : iEngineAsleep ? _L("The mail engine is resting, to save memory") : _L("The mail engine is not running");
 	TBool memLine = !(Busy() && iLastProgress.Length()) && !iStatus.Length();
 	{
 	// where the mail is kept (pmstore.cpp), the disk's room, and memory

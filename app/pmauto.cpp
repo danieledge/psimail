@@ -109,7 +109,7 @@ void CPmView::CheckDueL()
 		return;
 	if (++iCheckTicks * 5 < minutes)
 		return;
-	if (iMode == ENoAccount || !iRunning || iSettings->iOffline || iLoginHeld)
+	if (iMode == ENoAccount || (!iRunning && !iEngineAsleep) || iSettings->iOffline || iLoginHeld)
 		{
 		iCheckTicks = 0;                 // (working offline: never dial; a refused login: not until it is put right)
 		return;
@@ -133,6 +133,39 @@ void CPmView::CheckDueL()
 // command ends the wait within a second. On the modem route the line is
 // dropped after use, so it is a check every 10 minutes instead. A server
 // without IDLE: the same, until the preference is set again.
+
+// ----- (1.15) short of memory (MEM-55) ----------------------------------------
+//
+// The engine (psimail.exe, about 0.8 MB of code and heap) need not run
+// while PsiMail is behind other programs with nothing to do. When the
+// memory watcher (PsiHub, core psimemlvl.h) says memory is low, the engine
+// ends by itself at an idle moment (engine/pmmain.c, pm_loop) unless the
+// app says it must stay (keep_awake); on "sleep" the app ends it
+// (MemWordL). Either way it is woken quietly by the next command, or when
+// PsiMail comes to the front (WakeEngineL).
+
+// what needs the engine even behind other programs
+TBool CPmView::KeepEngine() const
+	{
+	if (iMode == ENoAccount)
+		return EFalse;
+	if (!iSettings->iOffline && CheckMinutes(*iSettings))
+		return ETrue;                    // a timed check, or new mail at once
+	return iIdleCmd || CalendarBusy() || iUpdDlg;
+	}
+
+// a transfer running or queued, or an update: not to be put to sleep
+TBool CPmView::MemBusy() const
+	{
+	return (iRunning && iShared && Busy()) || iUpdDlg || CalendarBusy();
+	}
+
+void CPmView::MemTick(TBool aFront)
+	{
+	if (iShared && iRunning)
+		iShared->keep_awake = aFront || KeepEngine() || iUpdDlg ? 1 : 0;
+	((CPmAppUi*)iEikonEnv->EikAppUi())->SetMemBusy(MemBusy());
+	}
 
 TBool CPmView::IdleWanted() const
 	{

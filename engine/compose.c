@@ -307,14 +307,45 @@ static void rfc_date(long t, char *out)
 		secs / 3600, (secs / 60) % 60, secs % 60);
 }
 
+/* (1.15) what one message being made ready needs (17 KB): taken for it and
+   given back, not statics for as long as the engine runs */
+typedef struct {
+	char line[1100], to[1100], cc[1100], bcc[1100], subject[400], irt[200], refs[1000];
+	char attach[8][260];                 /* (a full EPOC file name is 256: at 150 a long one was cut and "missing") */
+	ItipReply itip;
+	char ics[4096];
+} ComposeWork;
+
+static int compose_mime_w(ComposeWork *w, int acct, const char *outbox_path, const char *mime_path,
+                 char *from_addr, int famax, char *rcpts, int rmax, char *why, int whymax);
+
 int compose_mime(int acct, const char *outbox_path, const char *mime_path,
                  char *from_addr, int famax, char *rcpts, int rmax, char *why, int whymax)
 {
+	ComposeWork *w = (ComposeWork *)malloc(sizeof(ComposeWork));
+	int r;
+	if (!w) { set_why(why, whymax, "Not enough memory for the message"); return PM_RES_FAILED; }
+	r = compose_mime_w(w, acct, outbox_path, mime_path, from_addr, famax, rcpts, rmax, why, whymax);
+	free(w);
+	return r;
+}
+
+#define line (w->line)
+#define to (w->to)
+#define cc (w->cc)
+#define bcc (w->bcc)
+#define subject (w->subject)
+#define irt (w->irt)
+#define refs (w->refs)
+#define attach (w->attach)
+#define itip (w->itip)
+
+static int compose_mime_w(ComposeWork *w, int acct, const char *outbox_path, const char *mime_path,
+                 char *from_addr, int famax, char *rcpts, int rmax, char *why, int whymax)
+{
 	PmAccount *a = &pm_shared()->acct[acct];
-	static char line[1100], to[1100], cc[1100], bcc[1100], subject[400], irt[200], refs[1000];
-	static char attach[8][260];              /* (a full EPOC file name is 256: at 150 a long one was cut and "missing") */
-	static ItipReply itip;
 	int natt = 0, i, rich = 0, blen = 0;
+	long attbytes = 0;
 	char *body;
 	FILE *in, *f;
 	char date[40], boundary[48], msgid[140], fromh[200];
@@ -352,7 +383,21 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 	for (i = 0; i < natt; i++) {
 		FILE *t = fopen(attach[i], "rb");
 		if (!t) { fclose(in); set_why(why, whymax, "Attachment missing: %s", attach[i]); return PM_RES_FAILED; }
+		fseek(t, 0, SEEK_END);
+		attbytes += ftell(t);
 		fclose(t);
+	}
+	if (natt) {
+		/* (1.15) the message to send is the attachments in base64 (4/3 of
+		   them) on the store disk: room for it first, and on C: 768 KB
+		   kept free besides, rather than running the Psion's memory out */
+		long need = attbytes / 3 * 4 / 1024 + 64, freekb = pm_free_kb(mime_path);
+		int onc = mime_path[0] == 'C' || mime_path[0] == 'c';
+		if (freekb >= 0 && freekb < need + (onc ? 768 : 0)) {
+			fclose(in);
+			set_why(why, whymax, "No room left to send it (%ld KB needed, %ld KB free)", need + (onc ? 768 : 0), freekb);
+			return PM_RES_FAILED;
+		}
 	}
 	if (!(f = fopen(mime_path, "wb"))) { fclose(in); pm_write_why(why, whymax, "the message to send", mime_path); return PM_RES_FAILED; }
 
@@ -386,8 +431,8 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 	if (itip.partstat[0]) {
 		/* a reply to an invitation: the words, and the iTIP REPLY that
 		   calendar programs act on (RFC 6047), as alternatives */
-		static char ics[4096];
-		int ilen = itip_build(&itip, pm_time(), ics, sizeof(ics));
+		char *ics = w->ics;
+		int ilen = itip_build(&itip, pm_time(), ics, sizeof(w->ics));
 		char alt[56];
 		if (ilen < 0) { free(body); fclose(f); remove(mime_path); set_why(why, whymax, "The reply to the invitation is damaged"); return PM_RES_FAILED; }
 		sprintf(alt, "%s_alt", boundary);
@@ -454,3 +499,12 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 	if (pm_fclose(f) != 0) { remove(mime_path); pm_write_why(why, whymax, "the message to send", mime_path); return PM_RES_FAILED; }
 	return PM_RES_OK;
 }
+#undef line
+#undef to
+#undef cc
+#undef bcc
+#undef subject
+#undef irt
+#undef refs
+#undef attach
+#undef itip

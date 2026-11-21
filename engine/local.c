@@ -71,7 +71,7 @@ static int msg_matches(int acct, const char *folder, const PmMsg *m, const char 
 int local_search(int acct, const char *folder, const char *words, char *why, int whymax)
 {
 	static PmIndex fx, ix;
-	static char buf[LS_TEXT];
+	char *buf;                         /* (1.15) LS_TEXT, taken for the search only */
 	int i, found = 0, total;
 	char w[64];
 	if (!next_word(words, w, sizeof(w))) {
@@ -81,6 +81,11 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 	memset(&ix, 0, sizeof(ix));
 	if (st_index_load(acct, folder, "index.txt", &fx) != 0) {
 		snprintf(why, whymax, "Nothing in this folder here");
+		return PM_RES_FAILED;
+	}
+	if (!(buf = (char *)malloc(LS_TEXT))) {
+		st_index_free(&fx);
+		snprintf(why, whymax, "Not enough memory to find");
 		return PM_RES_FAILED;
 	}
 	total = fx.n;
@@ -94,6 +99,7 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 		}
 		if (pm_cancelled()) {
 			pm_cpu_low(0);
+			free(buf);
 			st_index_free(&fx);
 			st_index_free(&ix);
 			snprintf(why, whymax, "Stopped");
@@ -108,6 +114,7 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 		}
 	}
 	pm_cpu_low(0);
+	free(buf);
 	ix.uidvalidity = fx.uidvalidity;
 	st_index_free(&fx);
 	if (st_index_save(acct, folder, "search.txt", &ix) != 0) {

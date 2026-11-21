@@ -453,22 +453,76 @@ static void on_list(ImapNode *r, void *ctx)
 	}
 }
 
+/* (1.15) A folder deleted or renamed from another program left its
+   F<hash> folder (every message's files) on the store for good. After a
+   whole LIST - nothing damaged, not cut at 80 - the account's F<hash>
+   folders that match no listed folder go. INBOX always stays. */
+typedef struct { FolderList *list; int acct; char adir[160]; } DirSweep;
+
+static int hexname(const char *n)
+{
+	int i;
+	if (n[0] != 'F') return 0;
+	for (i = 1; i <= 8; i++)
+		if (!((n[i] >= '0' && n[i] <= '9') || (n[i] >= 'A' && n[i] <= 'F'))) return 0;
+	return n[9] == 0;
+}
+
+static void dir_sweep_cb(const char *name, void *ctx)
+{
+	DirSweep *d = (DirSweep *)ctx;
+	char want[200], have[200];
+	int i;
+	if (!hexname(name)) return;
+	snprintf(have, sizeof(have), "%s%s%s", d->adir, name, PM_SEP);
+	st_folder_dir(d->acct, "INBOX", want, sizeof(want));
+	if (!strcmp(want, have)) return;
+	for (i = 0; i < d->list->n; i++) {
+		st_folder_dir(d->acct, d->list->f[i].name, want, sizeof(want));
+		if (!strcmp(want, have)) return;
+	}
+	pm_log("imap: %s matches no folder on the server: removed", name);
+	pm_rmtree(have);
+}
+
+static int list_folders(int acct, FolderList *flp, char *why, int whymax);
+
 int imap_list_folders(int acct, char *why, int whymax)
 {
-	static FolderList fl;
+	/* (1.15) taken for the list only (11.5 KB), not a static for as long as
+	   the engine runs */
+	FolderList *fl = (FolderList *)malloc(sizeof(FolderList));
+	int r;
+	if (!fl) { set_why(why, whymax, "Not enough memory for the folder list"); return PM_RES_FAILED; }
+	r = list_folders(acct, fl, why, whymax);
+	free(fl);
+	return r;
+}
+
+static int list_folders(int acct, FolderList *flp, char *why, int whymax)
+{
+#define fl (*flp)
 	static const char order[] = "IDSAJT-N";
 	char dir[160], path[190], tmp[190], disp[128];
 	FILE *f;
-	int r, i, o;
+	int r, i, o, damaged;
 
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
 	pm_progress("Getting the folder list\x85");
 	memset(&fl, 0, sizeof(fl));
+	damaged = g_damaged;
 	if (has_cap("LIST-STATUS") && has_cap("SPECIAL-USE"))
 		r = cmd(on_list, &fl, why, whymax, "LIST \"\" \"*\" RETURN (SPECIAL-USE STATUS (MESSAGES UNSEEN))");
 	else
 		r = cmd(on_list, &fl, why, whymax, "LIST \"\" \"*\"");
 	if (r != PM_RES_OK) return r;
+	if (fl.n > 0 && fl.n < 80 && g_damaged == damaged) {
+		static DirSweep ds;
+		ds.list = &fl;
+		ds.acct = acct;
+		st_acct_dir(acct, ds.adir, sizeof(ds.adir));
+		pm_list_subdirs(ds.adir, dir_sweep_cb, &ds);
+	}
 	for (i = 0; i < fl.n && i < 30; i++) {
 		char q[160];
 		if (fl.f[i].have_status || fl.f[i].kind == 'N') continue;
@@ -498,6 +552,7 @@ int imap_list_folders(int acct, char *why, int whymax)
 	}
 	st_changed();
 	return PM_RES_OK;
+#undef fl
 }
 
 int imap_special_folder(int acct, char kind, char *out, int max)
@@ -831,9 +886,13 @@ static void on_fetch_msg(ImapNode *r, void *ctx)
 	ip_str(ip_nth(env, 8), m->inreplyto, sizeof(m->inreplyto));
 	ip_str(ip_nth(env, 9), m->msgid, sizeof(m->msgid));
 	if ((v = ip_get(items, "BODYSTRUCTURE")) != 0) {
-		static PmStructure st;
-		mime_structure(v, &st);
-		m->attach = st.nattach > 0;
+		/* (1.15) taken for the message, not a static (6 KB) for as long as
+		   the engine runs */
+		PmStructure *st = (PmStructure *)malloc(sizeof(PmStructure));
+		if (!st) { sc->oom = 1; return; }
+		mime_structure(v, st);
+		m->attach = st->nattach > 0;
+		free(st);
 	}
 	if (!st_flag_has(m->flags, 'S')) sc->newunseen++;
 	sc->count++;
@@ -849,6 +908,61 @@ static int cmp_uint(const void *a, const void *b)
 
 #define FETCH_ITEMS "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODYSTRUCTURE)"
 
+/* (1.15) A message's opened attachments (Open\<uid>\, kept so opening
+   one again is instant) go with the message: before, they stayed on the
+   store for good, which with no card is C:, so RAM. Kept only while a
+   message waiting in the Outbox (a forward with its attachments) names a
+   file there. */
+typedef struct { const char *dir; const char *needle; int found; } ObxCtx;
+
+static void obx_cb(const char *name, void *ctx)
+{
+	ObxCtx *o = (ObxCtx *)ctx;
+	char path[220];
+	static char buf[4096];
+	FILE *f;
+	size_t n;
+	if (o->found) return;
+	snprintf(path, sizeof(path), "%s%s", o->dir, name);
+	if (!(f = fopen(path, "rb"))) return;
+	/* the headers, Attach: lines among them, come before the text */
+	n = fread(buf, 1, sizeof(buf) - 1, f);
+	fclose(f);
+	buf[n] = 0;
+	if (pm_stristr(buf, o->needle)) o->found = 1;
+}
+
+static int outbox_names(int acct, const char *needle)
+{
+	char dir[160];
+	ObxCtx o;
+	st_acct_dir(acct, dir, sizeof(dir));
+	pm_copy(dir + strlen(dir), "outbox" PM_SEP, (int)(sizeof(dir) - strlen(dir)));
+	o.dir = dir; o.needle = needle; o.found = 0;
+	pm_list_dir(dir, ".txt", obx_cb, &o);
+	return o.found;
+}
+
+void st_open_remove(int acct, const char *folder, unsigned int uid)
+{
+	char d[200], needle[40];
+	st_folder_dir(acct, folder, d, sizeof(d));
+	snprintf(needle, sizeof(needle), "Open%s%u%s", PM_SEP, uid, PM_SEP);
+	if (strlen(d) + strlen(needle) >= sizeof(d)) return;
+	strcat(d, needle);
+	if (outbox_names(acct, d)) return;
+	pm_rmtree(d);
+}
+
+/* Everything kept beside a message that is not in its list any more:
+   opened attachments, invitation and card files (1.15: these stayed when a
+   message was deleted or moved) */
+void st_extras_remove(int acct, const char *folder, unsigned int uid)
+{
+	st_open_remove(acct, folder, uid);
+	inv_remove(acct, folder, uid);
+}
+
 static void remove_cached(int acct, const char *folder, unsigned int uid)
 {
 	char p[190];
@@ -856,7 +970,34 @@ static void remove_cached(int acct, const char *folder, unsigned int uid)
 	st_msg_path(acct, folder, uid, "att", p, sizeof(p)); remove(p);
 	st_msg_path(acct, folder, uid, "htm", p, sizeof(p)); remove(p);
 	pic_remove(acct, folder, uid);
-	inv_remove(acct, folder, uid);
+	st_extras_remove(acct, folder, uid);
+}
+
+/* (1.15) Open\ folders left by earlier versions, for messages no longer
+   in the list: swept after a whole sync */
+typedef struct { int acct; const char *folder; PmIndex *ix; } OpenSweep;
+
+static void open_sweep_cb(const char *name, void *ctx)
+{
+	OpenSweep *o = (OpenSweep *)ctx;
+	unsigned int uid = 0;
+	const char *p = name;
+	if (!*p) return;
+	for (; *p; p++) {
+		if (*p < '0' || *p > '9') return;          /* (only <uid> folders) */
+		uid = uid * 10 + (unsigned)(*p - '0');
+	}
+	if (uid && !st_index_find(o->ix, uid)) st_open_remove(o->acct, o->folder, uid);
+}
+
+static void open_sweep(int acct, const char *folder, PmIndex *ix)
+{
+	char d[200];
+	OpenSweep o;
+	st_folder_dir(acct, folder, d, sizeof(d));
+	pm_copy(d + strlen(d), "Open" PM_SEP, (int)(sizeof(d) - strlen(d)));
+	o.acct = acct; o.folder = folder; o.ix = ix;
+	pm_list_subdirs(d, open_sweep_cb, &o);
 }
 
 int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
@@ -990,6 +1131,7 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 	if (r == PM_RES_OK) {
 		if (sc.count) set_why(why, whymax, "%d new", sc.count);
 		else if (!older) set_why(why, whymax, "No new messages");
+		open_sweep(acct, folder, &ix);
 	}
 	st_index_free(&ix);
 	return r;
@@ -1388,11 +1530,15 @@ int imap_body(int acct, const char *folder, unsigned int uid, int full, char *wh
 	return r;
 }
 
+/* (1.15) one BodyCtx (10 KB) for a message's text and for an attachment:
+   the two never run at once (imap_attach used to have its own) */
+static BodyCtx g_bodyctx;
+
 static int imap_body_1(int acct, const char *folder, unsigned int uid, int full, char *why, int whymax)
 {
 	int keep_unread = (full & 2) != 0;     /* 2: downloaded ahead - not read yet */
 	PmAccount *a = &pm_shared()->acct[acct];
-	static BodyCtx b;
+#define b g_bodyctx
 	char path[190], tmp[196], raw[196], hp[190], apath[190], dir[160];
 	int r, i;
 	long limit = (a->max_body_kb > 0 ? a->max_body_kb : 64) * 1024L;
@@ -1547,6 +1693,8 @@ static int imap_body_1(int acct, const char *folder, unsigned int uid, int full,
 	st_changed();
 	return PM_RES_OK;
 }
+#undef b
+
 
 /* ----------------------------------------------------------- attachments */
 
@@ -1599,7 +1747,7 @@ static void safe_name(const char *in, char *out, int max)
 /* dir: where to put it (the app's Open folder), else s->attach_dir */
 int imap_attach(int acct, const char *folder, unsigned int uid, const char *part, const char *dir, char *why, int whymax)
 {
-	static BodyCtx b;
+#define b g_bodyctx
 	static AttCtx c;
 	PmShared *s = pm_shared();
 	PmPart *p = 0;
@@ -1615,6 +1763,20 @@ int imap_attach(int acct, const char *folder, unsigned int uid, const char *part
 	if (!p) { set_why(why, whymax, "That attachment is not in the message any more"); return PM_RES_FAILED; }
 
 	if (!dir || !dir[0]) dir = s->attach_dir;
+	{
+		/* (1.15) room for it first: an attachment was written piece by
+		   piece until the disk was full, which on C: is the Psion's
+		   memory - every other program short of it meanwhile. On C: 768 KB
+		   is kept free besides. */
+		long need = (p->enc == ENC_BASE64 ? p->size / 4 * 3 : p->size) / 1024 + 16;
+		long freekb = pm_free_kb(dir);
+		int onc = dir[0] == 'C' || dir[0] == 'c';
+		if (freekb >= 0 && freekb < need + (onc ? 768 : 0)) {
+			if (onc) set_why(why, whymax, "No room left on C: for the attachment (%ld KB needed, %ld KB free)", need + 768, freekb);
+			else set_why(why, whymax, "No room left for the attachment (%ld KB needed, %ld KB free)", need, freekb);
+			return PM_RES_FAILED;
+		}
+	}
 	safe_name(p->name[0] ? p->name : "attachment", name, sizeof(name));
 	pm_mkdir(dir);
 	/* don't overwrite: name.ext, name(1).ext ... */
@@ -1649,6 +1811,7 @@ int imap_attach(int acct, const char *folder, unsigned int uid, const char *part
 	pm_copy(s->last_file, path, sizeof(s->last_file));
 	set_why(why, whymax, "Saved %s", path);
 	return PM_RES_OK;
+#undef b
 }
 
 /* a part into a file, decoded (pictures.c: the picture parts of a message) */
@@ -1850,6 +2013,12 @@ int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
 	sprintf(tag, "P%03d", ++g_tagno % 1000);
 	n = sprintf(out, "%s IDLE\r\n", tag);
 	if (pmn_write(out, n) != 0) return lost(why, whymax, -1);
+	/* (1.15) the wait reads its own line[]: the response buffer and the
+	   parser's nodes (about 110 KB) go back for the whole of it, and
+	   imap_open takes them again for whatever comes next */
+	ip_work(0);
+	if (g_resp) { psi_work_free(g_resp); g_resp = 0; g_rlen = 0; }
+	psi_work_trim();
 	t0 = pm_ms();
 	pm_progress("Waiting for new mail\x85");
 	for (;;) {

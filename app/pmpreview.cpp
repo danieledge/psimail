@@ -320,6 +320,12 @@ void CPmView::PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC
 				TInt e = -1;
 				if (iPrevPictures && PicturesPref() == 0 && src.Length() > 4 && src.Left(4).CompareF(_L("cid:")) == 0)
 					e = iPrevPictures->FindCid(src.Mid(4));
+				if (e >= 0 && aText.Length() < aText.MaxLength() - 4)
+					{
+					// (1.15, MEM-59) read only when it is placed
+					TRAPD(le, iPrevPictures->LoadReadyL(iCoeEnv->FsSession(), e));
+					(void)le;
+					}
 				if (e >= 0 && iPrevPictures->At(e).iState == TPmPicEntry::EReady && iPrevPictures->At(e).iBitmap &&
 					aText.Length() < aText.MaxLength() - 4)
 					{
@@ -503,11 +509,8 @@ void CPmView::PreviewSyncL()
 	TFileName dir;
 	FolderDir(iFolder, dir);
 	iPrevPictures->LoadIndexL(iCoeEnv->FsSession(), dir, row.iUid);
-	for (TInt k = 0; k < iPrevPictures->Count(); k++)
-		{
-		TRAPD(le, iPrevPictures->LoadReadyL(iCoeEnv->FsSession(), k));
-		(void)le;
-		}
+	// (1.15, MEM-59) the pictures are read as they are placed (in the
+	// text, then attached ones after it), not every one at full size first
 	}
 	HBufC* file = NULL;
 	if (have)
@@ -543,7 +546,11 @@ void CPmView::PreviewSyncL()
 		TBool placed = EFalse;
 		for (TInt pl = 0; pl < iPrevPictures->PlaceCount(); pl++)
 			if (iPrevPictures->Place(pl).iEntry == pe) placed = ETrue;
-		if (placed || en.iWeb || en.iState != TPmPicEntry::EReady || !en.iBitmap || PicturesPref() == 2)
+		if (placed || en.iWeb || PicturesPref() == 2)
+			continue;
+		TRAPD(le, iPrevPictures->LoadReadyL(iCoeEnv->FsSession(), pe));
+		(void)le;
+		if (en.iState != TPmPicEntry::EReady || !en.iBitmap)
 			continue;
 		iPrevPictures->AddPlaceL(pe, t.Length());
 		t.Append(' ');

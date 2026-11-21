@@ -39,6 +39,8 @@
 #include "psikeep.h"           // (1.11) settings kept on the card, without passwords
 #include "psitbar.h"           // (1.14) which toolbar: Coda's netBook or not (core)
 #include "psiabout.h"          // (1.14) the family's About box (core)
+#include "psimem.h"            // (1.15) short of memory: the watcher's words, its list (core)
+#include "pmpict.h"            // (1.15) DropMessage: the pictures
 
 // how many of the newest messages to download ahead after a sync
 static TInt PrefetchCount(const TPmSettings& aSettings)
@@ -122,7 +124,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.14");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.15");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -760,6 +762,14 @@ void CPmView::EngineEnded()
 	TExitCategoryName cat = iProcess.ExitCategory();
 	iProcess.Close();
 	iRunning = EFalse;
+	if (iShared->slept && !iShared->quitting)
+		{
+		// (1.15) it ended by itself: memory low, nothing to do, nothing
+		// that needs it (keep_awake). Woken by the next command, or when
+		// PsiMail comes to the front (WakeEngineL); no word to the user
+		iEngineAsleep = ETrue;
+		return;
+		}
 	if (iUpdDlg && !iUpdEnded)
 		{
 		// the engine went while updating: the progress window must not wait for it
@@ -840,7 +850,7 @@ void CPmView::StopEngineWork(const TDesC& aToast)
 void CPmView::Cmd(TInt aOp, const TDesC8& aFolder, TUint aUid, const TDesC8& aArg)
 	{
 	PmShared* s = iShared;
-	if (!iRunning && !EngineBackL())         // (0.75: started again if it can be - pmrecover.cpp)
+	if (!iRunning && !(iEngineAsleep ? WakeEngineL() : EngineBackL()))   // (0.75: started again if it can be - pmrecover.cpp; 1.15: woken)
 		{
 		Toast(_L("The mail engine is not running"));
 		return;
@@ -965,7 +975,9 @@ void CPmView::MsgPath(TUint aUid, const TDesC& aExt, TDes& aPath) const
 	}
 
 // Reads a whole file (up to aMax bytes). aBuf is NULL if it isn't there.
-void CPmView::ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax)
+// (1.15) aTail: a file over aMax is read from its end (a folder's list:
+// the newest messages are its last lines), not its start
+void CPmView::ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax, TBool aTail)
 	{
 	aBuf = NULL;
 	RFile f;
@@ -973,8 +985,17 @@ void CPmView::ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax)
 		return;
 	TInt size = 0;
 	f.Size(size);
+	TBool cut = EFalse;
 	if (size > aMax)
+		{
+		if (aTail)
+			{
+			TInt pos = size - aMax;
+			f.Seek(ESeekStart, pos);
+			cut = ETrue;
+			}
 		size = aMax;
+		}
 	HBufC* b = HBufC::New(size + 1);
 	if (!b)
 		{
@@ -988,6 +1009,12 @@ void CPmView::ReadFileL(const TDesC& aName, HBufC*& aBuf, TInt aMax)
 		{
 		delete b;
 		return;
+		}
+	if (cut)
+		{
+		// read from the middle of a line: it goes, from the next whole one
+		TInt nl = p.Locate('\n');
+		p.Delete(0, nl >= 0 ? nl + 1 : p.Length());
 		}
 	aBuf = b;
 	}
@@ -1166,11 +1193,20 @@ void CPmView::LoadListL()
 	FolderDir(iFolder, path);
 	path.Append(iSearch ? _L("search.txt") : _L("index.txt"));
 	HBufC* buf = NULL;
-	ReadFileL(path, buf, 400 * 1024);
+	ReadFileL(path, buf, 400 * 1024, ETrue);
 	if (buf)
 		{
 		CleanupStack::PushL(buf);
 		TPtrC rest = *buf;
+		// (1.15) the rows' room taken once, not 32 at a time (7 copies of
+		// up to 45 KB at every reload of a 200-message list)
+		{
+		TInt lines = 0;
+		for (TInt k = 0; k < rest.Length(); k++)
+			if (rest[k] == '\n')
+				lines++;
+		iRows->SetReserveL(lines + 1);
+		}
 		while (rest.Length())
 			{
 			TInt nl = rest.Locate('\n');
@@ -1511,6 +1547,8 @@ void CPmView::OpenCurrentL()
 	TBool wasUnread = row.iFlags.Locate('S') < 0;
 	iMsgUid = row.iUid;
 	iMode = EMessage;
+	DropPreview();                           // (1.15) the reader shows it now: not held twice
+	iPicRelayoutDue = EFalse;
 	if (wasUnread)
 		row.iFlags.Append('S');                  // the engine marks it read
 	iBodyError.Zero();
@@ -1530,11 +1568,109 @@ void CPmView::OpenCurrentL()
 	Render();
 	}
 
+// (1.15) Back from a message: its text, the reader's copy of it and its
+// pictures (up to 600 KB, 1.2 MB in colour, in the bitmap server) were all
+// kept until the next message was opened - all day, with PsiMail behind.
+// Opening it again reads it from the store, as opening any message does.
+void CPmView::DropMessage()
+	{
+	if (iMode == EMessage)
+		return;
+	if (iReader)
+		{
+		// the text first: its pictures point at the bitmaps (see DestroyNative)
+		iReader->RichText()->Reset();
+		TRAPD(e, iReader->HandleTextChangedL());
+		(void)e;
+		}
+	if (iPictures)
+		iPictures->Reset();
+	if (iLinks)
+		iLinks->Reset();
+	delete iText;
+	iText = NULL;
+	iWaitingBody = ETrue;
+	iReaderUid = 0;
+	iPicRelayoutDue = EFalse;
+	User::Heap().Compress();
+	}
+
+// the preview's message and pictures, when the reader takes over (or the
+// memory is short); laid out again when the list is next shown
+void CPmView::DropPreview()
+	{
+	if (iPreview)
+		{
+		iPreview->RichText()->Reset();
+		TRAPD(e, iPreview->HandleTextChangedL());
+		(void)e;
+		}
+	if (iPrevPictures)
+		iPrevPictures->Reset();
+	iPrevUid = 0;
+	}
+
+// (1.15, MEM-55) The memory watcher's words. "trim": the message closed
+// before and the preview (behind other programs) go, the heap's free end
+// is given back, and the engine gives back its own at its next idle
+// moment. "sleep" and "sleepnow": the same, and behind other programs the
+// engine ends (its 0.8 MB of code and heap) if nothing is lost by it - no
+// transfer, nothing queued, no new mail at once, no timed check, no
+// calendar sync; it is started again, quietly, by the next command or when
+// PsiMail comes to the front. aWhy: why not, for "sleepnow"'s answer.
+void CPmView::MemWordL(TInt aWord, TBool aFront, TDes& aWhy)
+	{
+	aWhy.Zero();
+	if (iMode != EMessage)
+		DropMessage();
+	if (!aFront && iMode != EMessage)
+		DropPreview();
+	User::Heap().Compress();
+	if (iRunning && iShared)
+		{
+		iShared->trim_req = 1;
+		RingEngine();
+		}
+	if (aWord == EPsiMemWordTrim)
+		return;
+	if (!iRunning)
+		return;                              // (asleep already, or not started)
+	if (aFront)
+		aWhy.Copy(_L("it is in use"));
+	else if (MemBusy() || Busy())
+		aWhy.Copy(_L("it is fetching mail"));
+	else if (KeepEngine())
+		aWhy.Copy(_L("it checks for new mail"));
+	if (aWhy.Length())
+		return;
+	StopEngine();                            // (it logs out and hangs up: a few seconds at most)
+	iEngineAsleep = ETrue;
+	}
+
+// asleep (MemWordL, or the engine's own end at low memory): started again,
+// with no message
+TBool CPmView::WakeEngineL()
+	{
+	if (iRunning)
+		return ETrue;
+	if (!iShared || iClosing || iRestarting)
+		return EFalse;
+	iEngineAsleep = EFalse;
+	iRestarting = ETrue;
+	TRAPD(err, StartEngineL());
+	iRestarting = EFalse;
+	(void)err;
+	if (iRunning)
+		CopySettingsToShared();
+	return iRunning;
+	}
+
 void CPmView::BackL()
 	{
 	if (iMode == EMessage)
 		{
 		iMode = iListMode;
+		DropMessage();
 		if (iMode == EList) LoadListL(); else LoadOutboxL();
 		}
 	else if (iSidebar)
@@ -2346,6 +2482,12 @@ void CPmView::TickL()
 		TRAPD(pe, RefreshPicturesL());
 		(void)pe;
 		}
+	else if (iMode == EMessage && iPicRelayoutDue)
+		{
+		TRAPD(pe, RefreshPicturesL());       // (1.15) the pictures that came meanwhile
+		(void)pe;
+		}
+	MemTick(((CPmAppUi*)iEikonEnv->EikAppUi())->InFront());
 	if (s->done_seq != iDoneSeen && !iInResults && !iClosing)
 		{
 		// (one result at a time: a dialog it brings is answered before the
@@ -4022,6 +4164,9 @@ void CPmAppUi::ConstructL()
 	iView = new(ELeave) CPmView;
 	iView->ConstructL(ClientRect(), iSettings, iCalSettings);
 	AddToStackL(iView);
+	// (1.15, MEM-55) on the memory watcher's list (psimemlvl.h): PsiMail
+	// takes "trim" and "sleep" (ProcessMessageL)
+	PsiMemRegister(iMemChunk, KUidPsiMail.iUid);
 	if (iTall && iToolBar)
 		{
 		// (1.00) the connection panel in the toolbar's gap (tall screens)
@@ -4350,7 +4495,14 @@ void CPmAppUi::HandleWsEventL(const TWsEvent& aEvent, CCoeControl* aDestination)
 	if (type == EEventFocusGained || type == EEventFocusLost)
 		iForeground = type == EEventFocusGained;
 	if (type == EEventFocusGained && iView && !iExiting)
+		{
 		iView->LinkToShared();               // (1.12, review R60) a route changed elsewhere
+		if (iView->iEngineAsleep)
+			{
+			TRAPD(we, iView->WakeEngineL());     // (1.15) asleep for the memory: back with PsiMail
+			(void)we;
+			}
+		}
 	if (type == EEventFocusGained || type == EEventFocusLost || type == EEventKey || type == EEventPointer)
 		UpdateReading();
 	}
@@ -4460,6 +4612,7 @@ void CPmAppUi::ExitTick()
 
 CPmAppUi::~CPmAppUi()
 	{
+	PsiMemUnregister(iMemChunk, KUidPsiMail.iUid);
 	iReading.Leave(iCoeEnv->FsSession(), KUidPsiMail);   // the user's contrast and backlight back
 	delete iExitTimer;
 	delete iSoon;
@@ -4637,6 +4790,20 @@ void CPmAppUi::MailtoOrSayL(const TDesC& aUrl)
 // PsiWeb (or anyone) hands PsiMail a mailto: link as a message ...
 void CPmAppUi::ProcessMessageL(TUid aUid, const TDesC8& aParams)
 	{
+	// (1.15, MEM-55) short of memory: the memory watcher's words (psimem.h),
+	// never opened as a file (CEikAppUi's would)
+	if (aUid.iUid == KPsiMemMsgUid)
+		{
+		TPsiMemWord w = PsiMemWordOf(aUid, aParams);
+		if (w == EPsiMemWordNone || !iView || iExiting)
+			return;
+		TBuf<48> why;
+		TRAPD(err, iView->MemWordL(w, iForeground, why));
+		(void)err;
+		if (w == EPsiMemWordSleepNow)
+			PsiMemAnswer(iCoeEnv->WsSession(), KUidPsiMail.iUid, why.Length() ? KPsiMemCannot : KPsiMemSlept, why);
+		return;
+		}
 	if (aUid != KUidPsiMail)
 		{
 		CEikAppUi::ProcessMessageL(aUid, aParams);
@@ -6281,7 +6448,36 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 	DynInitMail2L(aMenuId, aMenuPane);           // invitations, cards, Word (pminvite.cpp)
 	}
 
+// (1.15) while a command runs (a dialog up) PsiMail is busy for the memory
+// watcher: not put to sleep or closed then
 void CPmAppUi::HandleCommandL(TInt aCommand)
+	{
+	iCommands++;
+	SetMemBusy(iViewBusy);
+	CleanupStack::PushL(TCleanupItem(CommandDone, this));
+	DoCommandL(aCommand);
+	CleanupStack::PopAndDestroy();
+	}
+
+void CPmAppUi::CommandDone(TAny* aSelf)
+	{
+	CPmAppUi* ui = (CPmAppUi*)aSelf;
+	ui->iCommands--;
+	ui->SetMemBusy(ui->iViewBusy);
+	}
+
+void CPmAppUi::SetMemBusy(TBool aViewBusy)
+	{
+	iViewBusy = aViewBusy;
+	TBool busy = iViewBusy || iCommands > 0;
+	if (busy != iMemBusyNow)
+		{
+		iMemBusyNow = busy;
+		PsiMemBusy(iMemChunk, KUidPsiMail.iUid, busy);
+		}
+	}
+
+void CPmAppUi::DoCommandL(TInt aCommand)
 	{
 	if (iExiting)
 		return;                              // closing: the engine is stopping (BeginExitL)

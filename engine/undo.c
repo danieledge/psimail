@@ -329,6 +329,7 @@ static void drop_dest(int acct, const char *dest, unsigned int uid)
 		st_index_save(acct, dest, "index.txt", &ix);
 		for (i = 0; i < 3; i++) { st_msg_path(acct, dest, uid, k_ext[i], p, sizeof(p)); remove(p); }
 		pic_remove(acct, dest, uid);
+		st_extras_remove(acct, dest, uid);       /* (1.15) */
 	}
 	st_index_free(&ix);
 }

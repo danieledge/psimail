@@ -62,7 +62,7 @@ void CPmView::UndoL()
 		Toast(_L("Not available in the calendar"));
 		return;
 		}
-	if (!iRunning)
+	if (!iRunning && !(iEngineAsleep && WakeEngineL()))
 		{
 		Toast(_L("Not available - the mail engine is not running"));
 		return;

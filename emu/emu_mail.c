@@ -31,6 +31,7 @@ int pm_app_gone(void) { return 0; }
 int unlink(const char *p);
 int pm_replace(const char *tmp, const char *path) { unlink(path); return rename(tmp, path); }
 long pm_free_kb(const char *path) { (void)path; return -1; }
+long pm_free_ram_kb(void) { return -1; }
 /* (estlib's stdio, declared here: emu objects are built without its headers) */
 void *fopen(const char *path, const char *mode);
 unsigned int fwrite(const void *p, unsigned int sz, unsigned int n, void *f);
@@ -45,6 +46,17 @@ int pm_write_whole(const char *path, const void *data, long n)
 	if (!ok) unlink(path);
 	return ok ? 0 : -1;
 }
+int pm_write_parts(const char *path, const void *head, long hn, const void *data, long n)
+{
+	FILE *f = fopen(path, "wb");
+	int ok;
+	if (!f) return -1;
+	ok = (long)fwrite(head, 1, hn, f) == hn && (n <= 0 || (long)fwrite(data, 1, n, f) == n);
+	if (fclose(f) != 0) ok = 0;
+	if (!ok) unlink(path);
+	return ok ? 0 : -1;
+}
+
 int pg_rx_errors(int *last) { if (last) *last = 0; return 0; }
 void pg_set_link_log(void (*fn)(const char *)) { (void)fn; }
 
@@ -59,6 +71,13 @@ int pm_list_dir(const char *dir, const char *suffix, void (*cb)(const char *, vo
 		k++;
 	}
 	return n;
+}
+
+/* (1.15) no folder listing in the ARM harness: nothing is swept there */
+int pm_list_subdirs(const char *dir, void (*cb)(const char *, void *), void *ctx)
+{
+	(void)dir; (void)cb; (void)ctx;
+	return 0;
 }
 
 void pm_log_path(char *out, int max, int old) { snprintf(out, max, old ? "psimail.old" : "psimail.log"); }

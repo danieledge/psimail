@@ -362,9 +362,21 @@ static void note_pmi(const char *pmi, const char *reason)
 	pm_write_whole(pmi, b, 16 + n + 1);
 }
 
+static int web_fetch_p(WebPic *pics, int acct, const char *folder, unsigned int uid, char *why, int whymax);
+
+/* (1.15) the list (6.5 KB) taken for the command, not a static */
 int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int whymax)
 {
-	static WebPic pics[WEB_MAX];
+	WebPic *pics = (WebPic *)malloc(WEB_MAX * sizeof(WebPic));
+	int r;
+	if (!pics) { snprintf(why, whymax, "Not enough memory for the web pictures"); return PM_RES_FAILED; }
+	r = web_fetch_p(pics, acct, folder, uid, why, whymax);
+	free(pics);
+	return r;
+}
+
+static int web_fetch_p(WebPic *pics, int acct, const char *folder, unsigned int uid, char *why, int whymax)
+{
 	PmShared *s = pm_shared();
 	int n, i, shown = 0, failed = 0, r = PM_RES_OK, hosts = 0;
 	long total = 0, budget = pic_budget();

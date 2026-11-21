@@ -27,6 +27,8 @@ long pm_time(void);                        /* seconds since 1970, UTC */
 int pm_mkdir(const char *path);            /* 0 ok or exists */
 int pm_list_dir(const char *dir, const char *suffix,
                 void (*cb)(const char *name, void *ctx), void *ctx);
+int pm_list_subdirs(const char *dir,       /* (1.15) the folders in dir, by name */
+                void (*cb)(const char *name, void *ctx), void *ctx);
 void pm_log(const char *fmt, ...);
 void pm_log_path(char *out, int max, int old);   /* psimail.log (old: psimail.old) */
 void pm_log_release(void);                 /* close the log so it can be read: the next line opens it again */
@@ -34,10 +36,13 @@ void pm_idle(int ms);                      /* sleep, keeping an eye on quit */
 void pm_rmtree(const char *dir);           /* delete a folder and all in it */
 int  pm_replace(const char *tmp, const char *path); /* tmp takes path's place (path may exist), in one step; 0 ok */
 long pm_free_kb(const char *path);         /* free space on the drive path is on; -1 unknown */
+long pm_free_ram_kb(void);                 /* (1.15) the Psion's free memory (KB); -1 unknown */
 /* a whole file in one go (RFile::Write on the Psion: one file-server call
    rather than stdio's 512-byte pieces, which the emulator's card does not
    like); path is made afresh. 0 ok */
 int  pm_write_whole(const char *path, const void *data, long n);
+/* (1.15) the same from a header and the data, no copy of both made first */
+int  pm_write_parts(const char *path, const void *head, long hn, const void *data, long n);
 /* (0.75) work that needs no line and may take seconds - setting out a
    picture - runs below PsiMail.app (1), then back at the engine's working
    priority (0): the app stays responsive and its heartbeat goes on. On the
@@ -196,6 +201,8 @@ typedef struct
 
 int  imap_open(int acct, char *why, int whymax);        /* connect + login (reuses) */
 void imap_logout(void);
+void st_open_remove(int acct, const char *folder, unsigned int uid);   /* (1.15) its Open\<uid>\ */
+void st_extras_remove(int acct, const char *folder, unsigned int uid); /* (1.15) Open\<uid>\, invitation and card files */
 int  imap_trim(void);      /* no mailbox open: its buffers back to the Psion (1 if any went) */
 int  imap_drops(void);                    /* connections lost mid-command so far */
 int  imap_list_folders(int acct, char *why, int whymax);
@@ -230,6 +237,7 @@ int  imap_unmove(int acct, const char *dest, unsigned int uid, const char *msgid
 void pic_write_index(int acct, const char *folder, unsigned int uid, const PmStructure *st);
 void pic_remove(int acct, const char *folder, unsigned int uid);   /* all of a message's picture files */
 int  pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts, char *why, int whymax);
+void pic_prune(int acct, const char *folder, unsigned int keep);   /* (1.15) older pictures over the folder's limit go */
 /* one picture file to its .pmi, below the app (0 shown, 1 not: the .pmi says why, -1 could not write) */
 long pic_budget(void);                 /* (1.04) a message's decoded pictures: twice on a colour screen */
 int  pic_decode_file(const char *img_path, const char *pmi_path, const char *label, long budget_left, char *note, int notemax);
@@ -273,6 +281,7 @@ int  st_index_load(int acct, const char *folder, const char *file, PmIndex *ix);
 int  st_index_save(int acct, const char *folder, const char *file, PmIndex *ix);
 void st_index_free(PmIndex *ix);
 PmMsg *st_index_find(PmIndex *ix, unsigned int uid);
+unsigned int st_index_last_uid(int acct, const char *folder);   /* (1.15) the newest uid, from the last line */
 PmMsg *st_index_add(PmIndex *ix, unsigned int uid);      /* keeps order */
 void st_index_remove(PmIndex *ix, unsigned int uid);
 void st_flag_set(char *flags, char f, int on);

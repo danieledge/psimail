@@ -125,6 +125,34 @@ extern "C" int pm_list_dir(const char* aDir, const char* aSuffix, void (*aCb)(co
 	return count;
 	}
 
+// (1.15) the folders in a folder (the sweep of opened attachments, imap.c)
+extern "C" int pm_list_subdirs(const char* aDir, void (*aCb)(const char*, void*), void* aCtx)
+	{
+	if (!gFs && (Fs(), !gFs))
+		return -1;
+	TFileName n;
+	ToName(n, aDir);
+	if (n.Length() && n[n.Length() - 1] != '\\')
+		n.Append('\\');
+	n.Append('*');
+	CDir* dir = 0;
+	if (Fs().GetDir(n, KEntryAttDir, ESortByName, dir) != KErrNone || !dir)
+		return -1;
+	TInt count = dir->Count(), found = 0;
+	for (TInt i = 0; i < count; i++)
+		{
+		if (!(*dir)[i].IsDir())
+			continue;
+		TBuf8<KMaxFileName + 1> name;
+		name.Copy((*dir)[i].iName);
+		name.ZeroTerminate();
+		aCb((const char*)name.Ptr(), aCtx);
+		found++;
+		}
+	delete dir;
+	return found;
+	}
+
 extern "C" void pm_rmtree(const char* aDir)
 	{
 	if (!gFs && (Fs(), !gFs))
@@ -162,6 +190,33 @@ extern "C" int pm_write_whole(const char* aPath, const void* aData, long aLen)
 	return r == KErrNone ? 0 : -1;
 	}
 
+// (1.15) the same in two pieces, a header then the data, with no copy of
+// both in one block first (a decoded picture is up to half a megabyte)
+extern "C" int pm_write_parts(const char* aPath, const void* aHead, long aHeadLen, const void* aData, long aLen)
+	{
+	if (!gFs && (Fs(), !gFs))
+		return -1;
+	TFileName n;
+	ToName(n, aPath);
+	RFile f;
+	TInt r = f.Replace(Fs(), n, EFileWrite | EFileShareExclusive);
+	if (r != KErrNone)
+		return -1;
+	TPtrC8 h((const TUint8*)aHead, aHeadLen);
+	r = f.Write(h);
+	if (r == KErrNone && aLen > 0)
+		{
+		TPtrC8 p((const TUint8*)aData, aLen);
+		r = f.Write(p);
+		}
+	if (r == KErrNone)
+		r = f.Flush();
+	f.Close();
+	if (r != KErrNone)
+		Fs().Delete(n);
+	return r == KErrNone ? 0 : -1;
+	}
+
 // tmp takes path's place in one file-server call (RFs::Replace), so there is
 // no moment when neither exists. The app may have the old file open to read
 // it (a message being shown, the list): then it is tried again, for up to
@@ -190,6 +245,15 @@ extern "C" int pm_replace(const char* aTmp, const char* aPath)
 	pm_replace_busy = (r == KErrInUse || r == KErrAccessDenied);
 	pm_log("replace %s -> %s: %d%s", aTmp, aPath, r, pm_replace_busy ? " (the file is in use)" : "");
 	return -1;
+	}
+
+// (1.15) the Psion's free memory, KB (a picture's decode is fitted to it)
+extern "C" long pm_free_ram_kb(void)
+	{
+	TMemoryInfoV1Buf mi;
+	if (UserHal::MemoryInfo(mi) != KErrNone || mi().iFreeRamInBytes < 0)
+		return -1;
+	return (long)(mi().iFreeRamInBytes >> 10);
 	}
 
 // free space (KB) on the drive the path is on: "D:\..." -> D

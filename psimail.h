@@ -193,6 +193,17 @@ typedef struct
 	   that account up again to send them"); +1 on store_note_seq each time */
 	volatile unsigned int store_note_seq;
 	char store_note[200];
+
+	/* (1.15) short of memory (the memory watcher's level, psi_mem_level):
+	   trim_req (app) gives the heap's free end back at the next idle
+	   moment (the engine clears it); keep_awake (app) is set while the
+	   engine must stay - PsiMail in front, a dialog up, a timed check or
+	   new mail at once wanted; slept (engine) says it ended because the
+	   memory was low with nothing to do, so the app starts it again on
+	   the next command rather than calling it a crash */
+	volatile int trim_req;
+	volatile int keep_awake;
+	volatile int slept;
 	} PmShared;
 
 #endif

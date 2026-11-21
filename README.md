@@ -37,6 +37,30 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.15
+
+Less memory, above all with no memory card, when the mail is kept on C:
+(which is the Psion's memory).
+
+- **Files that stayed for good now go.** An attachment you opened, and a
+  message's invitation or contact card files, go when the message is
+  deleted or moved. Folders deleted from another program lose their files
+  here at the next folder list, and opened attachments left by earlier
+  versions go at the next check.
+- **Pictures are kept to a limit.** A folder keeps at most 1 MB of set-out
+  pictures on C: (8 MB on a card); older messages' pictures go first and
+  come back when the message is read again.
+- **Room is checked first.** Saving or opening an attachment, and sending
+  one, says so at once if there is no room for it, rather than filling C:.
+- **When memory runs short** (Coda's memory watcher), PsiMail lets go of the
+  message it last showed, and behind other programs its mail engine rests
+  until it is needed again, unless it is fetching mail, checking for new
+  mail or syncing the calendar. Back in front, it picks up where it was.
+- **The engine gives memory back** after each job, and while it waits for
+  new mail at once; it holds less from start to end; and a folder's list is
+  read in one go. Pictures are fitted to the memory free, and a message's
+  pictures are laid out a few at a time.
+
 ## What's new in 1.14
 
 A tidy-up of how PsiMail looks and what it says, so it matches PsiWeb,
