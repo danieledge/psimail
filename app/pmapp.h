@@ -1065,13 +1065,6 @@ private:
 	TInt& iPort;
 	};
 
-class CPmAboutDialog : public CEikDialog
-	{
-private:
-	void PreLayoutDynInitL();
-	TBool OkToExitL(TInt aButtonId);               // (1.14) Credits... shows them; Continue closes
-	};
-
 // (1.14) Tools > Troubleshooting > Show log: the end of psimail.log
 class CPmLogDialog : public CEikDialog
 	{
@@ -1204,7 +1197,7 @@ private:
 // (CEikonEnv::Color), so it follows the machine's colour scheme.
 TBool PmColour();
 TBool PmTall();
-TBool PmCoda();                 // (1.14) Coda's netBook image (Z:\System\Data\PsiEdition.txt)
+TBool PmCoda();                 // (1.14) Coda's netBook image (Z:\System\Libs\PsiBattHook.bin)
 TPtrC PmMachine();              // (1.14) "netBook", "Series 5mx" or "Series 7": what Help and messages call this machine
 void PmSizeText(TDes& aOut, TInt64 aBytes);   // (1.14) "56.4 MB", as the toolbar shows free memory
 TRgb PmBack();                  // the workspace (5mx: white)

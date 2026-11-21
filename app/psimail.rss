@@ -26,6 +26,7 @@ NAME PSMA
 
 #include "psimail.hrh"
 #include "psilink.rh"           // (1.03) the shared connection words (psion-core)
+#include "psitbar.rh"           // (1.14) Coda's toolbar controls and the battery's fields (psion-core)
 
 RESOURCE RSS_SIGNATURE { }
 
@@ -69,24 +70,16 @@ RESOURCE ARRAY r_pm_setup_pages
 //   r_pm_toolbar        240 lines (the 5mx): buttons of the 5mx's 37 pixels
 //   r_pm_toolbar_tall   480 lines (Series 7, Psion's own netBook image):
 //                       the netBook's 50-pixel buttons, as Word's and Agenda's
-//   r_pm_toolbar_coda   480 lines on Coda (PsiBatt.dll in the ROM): the same,
-//                       with the netBook's battery and Coda's toolbar extras
-//                       (the charge, free memory, brightness: PsiBatt, type
-//                       0x7042) just above the clock, as in every Coda program
+//   r_pm_toolbar_coda   480 lines on Coda (Z:\System\Libs\PsiBattHook.bin,
+//                       core psitbar.h): the same, with Coda's battery
+//                       (0x7044), its toolbar extras (the charge, free memory,
+//                       brightness: PsiBatt, 0x7042) and Coda's clock (0x7043)
+//                       at the foot, as in every Coda program (the stretching
+//                       spacer above them: the box of CPmConnPanel sits there)
 // The name is a file name label, as Psion's programs have it (bold, in its
 // box; Coda draws that box in the theme's colours), with "PsiMail" set as
 // the program's document name. The first is EIK_APP_INFO's: the others take
 // its place when the screen is tall.
-STRUCT PM_NB_BATTERY
-	{
-	// the netBook's battery control (type 0x47): its 17 bytes, as in
-	// Psion's own toolbars there (psion-netbook's psiview.rss)
-	BYTE b0=0xff; BYTE b1=0xff; BYTE b2=0xff; BYTE b3=0xff;
-	BYTE b4=0x0a; BYTE b5=0x00; BYTE b6=0x00; BYTE b7=0x03;
-	BYTE b8=0x00; BYTE b9=0x00; BYTE b10=0x00; BYTE b11=0x18;
-	BYTE b12=0x00; BYTE b13=0xb5; BYTE b14=0xb1; BYTE b15=0xf3; BYTE b16=0x00;
-	}
-
 RESOURCE TOOLBAR r_pm_toolbar
 	{
 	breadth=KEikStdToolBarWidth;
@@ -216,11 +209,11 @@ RESOURCE TOOLBAR r_pm_toolbar_coda
 			length=0;
 			control=SPACER;
 			},
-		TBAR_CTRL { type=0x47; control=PM_NB_BATTERY { }; },
-		TBAR_CTRL { type=0x7042; control=SPACER; },
+		TBAR_CTRL { type=PSI_TB_TYPE_BATTERY; control=PSI_TB_BATTERY { }; },
+		TBAR_CTRL { type=PSI_TB_TYPE_EXTRAS; control=SPACER; },
 		TBAR_CTRL
 			{
-			type=EEikCtClock;
+			type=PSI_TB_TYPE_CLOCK;
 			control=CLOCK { digitalresourceid=R_EIK_DIGITAL_CLOCK; analogresourceid=R_EIK_ANALOG_CLOCK; };
 			},
 		TBAR_CTRL
@@ -1297,9 +1290,9 @@ RESOURCE ARRAY r_pm_conn_link_lines
 	{
 	items=
 		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="Baud rate"; id=EPmDlgBaud; control=CHOICELIST { array_id=r_pm_baud_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Connects via"; id=EPmDlgLink; control=CHOICELIST { array_id=r_pm_link_array; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Speed"; id=EPmDlgBaud; control=CHOICELIST { array_id=r_pm_baud_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Flow control"; id=EPmDlgFlow; control=CHOICELIST { array_id=r_pm_flow_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Mail connects via"; id=EPmDlgLink; control=CHOICELIST { array_id=r_pm_link_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Modem provides TLS"; id=EPmDlgModemTls; control=CHOICELIST { array_id=r_pm_yesno_array; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_FIRST_SEND; id=EPmDlgPppStart; control=EDWIN { width=14; maxlength=40; }; }
 		};
@@ -1318,50 +1311,12 @@ RESOURCE ARRAY r_pm_conn_proxy_lines
 		};
 	}
 
-// About (1.14): the same in PsiMail, PsiWeb and PsiTerm (Coda's About box,
-// one machine line for the programs that run on several): the name and
-// version in bold, what it is and for which machines, the copyright, and
-// the support line in the small font. Continue closes it; Credits... shows
-// the code from other people that PsiMail is built on.
-RESOURCE DLG_BUTTONS r_pm_about_buttons
-	{
-	buttons=
-		{
-		DLG_BUTTON { id=EPmBidCredits; button=CMBUT { txt="Credits"<0x85>; }; hotkey='C'; flags=0; },
-		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="Continue"; }; hotkey=EEikBidOk; flags=0; }
-		};
-	}
-
-RESOURCE DIALOG r_pm_about_dialog
-	{
-	title="About PsiMail";
-	flags=EEikDialogFlagWait;
-	buttons=r_pm_about_buttons;
-	items=
-		{
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=24; txt="PsiMail"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="Email for the Psion Series 5mx, Series 7 & netBook"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="Dan Edge 2026"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Buy me a coffee: buymeacoffee.com/danedge"; }; }
-		};
-	}
-
-// About > Credits...: the code PsiMail is built on, and its licence
-RESOURCE DIALOG r_pm_credits_dialog
-	{
-	title="Credits";
-	flags=EEikDialogFlagWait;
-	buttons=R_EIK_BUTTONS_CONTINUE;
-	items=
-		{
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="PsiMail is free software: MIT licence"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Source: github.com/danieledge/psimail"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="LibTomCrypt, LibTomMath, TweetNaCl, picojpeg, stb_image: public domain"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="zlib "<0xa9>" Jean-loup Gailly & Mark Adler"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Random numbers from Dropbear "<0xa9>" Matt Johnston: MIT licence"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="This product includes software licensed from Symbian Ltd "<0xa9>" Symbian Ltd 1998-9"; }; }
-		};
-	}
+// About (1.14): core's About box (ssh/psiabout.rssi, filled in by
+// PsiAboutL), the same in PsiMail, PsiWeb and PsiTerm: the name and version
+// in bold, what it is and for which machines, the copyright ("- part of
+// Coda for the Psion netBook" only on Coda's netBook), the support line in
+// the small font; Credits... shows the code PsiMail is built on.
+#include "psiabout.rssi"
 
 RESOURCE ARRAY r_pm_baud_array
 	{

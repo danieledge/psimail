@@ -37,6 +37,8 @@
 #include "pglinktest.h"
 #include "psigreyui.h"
 #include "psikeep.h"           // (1.11) settings kept on the card, without passwords
+#include "psitbar.h"           // (1.14) which toolbar: Coda's netBook or not (core)
+#include "psiabout.h"          // (1.14) the family's About box (core)
 
 // how many of the newest messages to download ahead after a sync
 static TInt PrefetchCount(const TPmSettings& aSettings)
@@ -2308,6 +2310,22 @@ void CPmView::Tick()
 	(void)err;
 	}
 
+// (1.14) A busy line that ends in three full stops (core's link notes,
+// which stay ASCII for the programs that read them as UTF-8, and the
+// certificate check's) ends in the one-character ellipsis on screen, as
+// every other busy line does
+static void PmEllipsis(TDes& aText)
+	{
+	TInt n = aText.Length();
+	while (n > 0 && aText[n - 1] == ' ')
+		n--;
+	if (n >= 3 && aText[n - 1] == '.' && aText[n - 2] == '.' && aText[n - 3] == '.')
+		{
+		aText.SetLength(n - 3);
+		aText.Append(TChar(0x85));
+		}
+	}
+
 void CPmView::TickL()
 	{
 	PmShared* s = iShared;
@@ -2363,12 +2381,14 @@ void CPmView::TickL()
 	// progress
 	TBuf<128> prog;
 	FromC(prog, s->progress);
+	PmEllipsis(prog);
 	// while it connects, show what the link is doing until the engine has
 	// news of its own
 	if (s->net.link_seq != iLinkSeq)
 		{
 		iLinkSeq = s->net.link_seq;
 		FromC(iLinkMsg, s->net.link_msg);
+		PmEllipsis(iLinkMsg);
 		iLinkProg = prog;
 		}
 	if (!s->busy)
@@ -3970,7 +3990,9 @@ void CPmAppUi::ConstructL()
 	iTall = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
 	{
 	TEntry e;
-	iCoda = iCoeEnv->FsSession().Entry(_L("Z:\\System\\Data\\PsiEdition.txt"), e) == KErrNone;
+	// (Coda's ROM, told as every bundled program tells it: the hook in
+	// Eikon that makes Coda's toolbar controls, core psitbar.h)
+	iCoda = iCoeEnv->FsSession().Entry(KPsiTbarCodaHook, e) == KErrNone;
 	}
 	ToolBarL();                              // (1.14) the netBook's toolbar on a tall screen
 	// (1.11) a new C: (a new image, a cold start, a flat battery): the
@@ -4046,14 +4068,13 @@ void CPmAppUi::ConstructL()
 // 5mx's buttons; on a screen of 480 lines it is replaced by one with the
 // netBook's, and on Coda's netBook image by one that also has the netBook's
 // battery and Coda's extras above the clock, as every program there has.
-// Only Coda's ROM has the extras (PsiBatt.dll and its hook in Eikon), and
-// only the netBook's Eikon the battery, so they are asked for only there.
+// Only Coda's ROM has the hook in Eikon that makes Coda's battery, extras
+// and clock (PsiBattHook.bin: iCoda), so they are asked for only there.
 void CPmAppUi::ToolBarL()
 	{
 	if (!iTall || !iToolBar)
 		return;
-	TEntry e;
-	TBool extras = iCoda && iCoeEnv->FsSession().Entry(_L("Z:\\System\\Libs\\PsiBatt.dll"), e) == KErrNone;
+	TBool extras = iCoda;
 	CEikToolBar* bar = new(ELeave) CEikToolBar;
 	CleanupStack::PushL(bar);
 	delete iToolBar;
@@ -6044,35 +6065,18 @@ TBool CPmAppUi::RunSetupL()
 	return ETrue;
 	}
 
-// About (1.14: Coda's About box, the same in PsiMail, PsiWeb and PsiTerm):
-// the route is in Status information, not here
+// About (1.14: core's About box, the same in PsiMail, PsiWeb and PsiTerm):
+// the route is in Status information, not here; Credits... the code PsiMail
+// is built on, a line each
+_LIT(KPmCredits, "PsiMail is free software - MIT licence\n"
+	"Source: github.com/danieledge/psimail\n"
+	"LibTomCrypt, LibTomMath, TweetNaCl, picojpeg, stb_image - public domain\n"
+	"zlib \xa9 Jean-loup Gailly & Mark Adler\n"
+	"Random numbers from Dropbear \xa9 Matt Johnston - MIT licence\n"
+	"Includes software licensed from Symbian Ltd \xa9 Symbian Ltd 1998-9");
 void CPmAppUi::AboutL()
 	{
-	CPmAboutDialog* dlg = new(ELeave) CPmAboutDialog;
-	dlg->ExecuteLD(R_PM_ABOUT_DIALOG);
-	}
-
-void CPmAboutDialog::PreLayoutDynInitL()
-	{
-	TBuf<32> title(_L("PsiMail "));
-	title.Append(KVersion);
-	SetLabelL(EPmDlgInfo1, title);
-	((CEikLabel*)Control(EPmDlgInfo1))->SetFont(iEikonEnv->TitleFont());   // (bold, as PsiTerm's and PsiWeb's)
-	TBuf<32> who;
-	who.Append(TChar(0xa9));                  // the copyright sign, as the Psion's fonts have it
-	who.Append(_L(" Dan Edge 2026"));
-	SetLabelL(EPmDlgInfo3, who);
-	}
-
-TBool CPmAboutDialog::OkToExitL(TInt aButtonId)
-	{
-	if (aButtonId == EPmBidCredits)
-		{
-		CEikDialog* dlg = new(ELeave) CEikDialog;
-		dlg->ExecuteLD(R_PM_CREDITS_DIALOG);
-		return EFalse;
-		}
-	return ETrue;
+	PsiAboutL(_L("PsiMail"), KVersion, _L("Email"), KPmCredits);
 	}
 
 // (1.14) Tools > Troubleshooting > Show log: the last few KB of psimail.log

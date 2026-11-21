@@ -55,11 +55,14 @@ mail changed, and the settings are kept.
   Archive is Shift+Ctrl+X (Check this folder is Shift+Ctrl+E). Tools >
   Troubleshooting has Keep a log, Show log, Send log to helper and Restart
   mail engine.
-- **About** has the same layout as PsiWeb's and PsiTerm's, with the credits
-  behind a Credits button. Help shows whole lines, and names the machine
+- **About** is the one PsiWeb and PsiTerm show, with the credits behind a
+  Credits button; on Coda's netBook it says PsiMail is part of Coda. Help shows whole lines, and names the machine
   you are using.
 - **Settings**: yes/no settings are tick boxes; clearer words in
-  Preferences, the account, Find, Update and Calendar settings.
+  Preferences, the account, Find, Update and Calendar settings. A new
+  account starts with its servers empty. Connection settings' Link page
+  reads Connects via, Speed, Flow control, in the same order as PsiWeb's
+  and PsiTerm's, and the setup assistant opens on the route in use.
 - **First start**: Esc on the first question stops there; on Coda PsiMail
   no longer asks about the Email icon, which opens PsiMail already.
 - A new icon, in the netBook's own style.
@@ -454,11 +457,12 @@ Agenda, and a week and month view of its own (see [below](#the-calendar)).
    app passwords too, under their security settings, once two-step
    verification is on.
 2. Install `dist/PsiMail.sis`, start PsiMail. The account dialog starts
-   with Fastmail's servers filled in (imap.fastmail.com:993 and
-   smtp.fastmail.com:465, both TLS): fill in your address and the app
-   password. For another provider, type its servers and ports.
-3. Tools > Connection settings: as for PsiTerm (modem or Psion TCP/IP, baud
-   rate, flow control) - see [Connections](#connections).
+   with its servers empty and the usual ports (993 and 465, both TLS):
+   fill in your address, the app password and Fastmail's servers
+   (imap.fastmail.com and smtp.fastmail.com). Servers left empty become
+   imap. and smtp. with your address's domain.
+3. Tools > Connection settings: as for PsiTerm (Connects via, Speed, flow
+   control) - see [Connections](#connections).
 4. Shift+Ctrl+C (Check mail) sends and receives. The first time PsiMail
    talks to a server it shows the server's key and asks whether to trust it.
 
