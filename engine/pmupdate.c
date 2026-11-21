@@ -285,7 +285,7 @@ int pm_update(const char *src, const char *final, char *why, int whymax)
 	snprintf(save, sizeof(save), "%.70s.part", final);
 	g_conn = -1;
 	if (route(src, why, whymax)) return PM_RES_FAILED;
-	pm_progress("Looking for a new PsiMail (%s)...", R.local ? R.host : "GitHub");
+	pm_progress("Looking for a new PsiMail (%s)\x85", R.local ? R.host : "GitHub");
 
 	r = fetch_small("PsiMail-version.txt", remote, sizeof(remote), why, whymax);
 	if (r) goto fail;
@@ -314,7 +314,7 @@ int pm_update(const char *src, const char *final, char *why, int whymax)
 		snprintf(why, whymax, buf ? "Cannot write %.60s" : "Out of memory", save);
 		r = -1; goto fail;
 	}
-	pm_progress("Downloading PsiMail %s...", remote);
+	pm_progress("Downloading PsiMail %s\x85", remote);
 	for (;;) {
 		long want, k;
 		if (total >= 0 && got >= total) break;
@@ -379,7 +379,7 @@ int pm_update(const char *src, const char *final, char *why, int whymax)
 	buf = 0;
 	pmn_close(1);
 	g_conn = -1;
-	pm_progress("Checking the release signature...");
+	pm_progress("Checking the release signature\x85");
 	if (verify_file(save, remote, sig) != 0) {
 		remove(save);
 		snprintf(why, whymax, "The release signature does not match - the download was deleted");

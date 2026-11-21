@@ -197,7 +197,7 @@ static int get(const char *url0, const char *path, long max, long *got, char *wh
 				g_port == cport && g_tls == ctls && !strcmp(g_host, chost);
 			if (!reused) {
 				if (pm_shared()->offline) { snprintf(why, whymax, "Working offline"); return PM_RES_OFFLINE; }
-				pm_progress("Connecting to %s...", u.host);
+				pm_progress("Connecting to %s\x85", u.host);
 				if (pmn_connect(chost, cport, ctls, why, whymax) != 0) {
 					g_conn = -1;
 					if (pm_cancelled()) return PM_RES_CANCELLED;
@@ -390,7 +390,7 @@ int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int why
 		if (total > WEB_TOTAL_KB * 1024L) { pm_log("web pictures: %ld KB so far - enough", total / 1024); break; }
 		if (parse_url(pics[i].url, &u) == 0 && strcmp(u.host, last_host)) { hosts++; pm_copy(last_host, u.host, sizeof(last_host)); }
 		snprintf(label, sizeof(label), "web picture %d of %d", i + 1, n);
-		pm_progress("Getting the web pictures (%d of %d)...", i + 1, n);
+		pm_progress("Getting the web pictures (%d of %d)\x85", i + 1, n);
 		err[0] = 0;
 		d = get(pics[i].url, img, WEB_MAX_KB * 1024L, &got, err, sizeof(err));
 		pm_log("web picture %d: %s -> %d %s (%ld bytes)", i + 1, pics[i].url, d, err, got);
@@ -402,7 +402,7 @@ int web_fetch(int acct, const char *folder, unsigned int uid, char *why, int why
 			continue;
 		}
 		total += got;
-		pm_progress("Setting out the web pictures (%d of %d)...", i + 1, n);
+		pm_progress("Setting out the web pictures (%d of %d)\x85", i + 1, n);
 		d = pic_decode_file(img, pmi, label, budget, note, sizeof(note));
 		if (d == 0) {
 			unsigned char h[16];
@@ -502,7 +502,7 @@ int pm_send_log(char *why, int whymax)
 
 	g_conn = -1;
 	pmn_close(0);                            /* a fresh line: not one the web pictures kept */
-	pm_progress("Sending log...");
+	pm_progress("Sending log\x85");
 	if (pmn_connect(lhost, lport, 0, why, whymax) != 0) {
 		pm_log("send log: could not connect to %s:%d: %s", lhost, lport, why);
 		return pm_cancelled() ? PM_RES_CANCELLED : PM_RES_FAILED;

@@ -37,6 +37,33 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.14
+
+A tidy-up of how PsiMail looks and what it says, so it matches PsiWeb,
+PsiTerm and the netBook's own programs. Nothing in how it fetches or sends
+mail changed, and the settings are kept.
+
+- **The toolbar on the netBook and Series 7** has the netBook's own button
+  size, the program's name in its box as Word and Agenda have it, and new
+  colour pictures. On Coda the battery, free memory and brightness sit above
+  the clock, as in every program there. The Series 5mx keeps its toolbar.
+- **The second button is Reply** (its pop-up still has Reply to all and
+  Forward). The box above the clock says Online or Offline, By modem or By
+  network, Secure, and when mail was last checked.
+- **Menus**: Reply and Reply to all are on the Message menu; Unread and
+  Flagged are under Message > Mark; Save as Word file is on the File menu;
+  Archive is Shift+Ctrl+X (Check this folder is Shift+Ctrl+E). Tools >
+  Troubleshooting has Keep a log, Show log, Send log to helper and Restart
+  mail engine.
+- **About** has the same layout as PsiWeb's and PsiTerm's, with the credits
+  behind a Credits button. Help shows whole lines, and names the machine
+  you are using.
+- **Settings**: yes/no settings are tick boxes; clearer words in
+  Preferences, the account, Find, Update and Calendar settings.
+- **First start**: Esc on the first question stops there; on Coda PsiMail
+  no longer asks about the Email icon, which opens PsiMail already.
+- A new icon, in the netBook's own style.
+
 ## What's new in 1.07
 
 - **New roots for secure connections.** SSL.com TLS ECC Root CA 2022 and
@@ -223,7 +250,7 @@ On the netBook and Series 7:
 - The calendar's month view lists each day's events, as many as fit, each in its calendar's colour. The day's list has a bar in the calendar's colour beside each event. Today has a red frame.
 - Writing a message: the text takes the whole height of the screen. It was four lines high.
 - Help opens in a taller window.
-- Download ahead fetches 25 messages unless you set another number. This goes by memory: 24 MB or more. It is still 10 on a 16 MB 5mx.
+- Get in advance fetches 25 messages unless you set another number. This goes by memory: 24 MB or more. It is still 10 on a 16 MB 5mx.
 - Preferences > Screen greys is dimmed. The greys are the 5mx's screen's.
 
 On every machine:
@@ -455,17 +482,17 @@ save the upload time).
 | Page | Setting | Choices |
 |---|---|---|
 | General | Order of messages | newest or oldest first, by sender, by subject, unread first |
-| | Download ahead | how many of the newest messages' text to fetch after Check mail (0 = off) |
-| | Keep mail on | the memory disk (CF card) if there is one, or the internal disk |
-| | Email icon opens | PsiMail or Built-in Email |
+| | Get in advance | how many of the newest messages' text to fetch after Check mail (0 = off) |
+| | Keep mail on | the card, if it is in, or the Internal disk |
+| | Email icon opens | PsiMail or Built-in Email (on Coda: PsiMail, shown dimmed) |
 | New mail | Alert for new mail | Sound & message, Message only, Off |
-| | Check for new mail | Off, every 10, 15 or 30 minutes, every hour |
+| | Check for new mail | Off, every 10, 15 or 30 minutes, every hour, as it arrives |
 | | If not connected | Wait for a connection, or Connect |
-| | Send waiting mail when connected | No, Yes |
-| | Show detailed progress | every engine and link step, for finding connection problems |
+| | Send waiting mail | a tick box: sent when PsiMail connects |
+| | Show detailed progress | a tick box: every engine and link step, for finding connection problems |
 | Screen | Show pictures | Yes, Only attached files, No |
 | | Web pictures | Ask, Always, Never (see [Privacy](#privacy)) |
-| | Web pictures via proxy | No (the standard) or Yes: fetch them through the shared proxy (Connection settings > Network), which converts them to 16 greys on the computer; if it does not answer, they come direct |
+| | Use the web helper | a tick box: fetch them through the shared proxy (Connection settings > Network), which converts them to 16 greys on the computer; if it does not answer, they come direct |
 
 **Tools > Calendar settings**: see [The calendar](#the-calendar).
 **Tools > Connection settings**: see [Connections](#connections).
@@ -512,7 +539,7 @@ settings are shared with PsiTerm and PsiWeb.
     decode, and formats the Psion cannot decode (WebP, AVIF) can be shown. If
     the proxy does not answer, the pictures come direct, for the rest of
     that run.
-  * **Send log to server** (Tools > Troubleshooting), which needs PsiProxy
+  * **Send log to helper** (Tools > Troubleshooting), which needs PsiProxy
     and Tools > Troubleshooting > Keep a log ticked.
 
   [PsiProxy](https://github.com/danieledge/psiproxy) is the proxy made for
@@ -602,18 +629,18 @@ lists, anniversaries, more than one calendar account.
 | Del (and Backspace in a list) | delete |
 | Shift+Up/Down (and Pg Up, Pg Dn, Home, End) | choose several messages: Delete, Move, Archive, Unread and Flagged act on all (1.05) |
 | Right / Left on a conversation | unfold / fold it (View > Show > Conversations, 1.05) |
-| Shift+Ctrl+C / Ctrl+U / Esc | check mail (send & receive) / disconnect / stop |
+| Shift+Ctrl+C / Ctrl+U / Esc | check mail / disconnect / stop |
 | Shift+Ctrl+W | work offline |
 | Ctrl+N / Ctrl+R / Shift+Ctrl+R / Ctrl+W | new / reply / reply to all / forward |
-| Ctrl+D / Ctrl+X / Shift+Ctrl+E | delete / move to folder / archive |
+| Ctrl+D / Ctrl+X / Shift+Ctrl+X | delete / move to folder / archive |
 | Ctrl+Z | undo the last delete, move or archive |
 | Ctrl+P / Shift+Ctrl+P / Shift+Ctrl+V | print / print setup / print preview |
-| Shift+Ctrl+U / Shift+Ctrl+F | unread / flagged |
+| Shift+Ctrl+U / Shift+Ctrl+F | unread / flagged (Message > Mark) |
 | Ctrl+S | save an attachment (Message > Attachments > Open / Save) |
-| Shift+Ctrl+S | save the open message as a Word file (File > Printing > Save as Word file) |
-| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find (on the server, or on this Psion) |
+| Shift+Ctrl+S | save the open message as a Word file (File > Save as Word file) |
+| Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F | inbox / go to folder / outbox / find (on the server, or in the mail here) |
 | Shift+Ctrl+J | the next unread message (1.02) |
-| Shift+Ctrl+X / Shift+Ctrl+G | check this folder / get older messages (File > Folder, with Create new / Rename / Delete) |
+| Shift+Ctrl+E / Shift+Ctrl+G | check this folder / get older messages (File > Folder, with Create new / Rename / Delete) |
 | Ctrl+M / Shift+Ctrl+M | zoom in / out (three sizes, going round) |
 | Ctrl+T / Shift+Ctrl+T / Shift+Ctrl+L | show the toolbar / title bar / folder list |
 | Shift+Ctrl+Q / Shift+Ctrl+B | status information / sort |
@@ -677,7 +704,7 @@ without the `cryptography` package too). The version must go up each time.
 ## Troubleshooting
 
 * **Nothing connects.** Use Test in Tools > Connection settings first. Then
-  set Tools > Preferences > New mail > Show detailed progress to Yes and
+  tick Tools > Preferences > New mail > Show detailed progress and
   try again: every step (dialling, the modem's answer, logging in, each
   message) is shown at the bottom left. Check that the Remote link is off
   and that PsiTerm or PsiWeb isn't holding the serial port.
@@ -688,8 +715,8 @@ without the `cryptography` package too). The version must go up each time.
   timed, at most 32 KB; after a crash or a restart the previous engine's log
   is kept as `psimail.old`, with the reason it ended at the top of the new
   log. The tick takes effect at once; untick it to stop (the log kept so far
-  stays). They are the files to send with a bug report. Tools >
-  Troubleshooting > Send log to server sends them to your PsiProxy: the
+  stays). Tools > Troubleshooting > Show log shows its end. They are the files to send with a bug report. Tools >
+  Troubleshooting > Send log to helper sends them to your PsiProxy: the
   shared proxy, or, if that is the Atom modem's own, the PsiProxy set in the
   modem's Web proxy settings (AT$PU; without one it says *Needs PsiProxy on
   a computer*). It is dimmed until a proxy is set, and while no log is kept. They go as plain HTTP and hold server, account and folder names

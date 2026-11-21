@@ -80,7 +80,7 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 	}
 	memset(&ix, 0, sizeof(ix));
 	if (st_index_load(acct, folder, "index.txt", &fx) != 0) {
-		snprintf(why, whymax, "Nothing in this folder on this Psion");
+		snprintf(why, whymax, "Nothing in this folder here");
 		return PM_RES_FAILED;
 	}
 	total = fx.n;
@@ -89,7 +89,7 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 	for (i = fx.n - 1; i >= 0; i--) {
 		int loaded;
 		if (((fx.n - i) % 10) == 1) {
-			pm_progress("Finding on this Psion (%d of %d)...", fx.n - i, total);
+			pm_progress("Finding in the mail here (%d of %d)\x85", fx.n - i, total);
 			pm_beat_reset();
 		}
 		if (pm_cancelled()) {
@@ -118,7 +118,7 @@ int local_search(int acct, const char *folder, const char *words, char *why, int
 		return PM_RES_FAILED;
 	}
 	st_index_free(&ix);
-	if (found > LS_MAX) snprintf(why, whymax, "%d found on this Psion - showing the newest %d", found, LS_MAX);
-	else snprintf(why, whymax, "%d found on this Psion", found);
+	if (found > LS_MAX) snprintf(why, whymax, "%d found here - showing the newest %d", found, LS_MAX);
+	else snprintf(why, whymax, "%d found here", found);
 	return PM_RES_OK;
 }

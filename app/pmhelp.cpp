@@ -17,10 +17,13 @@
 
 struct TPmHelpTopic { const char* iTitle; const char* iText; };
 
-// The wording follows the EIKON style guide: the user's words, key names as
-// the keyboard prints them (Ctrl, Shift, Fn, Tab, Enter, Esc), menu commands
-// named as they appear (without their "..."), and no jargon that a glossary
-// would not allow ("program", "folder", "memory disk").
+// The wording follows the EIKON style guide and the Coda sheet: the user's
+// words, key names as the keyboard prints them (Ctrl, Shift, Fn, Tab, Enter,
+// Esc), menu commands named as they appear (without their "..."), and no
+// jargon that a glossary would not allow ("program", "folder", "the card",
+// "Internal disk"). The machine is written "the Psion", "The Psion" or "this
+// Psion" and nothing else: those three are put in as the machine's own name
+// (the netBook, the Series 5mx, the Series 7) when the text is shown.
 static const TPmHelpTopic KHelpTopics[] =
 	{
 	{ "Getting started",
@@ -28,7 +31,7 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "or the Psion's own Internet connection.\n"
 	  "\n"
 	  "To add an account, use Tools > Accounts > Add. Fastmail's servers are filled in to begin with "
-	  "(imap.fastmail.com 993 and smtp.fastmail.com 465, both TLS); for another provider, type its "
+	  "(imap.fastmail.com 993 and smtp.fastmail.com 465, both TLS). For another provider, type its "
 	  "servers and ports.\n"
 	  "\n"
 	  "Most providers want an app password rather than your normal one. On fastmail.com choose "
@@ -42,9 +45,9 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "PsiMail opens where you closed it - the folder, the Outbox or the calendar - with your accounts, "
 	  "folders and preferences as you left them.\n"
 	  "\n"
-	  "Passwords are kept on this Psion only (in its internal memory, scrambled but not encrypted), "
+	  "Passwords are kept on this Psion only (on its Internal disk, scrambled but not encrypted), "
 	  "never on the card. The rest of the settings are copied to the card as well "
-	  "(\\System\\Data\\Kept\\): if the internal memory is ever cleared, PsiMail puts them back "
+	  "(\\System\\Data\\Kept\\): if the Internal disk is ever cleared, PsiMail puts them back "
 	  "and asks for each password again. Unsent mail is never removed when an account is set up "
 	  "again in another order." },
 
@@ -55,19 +58,20 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "choose Network card or dial-up (Psion TCP/IP) in Tools > Connection settings, and leave "
 	  "Dial-up: first send empty. The Psion does the security (TLS) itself.\n"
 	  "\n"
-	  "The Atom modem: a small WiFi modem on the serial port. It can do the security for the Psion "
+	  "The Atom modem: a small WiFi modem on the serial port. It can do the security itself "
 	  "(Modem provides TLS), which makes connecting quicker. Its software is at "
 	  "github.com/danieledge/psiconnect\n"
 	  "\n"
 	  "Another WiFi modem (a WiRSa, a WiFi232): works. The Psion does the security itself. About 5 KB "
 	  "a second, so big attachments are slow.\n"
 	  "\n"
-	  "Connection settings > Set up (Ctrl+U) asks which of these you have and fills the settings in; "
-	  "it is asked once on its own the first time PsiMail starts on a new Psion.\n"
+	  "Connection settings > Set up (Ctrl+U) asks which of these you have and fills the settings in. "
+	  "It is asked once on its own the first time PsiMail starts.\n"
 	  "\n"
-	  "The box at the right of the title bar shows the route and who does the security (on a colour "
-	  "screen with a light: green online, amber connecting, grey not connected, red not secure). Tap "
-	  "it, or use View > Status information (Shift+Ctrl+Q), for more." },
+	  "On the netBook and Series 7 a box in the toolbar, above the clock, shows whether PsiMail is "
+	  "online, the route (By modem, By network), whether it is secure, and when "
+	  "mail was last checked. On a colour screen it has a light: green online, amber connecting, grey "
+	  "offline, red not secure. Tap it, or use View > Status information (Shift+Ctrl+Q), for more." },
 
 	{ "PsiProxy and other helpers",
 	  "PsiMail does not need a helper. Mail, the calendar and contacts always go straight to your "
@@ -82,8 +86,9 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "it. The Atom modem has a helper of its own for web pictures (Atom modem helper).\n"
 	  "\n"
 	  "To use it: Tools > Connection settings > Network, Web helper: Atom modem or PsiProxy, the "
-	  "computer's address and port 8081 (the Atom's own: psiproxy, port 8080). Then Preferences > "
-	  "Screen > Web pictures via helper: Yes. The setting is shared with PsiTerm and PsiWeb.\n"
+	  "computer's address and port 8081 (the Atom's own: psiproxy, port 8080). Then tick Tools > "
+	  "Preferences > Screen > Use the web helper. The Web helper setting is shared "
+	  "with PsiTerm and PsiWeb.\n"
 	  "\n"
 	  "The link to PsiProxy is not encrypted. Use it on your own network only, and set PSIPROXY_ALLOW "
 	  "on the computer to the addresses allowed to use it.\n"
@@ -101,14 +106,14 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "\n"
 	  "A message's text is downloaded when you open it (up to 64 KB - Message > Get whole message "
 	  "fetches the rest). Left and Right step to the previous and next message. Tab moves between the "
-	  "links and attachments in a message and Enter opens one; Message > View as web page "
+	  "links and attachments in a message and Enter opens one; Message > Web > View as web page "
 	  "shows the message in PsiWeb.\n"
 	  "\n"
 	  "Message > Attachments > Open opens an attached file in its own program (Word, Sketch and so on); "
 	  "Message > Attachments > Save (Ctrl+S) saves it in the Attachments folder in Documents, on the "
-	  "disk the mail is on. Delete moves a "
-	  "message to the Trash; Edit > Archive puts it in the Archive folder; Message > Unread and Flagged "
-	  "mark it. With the pen, drag a message onto a folder on the left to move it there.\n"
+	  "disk the mail is on. Delete moves a message to the Trash; Edit > Archive (Shift+Ctrl+X) puts it "
+	  "in the Archive folder; Message > Mark > Unread and Flagged mark it (Shift+Ctrl+U, "
+	  "Shift+Ctrl+F). With the pen, drag a message onto a folder on the left to move it there.\n"
 	  "\n"
 	  "Several messages at once: hold Shift and press Up or Down (or Pg Up, Pg Dn, Home, End) to choose "
 	  "a run of them. Delete, Move, Archive, Unread and Flagged then act on all of them; Delete asks "
@@ -123,8 +128,8 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "A tap on the sender's name in a message offers Write (a new message to them) and Add to "
 	  "Contacts.\n"
 	  "\n"
-	  "Edit > Find (Ctrl+F) looks for words in the open folder: on the server, or (Look: On this "
-	  "Psion) in the mail downloaded to the Psion, which needs no connection. Tap a column heading, or "
+	  "Edit > Find (Ctrl+F) looks for words in the open folder: on the server, or (Find in: The mail "
+	  "here) in the mail already downloaded, which needs no connection. Tap a column heading, or "
 	  "use View > Sort, to change the order. View > Zoom in and Zoom out (Ctrl+M, Shift+Ctrl+M) go "
 	  "round the three sizes." },
 
@@ -143,31 +148,32 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "from inside the HTML), or No. Whatever the setting, an attached picture can still be saved or "
 	  "opened with Message > Attachments.\n"
 	  "\n"
-	  "While a picture is being fetched or decoded its frame says so; if it can't be shown, the frame "
+	  "While a picture is being fetched or set out its frame says so; if it cannot be shown, the frame "
 	  "says why, with Help on pictures under it. Working offline, pictures not yet fetched wait until "
 	  "you go online.\n"
 	  "\n"
 	  "PsiMail reads JPEG (baseline and progressive), PNG and GIF. A picture in another format (WebP, "
-	  "AVIF, HEIC, SVG) can't be shown here; from the web, PsiProxy or the Atom modem's helper can turn "
+	  "AVIF, HEIC, SVG) cannot be shown here; from the web, PsiProxy or the Atom modem's helper can turn "
 	  "it into one PsiMail reads (see PsiProxy and other helpers). A picture too big for the memory, or "
 	  "one that takes over 90 seconds to set out, is not shown either; it can still be saved with "
 	  "Message > Attachments.\n"
 	  "\n"
 	  "On a colour screen (the netBook, the Series 7) pictures are set out in the screen's 256 colours; "
 	  "pictures set out in greys before PsiMail 1.04 stay grey. On the Series 5mx they are set out in "
-	  "the Psion's 16 greys by error diffusion. Tools > Preferences > Screen "
-	  "greys shows a picture four ways: choose the one that looks best with 1 to 4, fine-tune it "
-	  "lighter or darker with Up and Down, and press Enter (A there opens the detailed settings, which "
-	  "can also choose the ordered pattern instead). The same greys are used by PsiTerm and PsiWeb. "
-	  "A change applies to pictures set out after it.\n"
+	  "its 16 greys with a fine dither, and Tools > Preferences > Screen greys shows a picture four "
+	  "ways: choose the one that looks best with 1 to 4, make it lighter or darker with Up and Down, and "
+	  "press Enter (A there opens the detailed settings, which can also choose the ordered pattern "
+	  "instead). The same greys are used by PsiTerm and PsiWeb. A change applies to pictures set out "
+	  "after it.\n"
 	  "\n"
 	  "Tools > Preferences > Screen > Reading mode: While reading a message raises the screen's contrast and "
 	  "keeps the backlight on while a message is open and PsiMail is in front. Your own settings "
 	  "come back in the list, in the background, on closing, or when the Psion is switched off." },
 
 	{ "Writing messages",
-	  "Message > Create new email (Ctrl+N) opens a new message; Ctrl+R replies, Shift+Ctrl+R replies to "
-	  "everyone and Ctrl+W forwards. Type addresses separated by commas.\n"
+	  "Message > Create new email (Ctrl+N) opens a new message; Message > Reply (Ctrl+R) replies, Reply "
+	  "to all (Shift+Ctrl+R) replies to everyone and Forward (Ctrl+W) forwards. The Reply button on the "
+	  "toolbar offers the same three. Type addresses separated by commas.\n"
 	  "\n"
 	  "In the text, Ctrl+B, Ctrl+I and Ctrl+U make bold, italic and underlined text, which is sent as "
 	  "HTML with a plain copy for older programs. The Add file button adds files from the Psion (up "
@@ -178,13 +184,15 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "While you write, a copy goes to the Outbox each minute, so a reset or a flat battery loses at "
 	  "most a minute of it; the copy goes when you send, save or close the message. A "
 	  "copy of each message you send is saved in the Sent folder unless the account settings say "
-	  "otherwise.\n"
+	  "otherwise (Copy to Sent folder).\n"
 	  "\n"
 	  "A reply starts in the text, with the message it answers folded to one line, \"[Frank wrote: 23 "
 	  "lines - Ctrl+Q shows them]\": it is sent in full under your reply. Ctrl+Q puts it in the text to "
 	  "edit; deleting the line leaves it out. Quotes of 3 lines or fewer are shown as they are.\n"
 	  "\n"
-	  "A signature, if you set one in the account settings, goes at the end of every new message." },
+	  "A signature goes at the end of every new message: set it in the account settings (Signature), "
+	  "or in Tools > Accounts > Signatures, which can give replies a signature of their own. Type / for "
+	  "a new line." },
 
 	{ "Addresses from Contacts",
 	  "PsiMail uses the addresses in the Psion's Contacts program.\n"
@@ -221,7 +229,7 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "contact card: your name and address go with the message as a .vcf file." },
 
 	{ "Saving a message as a Word file",
-	  "File > Printing > Save as Word file (Shift+Ctrl+S) saves the open message as a file the Psion's Word "
+	  "File > Save as Word file (Shift+Ctrl+S) saves the open message as a file the Psion's Word "
 	  "program opens: the subject, From, To, Cc and Date, then the text with its bold, italic and "
 	  "underlining, headings, lists and quotes as PsiMail shows them. It goes in the Documents folder "
 	  "to begin with, named after the subject. Pictures are shown in the file as [Picture]." },
@@ -233,37 +241,38 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "\n"
 	  "File > Folder > Create new makes a folder, at the top level or inside another one. File > Folder "
 	  "> Rename and Delete act on the highlighted folder (or the open one). The Inbox and the standard "
-	  "folders can't be renamed or deleted, and a folder that holds other folders must be emptied of "
+	  "folders cannot be renamed or deleted, and a folder that holds other folders must be emptied of "
 	  "them first. Deleting a folder deletes the messages in it too, so PsiMail asks first.\n"
 	  "\n"
-	  "Edit > Move to folder (Ctrl+X) moves the selected message. View > Go to (Ctrl+G) opens any "
-	  "folder, and Ctrl+I goes straight to the Inbox.\n"
+	  "Edit > Move to folder (Ctrl+X) moves the selected message, and Edit > Archive (Shift+Ctrl+X) "
+	  "moves it to the Archive folder. View > Go to > Folder (Ctrl+G) opens any folder, and Ctrl+I "
+	  "goes straight to the Inbox.\n"
 	  "\n"
-	  "File > Folder > Check this folder (Shift+Ctrl+X) fetches new messages for the open folder alone; Get "
+	  "File > Folder > Check this folder (Shift+Ctrl+E) fetches new messages for the open folder alone; Get "
 	  "older messages (Shift+Ctrl+G) brings in the next 50 older ones. Check mail fetches every folder "
 	  "and sends what is waiting in the Outbox." },
 
-	{ "Download ahead and offline",
+	{ "Getting mail in advance, and offline",
 	  "PsiMail keeps the newest messages of each folder (50, unless the account's Limits page says "
-	  "otherwise) on the memory disk (the CF card) or the internal disk, so they can be read without a "
-	  "connection. After Check mail it also downloads the text of the newest messages ahead, so they "
-	  "open at once; the number is set in Tools > Preferences (Download ahead), and 0 turns it off.\n"
+	  "otherwise) on the card or the Internal disk, so they can be read without a connection. After "
+	  "Check mail it also gets the text of the newest messages in advance, so they open at once; the "
+	  "number is set in Tools > Preferences (Get in advance), and 0 turns it off.\n"
 	  "\n"
 	  "File > Work offline (Shift+Ctrl+W) stops PsiMail connecting. Anything you do offline - deleting, "
 	  "moving, flagging, sending - is kept and done the next time you check mail. Making, renaming and "
 	  "deleting folders needs the server, so PsiMail asks to go online for those.\n"
 	  "\n"
-	  "What PsiMail is doing is shown at the bottom left of the screen. Esc, or File > Stop, "
-	  "stops a download that is running; File > Disconnect (Ctrl+U) hangs up." },
+	  "What PsiMail is doing is shown at the bottom left of the screen. Esc stops a download that is "
+	  "running; File > Disconnect (Ctrl+U) hangs up." },
 
 	{ "Where the mail is kept",
 	  "PsiMail keeps your mail in the System folder, out of the way of your own files: "
-	  "\\System\\Data\\PsiMail on the memory disk (the CF card), or on the internal disk if there is no "
-	  "card or Tools > Preferences > Keep mail on says so. View > Status information shows which.\n"
+	  "\\System\\Data\\PsiMail on the card, or on the Internal disk if the card is not in or "
+	  "Tools > Preferences > Keep mail on says so. View > Status information shows which.\n"
 	  "\n"
 	  "Before version 0.74 the mail was in a PsiMail folder at the top of the disk. The first time a "
 	  "newer PsiMail opens, it moves that folder into the System folder - one quick step - and the "
-	  "attachments you had saved go to the Attachments folder in Documents. If the move can't be done "
+	  "attachments you had saved go to the Attachments folder in Documents. If the move cannot be done "
 	  "(the disk is full or a file is in use, say) PsiMail says so and goes on using the old folder, "
 	  "and tries again next time.\n"
 	  "\n"
@@ -272,17 +281,19 @@ static const TPmHelpTopic KHelpTopics[] =
 
 	{ "The calendar",
 	  "PsiMail can keep the Psion's Agenda in step with a CalDAV calendar such as Fastmail's. Turn it on "
-	  "in Tools > Calendar settings: the server (caldav.fastmail.com, or another server's address), the "
-	  "password if it differs from the mail one, your time zone and the Agenda file.\n"
+	  "in Tools > Calendar settings (tick Sync with Agenda): the server (caldav.fastmail.com, or another "
+	  "server's address), the password if it differs from the mail one, your time zone and the Agenda "
+	  "file. New entries go to shows (none yet) until the first sync has found your calendars.\n"
 	  "\n"
-	  "Event > Sync calendar (Shift+Ctrl+Y, from anywhere) fetches changes and sends new Agenda entries; with Sync with "
-	  "the Agenda on, Check mail does it too. View > Go to > Calendar (Shift+Ctrl+N) shows the week; "
-	  "View > Switch view (Ctrl+Q) changes between the week and the month. Event > Create new event "
-	  "(Ctrl+N) adds an entry to the Agenda, which is then sent to the server; Event > Details shows "
-	  "the selected event.\n"
+	  "Event > Sync calendar (Shift+Ctrl+Y, from anywhere) fetches changes and sends new Agenda entries; "
+	  "with Sync with Agenda ticked, Check mail does it too. View > Go to > Calendar (Shift+Ctrl+N) "
+	  "shows the week; View > Switch view (Ctrl+Q) changes between the week and the month. Event > "
+	  "Create new event (Ctrl+N) adds an entry to the Agenda, which is then sent to the server; Event > "
+	  "Details shows the selected event.\n"
 	  "\n"
-	  "Repeating entries made on the Psion stay on the Psion; to-do lists and anniversaries are not "
-	  "synced." },
+	  "Calendar settings > Agenda > Existing entries: Keep here only leaves the entries already in the "
+	  "Agenda where they are; Copy to the server sends them too. Repeating entries made on the Psion "
+	  "stay on the Psion; to-do lists and anniversaries are not synced." },
 
 	{ "Connections",
 	  "Tools > Connection settings chooses how PsiMail reaches the Internet, the same way as PsiTerm.\n"
@@ -292,64 +303,66 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "connection is up and names can be looked up (it asks before dialling).\n"
 	  "\n"
 	  "Modem: a serial WiFi modem (such as a WiRSa or a WiFi232) on the Psion's serial port. PsiMail "
-	  "dials the server with ATDT host:port. Set the baud rate to the modem's; 115200 with RTS/CTS "
-	  "flow control is fastest if the cable carries those lines.\n"
+	  "dials the server with the modem's own dial command. Set Baud rate to the modem's speed; 115200 "
+	  "with RTS/CTS flow control is fastest if the cable carries those lines.\n"
 	  "\n"
 	  "Network card or dial-up (Psion TCP/IP): the Psion's own TCP/IP - a network card, or a dial-up "
-	  "(PPP) set up in the Control panel's Internet and Modems settings. PsiMail starts it when it "
-	  "needs to and the Psion's connection dialogs appear. Dial-up: first send is what is sent to a "
-	  "serial modem first; leave it empty for a network card. Connection settings > Network > After "
-	  "use, Psion TCP/IP chooses what happens "
-	  "next, for PsiTerm and PsiWeb too: Stays connected (the standard on a new Psion) keeps it up "
+	  "connection set up in the Control panel. PsiMail starts it when it needs to and the Psion's "
+	  "connection dialogs appear. Dial-up: first send is what is sent to a serial modem first; leave "
+	  "it empty for a network card. Connection settings > Network > After use, Psion TCP/IP chooses "
+	  "what happens next, for PsiTerm and PsiWeb too: Stays connected (the standard) keeps it up "
 	  "until you disconnect with File > Disconnect (Ctrl+U); Disconnects when idle leaves it to "
 	  "the Psion's own idle time, as before (kept for anyone updating from an older version). The "
 	  "modem route always hangs up after use.\n"
 	  "\n"
-	  "Modem provides TLS is only for a modem whose own firmware does the TLS (the Atom modem's); "
+	  "Modem provides TLS is only for a modem whose own software does the TLS (the Atom modem's); "
 	  "leave it at No for a WiRSa or a WiFi232. If it is Yes and the modem does not, PsiMail "
 	  "notices on the first connection and does the TLS itself.\n"
 	  "\n"
 	  "Web helper (Connection settings > Network, shared with PsiTerm and PsiWeb) is optional: see "
-	  "PsiProxy and other helpers. "
-	  "PsiMail uses it only for web pictures, if Preferences > Web pictures via helper is Yes (if "
-	  "the proxy does not answer, the pictures come direct), and for Tools > Troubleshooting > "
-	  "Send log to server, which sends PsiMail's log to a PsiProxy on a computer, to help find a "
-	  "fault: the proxy, or if that is the Atom modem's own, the PsiProxy set in the modem's Web "
-	  "proxy settings (without one it says Needs PsiProxy on a computer). The log goes as plain "
-	  "HTTP and can hold server and account names.\n"
+	  "PsiProxy and other helpers. PsiMail uses it only for web pictures, when Tools > Preferences > "
+	  "Screen > Use the web helper is ticked (if the helper does not answer, the "
+	  "pictures come direct), and for Tools > Troubleshooting > Send log to helper, which sends "
+	  "PsiMail's log to a PsiProxy on a computer, to help find a fault: the helper, or if that is the "
+	  "Atom modem's own, the PsiProxy set in the modem's Web proxy settings (without one it says Needs "
+	  "PsiProxy on a computer). The log goes as plain HTTP and can hold server and account names.\n"
 	  "\n"
 	  "PsiMail keeps no log unless Tools > Troubleshooting > Keep a log is ticked. Then the mail "
-	  "engine writes what it does to psimail.log (the last engine's is kept as psimail.old), for "
-	  "whoever is looking into a problem; it takes effect at once, and unticking it stops it (the "
-	  "log kept so far stays). Send log to server is dimmed while no log is kept. Passwords are "
-	  "never written to the log.\n"
+	  "engine writes what it does to its log (the last one is kept as well), for whoever is looking "
+	  "into a problem; it takes effect at once, and unticking it stops it (the log kept so far stays). "
+	  "Troubleshooting > Show log shows the end of it, and Send log to helper sends it; both are dimmed "
+	  "while no log is kept. Passwords are never written to the log. Troubleshooting > Restart mail "
+	  "engine starts the part of PsiMail that does the networking again, should it stop answering.\n"
 	  "\n"
 	  "Everything goes over TLS 1.3 (or STARTTLS, if the account says so); the server's certificate is "
 	  "checked against the key you trusted the first time.\n"
 	  "\n"
 	  "While PsiMail works it says so at the bottom left - Checking mail, Sending, Getting message - "
 	  "and what came of it at the top right. To see every step (dialling, logging in, each message "
-	  "fetched), which helps when a connection won't come up, set Tools > Preferences > New mail > "
-	  "Show detailed progress to Yes." },
+	  "fetched), which helps when a connection will not come up, tick Tools > Preferences > New mail > "
+	  "Show detailed progress." },
 
 	{ "The Email icon",
-	  "The Email icon below the screen can open PsiMail instead of the built-in Email program. PsiMail "
-	  "asks once, the first time it opens after it is installed; after that, Tools > Preferences > "
-	  "Email icon opens chooses PsiMail or Built-in Email.\n"
+	  "On the Series 5mx the Email icon below the screen can open PsiMail instead of the built-in Email "
+	  "program. PsiMail asks once, the first time it opens after it is installed; after that, Tools > "
+	  "Preferences > Email icon opens chooses PsiMail or Built-in Email.\n"
 	  "\n"
 	  "With PsiMail chosen, a tap on the Email icon brings PsiMail to the front, or opens it if it is "
-	  "closed. A small helper program, pmbutton, waits in the background for the tap, taking very "
-	  "little memory and doing nothing until then; the other icons work as they always do. After the "
-	  "Psion has been reset, open PsiMail once and the Email icon is PsiMail's again.\n"
+	  "closed. A small helper program waits in the background for the tap, taking very little memory "
+	  "and doing nothing until then; the other icons work as they always do. After a reset, open "
+	  "PsiMail once and the Email icon is PsiMail's again.\n"
 	  "\n"
 	  "Choose Built-in Email, or remove PsiMail, and the Email icon opens the built-in Email program "
-	  "again. PsiMail's connections and the built-in Email program are not changed either way." },
+	  "again. PsiMail's connections and the built-in Email program are not changed either way.\n"
+	  "\n"
+	  "In Coda for the netBook the Email icon opens PsiMail already, so PsiMail does not ask, and "
+	  "Email icon opens shows PsiMail, dimmed." },
 
 	{ "Updating PsiMail",
-	  "Tools > Update PsiMail looks for a newer PsiMail on GitHub (the published releases, or the test "
-	  "builds) or on a local server on your own network, downloads it in pieces to the memory disk, "
-	  "checks its signature and offers to install it. PsiMail closes while the installer runs; start it "
-	  "again from the Extras bar afterwards.\n"
+	  "Tools > Update PsiMail looks for a newer PsiMail: Released versions, Test versions, or A "
+	  "computer on my network (a server of your own, with its address and port). It downloads the new "
+	  "version in pieces to the card, checks its signature and offers to install it. PsiMail closes "
+	  "while the installer runs; start it again afterwards.\n"
 	  "\n"
 	  "Tools > About PsiMail (Shift+Ctrl+A) shows the version you have." },
 
@@ -362,12 +375,12 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "Shift+Up/Down: choose several messages; Right/Left on a conversation: unfold / fold it\n"
 	  "Ctrl+Q in a reply: show the quote\n"
 	  "\n"
-	  "Shift+Ctrl+C: check mail (send & receive)\n"
-	  "Shift+Ctrl+X / Shift+Ctrl+G: check this folder / get older messages\n"
+	  "Shift+Ctrl+C: check mail (send and receive)\n"
+	  "Shift+Ctrl+E / Shift+Ctrl+G: check this folder / get older messages\n"
 	  "Ctrl+U / Esc / Shift+Ctrl+W: disconnect / stop / work offline\n"
 	  "Ctrl+N / Ctrl+R / Shift+Ctrl+R / Ctrl+W: create new / reply / reply to all / forward\n"
-	  "Ctrl+D / Ctrl+X / Shift+Ctrl+E / Ctrl+Z: delete / move to folder / archive / undo\n"
-	  "Shift+Ctrl+U / Shift+Ctrl+F: unread / flagged\n"
+	  "Ctrl+D / Ctrl+X / Shift+Ctrl+X / Ctrl+Z: delete / move to folder / archive / undo\n"
+	  "Shift+Ctrl+U / Shift+Ctrl+F: mark unread / flagged\n"
 	  "Ctrl+S / Shift+Ctrl+S: save an attachment / save as Word file\n"
 	  "Ctrl+P / Shift+Ctrl+P / Shift+Ctrl+V: print / print setup / print preview\n"
 	  "Ctrl+I / Ctrl+G / Ctrl+B / Ctrl+F: Inbox / go to folder / Outbox / find\n"
@@ -415,10 +428,30 @@ void CPmHelpText::SetContainerWindowL(const CCoeControl& aContainer)
 		iEditor->SetContainerWindowL(*this);
 	}
 
+// (1.14) the text's box holds whole lines: 7 on a screen of 240, 12 on 480
+// (the same in PsiMail, PsiWeb and PsiTerm), never one cut through. The
+// line's height is the formatted text's own (its first line), once the
+// dialog has put a topic in
+TInt CPmHelpText::LineHeight() const
+	{
+	CTextLayout* lay = iEditor ? iEditor->TextLayout() : NULL;
+	TRect line;
+	TInt h = 0;
+	if (lay && lay->NumFormattedLines() > 0)
+		{
+		lay->GetLineRect(1, line);
+		h = line.Height();
+		}
+	if (h < 8 || h > 40)
+		h = CEikonEnv::Static()->NormalFont()->HeightInPixels() + 4;
+	return h;
+	}
+
 TSize CPmHelpText::MinimumSize()
 	{
 	TSize s = iEditor->MinimumSize();
-	return TSize(s.iWidth + KHelpBarW + 2, s.iHeight + 2);
+	TInt lines = PmTall() ? 12 : 7;
+	return TSize(s.iWidth + KHelpBarW + 2, lines * LineHeight() + 2);
 	}
 
 void CPmHelpText::SizeChangedL()
@@ -650,7 +683,7 @@ void CPmHelpDialog::ShowTopicL(TInt aTopic)
 	const TPmHelpTopic& topic = KHelpTopics[aTopic];
 	TPtrC8 title((const TUint8*)topic.iTitle);
 	TPtrC8 text((const TUint8*)topic.iText);
-	HBufC* b = HBufC::NewLC(title.Length() + text.Length() + 4);
+	HBufC* b = HBufC::NewLC(title.Length() + text.Length() + 404);   // (room for the machine's name, below)
 	TPtr p = b->Des();
 	p.Copy(title);
 	p.Append(CEditableText::EParagraphDelimiter);
@@ -661,6 +694,20 @@ void CPmHelpDialog::ShowTopicL(TInt aTopic)
 			p.Append(CEditableText::EParagraphDelimiter);
 		else
 			p.Append((TText)c);
+		}
+	// (1.14) the machine by its own name: "the Psion" in the text is "the
+	// netBook", "the Series 5mx" or "the Series 7" on the screen
+	TPtrC machine = PmMachine();
+	const TText* const KWords[3] = { _S("the Psion"), _S("The Psion"), _S("this Psion") };
+	for (TInt w = 0; w < 3; w++)
+		{
+		TPtrC word(KWords[w]);
+		TInt keep = word.Length() - 5;          // ("the ", "The ", "this ")
+		TInt at;
+		while ((at = p.Find(word)) >= 0 && p.Length() + machine.Length() - 5 <= p.MaxLength())
+			{
+			p.Replace(at + keep, 5, machine);
+			}
 		}
 	CEikRichTextEditor* ed = ((CPmHelpText*)Control(EPmDlgHelpText))->Editor();
 	ed->SetTextL(b);

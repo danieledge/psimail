@@ -1010,6 +1010,7 @@ private:
 	void ConstructFromResourceL(TResourceReader& aReader);
 	void SetContainerWindowL(const CCoeControl& aContainer);
 	TSize MinimumSize();
+	TInt LineHeight() const;                       // (1.14) the text's line, for whole lines
 	void SizeChangedL();
 	void PositionChanged();
 	void Layout();
@@ -1066,11 +1067,19 @@ private:
 
 class CPmAboutDialog : public CEikDialog
 	{
-public:
-	CPmAboutDialog(const TDesC& aStatus) : iStatus(aStatus) {}
 private:
 	void PreLayoutDynInitL();
-	TPtrC iStatus;
+	TBool OkToExitL(TInt aButtonId);               // (1.14) Credits... shows them; Continue closes
+	};
+
+// (1.14) Tools > Troubleshooting > Show log: the end of psimail.log
+class CPmLogDialog : public CEikDialog
+	{
+public:
+	CPmLogDialog(const TDesC& aText) : iText(aText) {}
+private:
+	void PreLayoutDynInitL();
+	TPtrC iText;
 	};
 
 class CPmPrefsDialog : public CEikDialog
@@ -1195,6 +1204,9 @@ private:
 // (CEikonEnv::Color), so it follows the machine's colour scheme.
 TBool PmColour();
 TBool PmTall();
+TBool PmCoda();                 // (1.14) Coda's netBook image (Z:\System\Data\PsiEdition.txt)
+TPtrC PmMachine();              // (1.14) "netBook", "Series 5mx" or "Series 7": what Help and messages call this machine
+void PmSizeText(TDes& aOut, TInt64 aBytes);   // (1.14) "56.4 MB", as the toolbar shows free memory
 TRgb PmBack();                  // the workspace (5mx: white)
 TRgb PmText();                  // ... and its text (5mx: black)
 TRgb PmFace();                  // a button's face, a heading (5mx: light grey)
@@ -1274,7 +1286,12 @@ public:
 	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7
 	TBool iTall;                                   // ... of 400 lines or more
+	TBool iCoda;                                   // (1.14) Coda's netBook image (PmCoda): the Email icon is PsiMail's already
 private:
+	void ToolBarL();                               // (1.14) the toolbar for this screen (psimail.rss)
+	CCoeControl* CreateCustomCommandControlL(TInt aControlType);   // (1.14) Coda's toolbar extras, should Eikon not know them
+	void ShowLogL();                               // (1.14) Tools > Troubleshooting > Show log
+	TBool iSetupCancelled;                         // (1.14) the first start's setup cancelled: nothing more is asked
 	static TInt EmailButtonCallback(TAny* aSelf);
 	void EmailButtonStartL();
 	void HandleCommandL(TInt aCommand);

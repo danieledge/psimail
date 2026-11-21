@@ -90,7 +90,7 @@ TInt CPmContacts::LoadL()
 	User::LeaveIfError(err);
 	CleanupStack::PushL(db);
 	CEikonEnv* env = CEikonEnv::Static();
-	env->BusyMsgL(_L("Reading Contacts..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
+	env->BusyMsgL(_L("Reading Contacts\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
 	TRAP(err, ReadAllL(*db));
 	env->BusyMsgCancel();
 	CleanupStack::PopAndDestroy();       // db
@@ -182,7 +182,7 @@ TBool CPmContacts::Ready()
 		if (err == KErrInUse || err == KErrLocked)
 			t = _L("The Contacts file is in use - close Contacts and try again");
 		else
-			PmErrMsg(t, _L("The Contacts file can't be read"), err);
+			PmErrMsg(t, _L("The Contacts file could not be read"), err);
 		env->InfoMsg(t);
 		return EFalse;
 		}

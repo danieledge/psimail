@@ -67,34 +67,34 @@ static TPtrC QuietText(TInt aOp, const TDesC& aProgress)
 	case PM_CMD_FOLDERS:
 	case PM_CMD_SYNC:
 	case PM_CMD_SENDRECV:
-		return _L("Checking mail...");
+		return _L("Checking mail\x85");
 	case PM_CMD_OLDER:
-		return _L("Getting older messages...");
+		return _L("Getting older messages\x85");
 	case PM_CMD_BODY:
 	case PM_CMD_FULLBODY:
-		return _L("Getting message...");
+		return _L("Getting message\x85");
 	case PM_CMD_ATTACH:
-		return _L("Getting attachment...");
+		return _L("Getting attachment\x85");
 	case PM_CMD_SEARCH:
-		return _L("Finding...");
+		return _L("Finding\x85");
 	case PM_CMD_SEND:
-		return _L("Sending...");
+		return _L("Sending\x85");
 	case PM_CMD_CALSYNC:
-		return _L("Updating the calendar...");
+		return _L("Updating the calendar\x85");
 	case PM_CMD_PUTLOG:
-		return _L("Sending log...");
+		return _L("Sending log\x85");
 	case PM_CMD_UPDATE:
 		if (aProgress.Length() >= 11 && aProgress.Left(11) == _L("Downloading"))
-			return _L("Downloading PsiMail...");
-		return _L("Looking for a new PsiMail...");
+			return _L("Downloading PsiMail\x85");
+		return _L("Looking for a new PsiMail\x85");
 	case PM_CMD_MKFOLDER:
-		return _L("Creating the folder...");
+		return _L("Creating the folder\x85");
 	case PM_CMD_RENFOLDER:
-		return _L("Renaming the folder...");
+		return _L("Renaming the folder\x85");
 	case PM_CMD_DELFOLDER:
-		return _L("Deleting the folder...");
+		return _L("Deleting the folder\x85");
 	case PM_CMD_UNDO:
-		return _L("Undoing...");
+		return _L("Undoing\x85");
 	default:
 		// downloading ahead (PM_CMD_NONE), pictures, flags, moves (already
 		// said: "Moved to the Trash"), hanging up: nothing to say
@@ -133,7 +133,7 @@ void CPmView::BusyTextNow(TDes& aOut) const
 		}
 	if (iCalSync && iCalSync->Running())
 		{
-		aOut = _L("Updating the calendar...");
+		aOut = _L("Updating the calendar\x85");
 		return;
 		}
 	if (!engine)
@@ -261,7 +261,7 @@ TBool CPmView::OutcomeText(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg, TDes
 			aOut.Copy(Clip(aMsg, aOut.MaxLength()));
 		else
 			{
-			aOut = _L("Could not send log - ");
+			aOut = _L("Cannot send log - ");
 			aOut.Append(Clip(aMsg, aOut.MaxLength() - aOut.Length()));
 			}
 		return ETrue;

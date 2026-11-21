@@ -69,7 +69,7 @@ void CPmView::UndoL()
 		}
 	iUndoDoing = iUndo[--iUndoCount];
 	Cmd(PM_CMD_UNDO, iUndoDoing.iFolder, iUndoDoing.iUid, KNullDesC8);
-	Working(_L("Undoing..."));
+	Working(_L("Undoing\x85"));
 	}
 
 // the engine's answer: the message is back (last_file: its uid now)

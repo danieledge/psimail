@@ -320,7 +320,7 @@ void CPmView::AddCardsL()
 			{
 			TBuf<80> t;
 			if (err == KErrInUse || err == KErrLocked) t = _L("The Contacts file is in use - close Contacts and try again");
-			else PmErrMsg(t, _L("The Contacts file can't be read"), err);
+			else PmErrMsg(t, _L("The Contacts file could not be read"), err);
 			Toast(t);
 			return;
 			}
@@ -333,7 +333,7 @@ void CPmView::AddCardsL()
 		{
 		TBuf<80> t;
 		if (err == KErrInUse || err == KErrLocked) t = _L("The Contacts file is in use - close Contacts and try again");
-		else PmErrMsg(t, _L("The Contacts file can't be opened"), err);
+		else PmErrMsg(t, _L("The Contacts file could not be opened"), err);
 		Toast(t);
 		return;
 		}

@@ -219,7 +219,7 @@ static int pic_abort(void *ctx, int percent)
 	if (pm_cancelled()) return 1;
 	if (percent >= a->shown + 10) {
 		a->shown = percent - percent % 10;
-		pm_progress("Setting out %s... %d%%", a->label, a->shown);
+		pm_progress("Setting out %s %d%%\x85", a->label, a->shown);
 	}
 	/* (signed: the clock has been seen to step back a little in the emulator) */
 	return (long)(pm_ms() - a->start) > PIC_TIME_MS;
@@ -358,7 +358,7 @@ static int decode_part2(const char *img_path, const char *pmi_path, const char *
 	a.start = pm_ms();
 	a.label = label;
 	a.shown = 0;
-	pm_progress("Setting out %s...", label);
+	pm_progress("Setting out %s\x85", label);
 	{
 		/* over the message's budget before it is even decoded? (the size is
 		   in the first bytes; the JPEG header may be too long to say) */
@@ -474,7 +474,7 @@ int pic_fetch(int acct, const char *folder, unsigned int uid, const char *parts,
 					return PM_RES_FAILED;
 				}
 			}
-			pm_progress("Downloading %s...", label);
+			pm_progress("Downloading %s\x85", label);
 			d = imap_part_to_file(acct, folder, uid, pe->part, pe->enc, pe->size, img, label, why, whymax);
 			if (d != PM_RES_OK) { r = d; break; }
 		}

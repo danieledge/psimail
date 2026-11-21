@@ -67,7 +67,7 @@ static void LoginClip(TDes& aDst, const TDesC& aSrc, TInt aMax)
 		return;
 		}
 	aDst = aSrc.Left(aMax - 3);
-	aDst.Append(_L("..."));
+	aDst.Append(_L("\x85"));
 	}
 
 // is done number aSeq (iDoneSeen's count) at or before aUpto? (they wrap)
@@ -88,8 +88,15 @@ void CPmLoginDialog::PreLayoutDynInitL()
 	t = iWhy.Left(iWhy.Length() < 159 ? iWhy.Length() : 159);
 	PmFitText(t, *((CEikLabel*)Control(EPmDlgInfo2))->Font(), KPmDlgTextPx);
 	SetLabelL(EPmDlgInfo2, t);
-	SetLabelL(EPmDlgInfo3, iNeedPass ? _L("The password is kept on this Psion")
-		: _L("Leave the password blank to keep the saved one"));
+	if (iNeedPass)
+		{
+		TBuf<60> kept(_L("The password is kept on this "));   // (1.14: the machine by its name)
+		kept.Append(PmMachine());
+		kept.Append(_L(" only"));
+		SetLabelL(EPmDlgInfo3, kept);
+		}
+	else
+		SetLabelL(EPmDlgInfo3, _L("Leave the password blank to keep the saved one"));
 	SetEdwinTextL(EPmDlgUser, &iUser);
 	TryChangeFocusToL(iNeedPass ? EPmDlgPass : EPmDlgUser);
 	}
@@ -280,13 +287,13 @@ void CPmView::UntrustedL(const PmCmd& aCmd)
 	TBuf<100> fp;
 	LoginFromC(fp, iShared->trust_fp);
 	TBuf<200> lines[4];
-	lines[0] = _L("PsiMail can't be sure it is talking to");
+	lines[0] = _L("PsiMail cannot be sure it is talking to");
 	lines[1] = host;
 	lines[1].Append(_L(": "));
 	lines[1].Append(why.Left(why.Length() < 110 ? why.Length() : 110));
 	lines[2] = _L("Key: ");
 	lines[2].Append(fp.Left(fp.Length() < 95 ? fp.Length() : 95));
-	lines[3] = _L("Trust it only if you expected this (e.g. your own server)");
+	lines[3] = _L("Trust it only if you expected this, as for your own server");
 	TPtrC ptrs[4];
 	for (TInt k = 0; k < 4; k++) ptrs[k].Set(lines[k]);
 	CPmInfoDialog* dlg = new(ELeave) CPmInfoDialog(_L("Certificate not trusted"), ptrs, 4);

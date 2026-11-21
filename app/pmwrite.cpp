@@ -18,7 +18,7 @@ void CPmEventDialog::PreLayoutDynInitL()
 	((CEikDateEditor*)Control(EPmDlgEvDate))->SetDate(iEvent.iDate);
 	((CEikTimeEditor*)Control(EPmDlgEvStart))->SetTime(iEvent.iStart);
 	((CEikTimeEditor*)Control(EPmDlgEvEnd))->SetTime(iEvent.iEnd);
-	SetChoiceListCurrentItem(EPmDlgEvAllDay, iEvent.iAllDay ? 1 : 0);
+	SetCheckBoxState(EPmDlgEvAllDay, iEvent.iAllDay ? CEikButtonBase::ESet : CEikButtonBase::EClear);
 	SetChoiceListCurrentItem(EPmDlgEvAlarm, iEvent.iAlarm);
 	TimesDimmed();
 	}
@@ -26,7 +26,7 @@ void CPmEventDialog::PreLayoutDynInitL()
 // an all-day event has no times: the lines dim rather than go
 void CPmEventDialog::TimesDimmed()
 	{
-	TBool allDay = ChoiceListCurrentItem(EPmDlgEvAllDay) == 1;
+	TBool allDay = CheckBoxState(EPmDlgEvAllDay) == CEikButtonBase::ESet;
 	SetLineDimmedNow(EPmDlgEvStart, allDay);
 	SetLineDimmedNow(EPmDlgEvEnd, allDay);
 	}
@@ -50,7 +50,7 @@ TBool CPmEventDialog::OkToExitL(TInt /*aButtonId*/)
 	GetEdwinText(iEvent.iWhere, EPmDlgEvLoc);
 	iEvent.iWhere.Trim();
 	iEvent.iDate = ((CEikDateEditor*)Control(EPmDlgEvDate))->Date();
-	iEvent.iAllDay = ChoiceListCurrentItem(EPmDlgEvAllDay) == 1;
+	iEvent.iAllDay = CheckBoxState(EPmDlgEvAllDay) == CEikButtonBase::ESet;
 	iEvent.iStart = ((CEikTimeEditor*)Control(EPmDlgEvStart))->Time();
 	iEvent.iEnd = ((CEikTimeEditor*)Control(EPmDlgEvEnd))->Time();
 	iEvent.iAlarm = ChoiceListCurrentItem(EPmDlgEvAlarm);
@@ -125,7 +125,7 @@ void CPmView::NewEventL()
 		{
 		TBuf<80> t;
 		if (err == KErrNotFound) t = _L("No Agenda file where Calendar settings say");
-		else PmErrMsg(t, _L("Could not add it to the Agenda"), err);
+		else PmErrMsg(t, _L("Cannot add it to the Agenda"), err);
 		Toast(t);
 		return;
 		}

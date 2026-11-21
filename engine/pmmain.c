@@ -268,10 +268,10 @@ static int send_outbox(int acct, char *why, int whymax, int *nsent)
 			fclose(f);
 		}
 		if (ruid == 0xffffffffu) continue;             /* a draft: not for sending */
-		pm_progress("Preparing message %d of %d...", i + 1, l.n);
+		pm_progress("Preparing message %d of %d\x85", i + 1, l.n);
 		r = compose_mime(acct, path, eml, from, sizeof(from), rcpts, sizeof(rcpts), why, whymax);
 		if (r == PM_RES_OK) {
-			pm_progress("Sending message %d of %d...", i + 1, l.n);
+			pm_progress("Sending message %d of %d\x85", i + 1, l.n);
 			r = smtp_send(acct, eml, from, rcpts, snt, why, whymax);
 		}
 		if (r != PM_RES_OK) {
@@ -406,7 +406,7 @@ static int pf_step(void)
 	s->busy = 1;
 	snprintf(label, sizeof(label), "%d of %d", n + 1, want);
 	pm_ahead_label(label);
-	pm_progress("Downloading...");
+	pm_progress("Downloading\x85");
 	drops = imap_drops();
 	r = imap_body(g_pf[k].acct, g_pf[k].folder, uid, 2, why, sizeof(why));
 	pm_ahead_label(0);
@@ -654,7 +654,7 @@ void pm_do_command(PmCmd *c)
 	   (mail, sending and the calendar alike) */
 	if (r == PM_RES_UNTRUSTED && !cal_clock_ok(pm_time(), CAL_BUILD_YEAR)) {
 		pm_log("cmd %d: %s refused with the clock not set", c->op, s->trust_host);
-		pm_copy(why, "The Psion's clock is not set - set the date first", sizeof(why));
+		pm_copy(why, "The clock is not set - set the date first", sizeof(why));
 		r = PM_RES_FAILED;
 	}
 	pm_log("cmd %d acct %d %s uid %u -> %d %s (%lu ms, heap %u KB)", c->op, c->acct, c->folder, c->uid, r, why,

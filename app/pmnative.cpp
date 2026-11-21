@@ -178,6 +178,43 @@ TBool PmTall()
 	return ui && ui->iTall;
 	}
 
+// (1.14) Coda: its netBook image says so in the ROM. There the Email icon
+// opens PsiMail already (the image's Shell), and the toolbar has Coda's extras
+TBool PmCoda()
+	{
+	CPmAppUi* ui = (CPmAppUi*)CEikonEnv::Static()->EikAppUi();
+	return ui && ui->iCoda;
+	}
+
+// (1.14) the machine's name in the words its own manual uses: 240 lines is
+// the Series 5mx; 480 is the netBook, unless the machine says it is a Series 7
+TPtrC PmMachine()
+	{
+	if (!PmTall())
+		return _L("Series 5mx");
+	TMachineInfoV1Buf mi;
+	if (UserHal::MachineInfo(mi) == KErrNone && mi().iMachineName.Find(_L("7")) >= 0)
+		return _L("Series 7");
+	return _L("netBook");
+	}
+
+// (1.14) a size in MB with one decimal ("56.4 MB"), as Coda's toolbar shows
+// free memory, and "768 KB" below 1 MB
+void PmSizeText(TDes& aOut, TInt64 aBytes)
+	{
+	aOut.Zero();
+	TInt kb = (aBytes / TInt64(1024)).Low();
+	if (aBytes < TInt64(0))
+		kb = 0;
+	if (kb < 1024)
+		aOut.AppendFormat(_L("%d KB"), kb);
+	else
+		{
+		TInt tenths = (kb * 10 + 512) / 1024;
+		aOut.AppendFormat(_L("%d.%d MB"), tenths / 10, tenths % 10);
+		}
+	}
+
 static TRgb SysColour(TInt aLogical, const TRgb& aGrey)
 	{
 	return PmColour() ? CEikonEnv::Static()->Color((TEikLogicalColor)aLogical) : aGrey;
@@ -540,7 +577,7 @@ public:
 		else if (aEvent.iType == TPointerEvent::EDrag && !iDragging && aEvent.iPosition.iX < Rect().iTl.iX - 4)
 			{
 			iDragging = ETrue;
-			CEikonEnv::Static()->BusyMsgL(_L("Moving to a folder..."));
+			CEikonEnv::Static()->BusyMsgL(_L("Moving to a folder\x85"));
 			}
 		if (iDragging)
 			{
@@ -1758,7 +1795,7 @@ void CPmView::UpdateReaderL()
 			}
 		else
 			t.Append(iSettings->iOffline ? _L("Not downloaded - you are working offline")
-				: _L("Downloading the message..."));
+				: _L("Downloading the message\x85"));
 		t.Append(KPara);
 		}
 	else
@@ -2175,7 +2212,7 @@ void PmPictureLook(CPmPicture& aPic, const TPmPicEntry& aEntry, const CFont* aFo
 		failed = ETrue;
 		}
 	else if (aEntry.iState == TPmPicEntry::EWaiting)
-		text = _L("Getting the picture...");
+		text = _L("Getting the picture\x85");
 	else if (aOffline)
 		text = _L("Picture not downloaded - you are working offline");
 	else
@@ -2653,7 +2690,7 @@ static void ConnectionText(const TPmSettings& aSettings, const PmShared* aShared
 		}
 	else if (aShared && aShared->busy && aShared->cur_op != PM_CMD_IDLE)
 		{
-		aOut = _L("Connecting...");
+		aOut = _L("Connecting\x85");
 		light = 1;
 		}
 	else
@@ -2768,7 +2805,7 @@ void CPmView::DrawTitle(CWindowGc& gc) const
 	// the middle: what's happening, or how many messages
 	TBuf<160> mid;
 	if (!iSplashDone && iRunning && iShared && iShared->state == PM_STATE_STARTING)
-		mid = _L("Starting...");
+		mid = _L("Starting\x85");
 	else if (iMode == EMessage)
 		{
 		if (iRows->Count())
@@ -2940,30 +2977,43 @@ void CPmView::DrawNative(const TRect& /*aRect*/) const
 	TBool emptyList = (iMode == EList || iMode == EOutbox) && iRows->Count() == 0;
 	if (emptyList || iMode == ENoAccount)
 		{
-		gc.UseFont(iListFont);
+		// (1.14) Coda's empty state: the first line bold, the second how to
+		// go on, in the dialogs' fonts (not the list's zoom)
 		gc.SetBrushStyle(CGraphicsContext::ENullBrush);
 		TRect area(iHeadX[1], top, r.iBr.iX, r.iBr.iY);
 		TBuf<120> line[3];
 		if (iMode == ENoAccount)
 			{
-			line[0] = _L("No mail account yet");
+			line[0] = _L("No account yet");
 			line[1] = _L("Tools > Accounts > Add sets one up");
-			line[2] = _L("Most providers want an app password");
 			}
 		else if (iMode == EOutbox) line[0] = _L("Nothing waiting to be sent");
 		else if (iSearch) line[0] = _L("Nothing found");
-		else line[0] = Busy() ? _L("Looking for messages...") : _L("No messages");
+		else line[0] = Busy() ? _L("Looking for messages\x85") : _L("No messages");
 		TInt n = 0;
 		while (n < 3 && line[n].Length()) n++;
-		TInt lh = iListFont->HeightInPixels() + 4;
+		const CFont* plain = iEikonEnv->NormalFont();
+		// (the first line: the normal font in bold, as PsiView's empty state)
+		CFont* bold = NULL;
+		TFontSpec spec = plain->FontSpecInTwips();
+		spec.iFontStyle.SetStrokeWeight(EStrokeWeightBold);
+		if (iCoeEnv->ScreenDevice()->GetNearestFontInTwips(bold, spec) != KErrNone)
+			bold = NULL;
+		if (!bold)
+			bold = (CFont*)iEikonEnv->LegendFont();
+		TInt lh = bold->HeightInPixels() + 4;
 		TInt y = area.iTl.iY + (area.Height() - n * lh) / 2;
 		for (TInt i = 0; i < n; i++)
 			{
-			TextUtils::ClipToFit(line[i], *iListFont, area.Width() - 8);   // "..." if it still won't fit
-			TInt w = iListFont->TextWidthInPixels(line[i]);
-			gc.DrawText(line[i], TPoint(area.iTl.iX + (area.Width() - w) / 2, y + i * lh + iListFont->AscentInPixels()));
+			const CFont* f = i == 0 ? bold : plain;
+			gc.UseFont(f);
+			TextUtils::ClipToFit(line[i], *f, area.Width() - 8);   // "..." if it still won't fit
+			TInt w = f->TextWidthInPixels(line[i]);
+			gc.DrawText(line[i], TPoint(area.iTl.iX + (area.Width() - w) / 2, y + i * lh + f->AscentInPixels()));
+			gc.DiscardFont();
 			}
-		gc.DiscardFont();
+		if (bold != iEikonEnv->LegendFont())
+			iCoeEnv->ScreenDevice()->ReleaseFont(bold);
 		}
 	}
 
@@ -3085,47 +3135,38 @@ void CPmView::ConnPanelText(TInt& aLight, TDes& aText) const
 	TBool modem = iSettings->iNetMode == 0;
 	const PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
 	TBool atomTls = modem && (iSettings->iSpare[0] & KPmModemTlsBit);
-	if (iSettings->iOffline)
-		{
-		aLight = 0;
-		aText = _L("Offline");
-		}
-	else if (iShared && iShared->online)
+	// (1.14) in a word or two that fit the box: Online or Offline (amber
+	// while it connects; working offline is ticked on the File menu), the
+	// route, whether it is secure, and when the mail was last checked - the
+	// details (the web pictures' way too) are in Status information, a tap away
+	if (iShared && iShared->online && !iSettings->iOffline)
 		{
 		aLight = (a.used && a.imap_tls == PM_TLS_NONE && !atomTls) ? 3 : 2;
 		aText = _L("Online");
 		}
-	else if (iShared && iShared->busy)
-		{
-		aLight = 1;
-		aText = _L("Connecting");
-		}
 	else
 		{
-		aLight = 0;
-		aText = _L("Not connected");
+		aLight = !iSettings->iOffline && iShared && iShared->busy ? 1 : 0;
+		aText = _L("Offline");
 		}
 	aText.Append('\n');
-	aText.Append(modem ? _L("Modem") : _L("Psion TCP/IP"));
+	aText.Append(modem ? _L("By modem") : _L("By network"));
 	aText.Append('\n');
 	if (a.used && a.imap_tls == PM_TLS_NONE && !atomTls)
 		aText.Append(_L("Not secure"));
 	else
-		aText.Append(atomTls ? _L("TLS: the Atom") : _L("TLS: here"));
+		aText.Append(_L("Secure"));
 	aText.Append('\n');
-	aText.Append(iShared && iShared->use_proxy ? _L("Web: helper") : _L("Web: direct"));
+	aText.Append(_L("Checked"));            // (when the mail was last checked, under it)
 	aText.Append('\n');
 	if (iLastChecked.Int64() == TInt64(0))
-		aText.Append(_L("Last: -"));
+		aText.Append(_L("not yet"));
 	else
 		{
 		TBuf<16> t;
 		TRAPD(err, iLastChecked.FormatL(t, _L("%-B%:0%J%:1%T%+B")));
 		if (!err)
-			{
-			aText.Append(_L("Last "));      // (when it was last checked: "Last 09:41")
 			aText.Append(t);
-			}
 		}
 	}
 
@@ -3255,23 +3296,24 @@ void CPmView::StatusInfoL()
 		lines[0].AppendFormat(_L(" (%S)"), &e);
 		}
 	else
-		lines[0].Append(_L("none yet"));
+		lines[0].Append(_L("none yet - Tools > Accounts > Add"));
 	const TInt KBauds[5] = { 9600, 19200, 38400, 57600, 115200 };
 	TInt bi = iSettings->iBaudIndex;
 	if (bi < 0 || bi > 4) bi = 4;
 	TBool modem = iSettings->iNetMode == 0;
+	// (1.14) the route in the words PsiMail, PsiWeb and PsiTerm share
 	if (modem)
-		lines[1].Format(_L("Route: the modem, %d baud"), KBauds[bi]);
+		lines[1].Format(_L("By modem, %d baud"), KBauds[bi]);
 	else
-		lines[1] = _L("Route: Psion TCP/IP (network card or dial-up)");
-	lines[1].Append(iSettings->iOffline ? _L(" - offline") : iShared && iShared->online ? _L(" - online") : _L(""));
+		lines[1] = _L("By network card or dial-up");
+	lines[1].Append(iSettings->iOffline ? _L(" - working offline") : iShared && iShared->online ? _L(" - online") : _L(" - offline"));
 	TBool atomTls = modem && (iSettings->iSpare[0] & KPmModemTlsBit);
 	if (a.used && a.imap_tls == PM_TLS_NONE && !atomTls)
-		lines[2] = _L("Security: none (the account says None)");
+		lines[2] = _L("Security: none - the account's Security is None");
 	else if (atomTls)
-		lines[2] = _L("Security: TLS by the Atom modem");
+		lines[2] = _L("Security: TLS, by the modem");
 	else
-		lines[2] = _L("Security: TLS 1.3 here, certificate checked");
+		lines[2] = _L("Security: TLS 1.3, certificate checked");
 	{
 	TBuf8<64> host;
 	TInt useProxy = 0;
@@ -3290,18 +3332,30 @@ void CPmView::StatusInfoL()
 		{
 		TInt unread = 0, total = 0;
 		CountRows(total, unread);
-		lines[4].Format(_L("This folder: %d messages here, %d unread"), total, unread);
+		lines[4].Format(total == 1 ? _L("This folder: %d message here, %d unread") : _L("This folder: %d messages here, %d unread"), total, unread);
 		}
 	else
-		lines[4] = _L("This folder: -");
-	lines[5].Format(_L("Outbox: %d waiting to be sent"), OutboxCount());
-	lines[6] = _L("Last: ");
-	if (Busy() && iLastProgress.Length())
-		lines[6].Append(Clip(iLastProgress, 60));
-	else if (iStatus.Length())
-		lines[6].Append(Clip(iStatus, 60));
+		lines[4] = _L("No folder open");
+	TInt waiting = OutboxCount();
+	if (waiting == 0)
+		lines[5] = _L("Outbox: nothing waiting to be sent");
+	else if (waiting == 1)
+		lines[5] = _L("Outbox: 1 message waiting to be sent");
 	else
-		lines[6].Append(iRunning ? _L("the mail engine is ready") : _L("the mail engine is not running"));
+		lines[5].Format(_L("Outbox: %d messages waiting to be sent"), waiting);
+	if (Busy() && iLastProgress.Length())
+		{
+		lines[6] = _L("Now: ");
+		lines[6].Append(Clip(iLastProgress, 60));
+		}
+	else if (iStatus.Length())
+		{
+		lines[6] = _L("Last: ");
+		lines[6].Append(Clip(iStatus, 60));
+		}
+	else
+		lines[6] = iRunning ? _L("The mail engine is ready") : _L("The mail engine is not running");
+	TBool memLine = !(Busy() && iLastProgress.Length()) && !iStatus.Length();
 	{
 	// where the mail is kept (pmstore.cpp), the disk's room, and memory
 	TBuf<100> dir;
@@ -3309,11 +3363,18 @@ void CPmView::StatusInfoL()
 	TInt drive = EDriveC;
 	if (dir.Length() && RFs::CharToDrive(dir[0], drive) != KErrNone) drive = EDriveC;
 	TVolumeInfo vol;
-	TInt freeKb = iCoeEnv->FsSession().Volume(vol, drive) == KErrNone ? (TInt)(vol.iFree / TInt64(1024)).Low() : -1;
+	TBool room = iCoeEnv->FsSession().Volume(vol, drive) == KErrNone;
 	TMemoryInfoV1Buf mem;
 	UserHal::MemoryInfo(mem);
-	lines[7].Format(_L("Mail on %c: %d KB free, memory %d KB"), dir.Length() ? (TUint)dir[0] : 'C',
-		freeKb, mem().iFreeRamInBytes / 1024);
+	// (1.14) the disk by its name and sizes in MB, as Coda's toolbar has them
+	TBuf<16> diskFree, memFree;
+	PmSizeText(diskFree, room ? vol.iFree : TInt64(0));
+	PmSizeText(memFree, TInt64(mem().iFreeRamInBytes));
+	lines[7] = drive == EDriveC ? _L("Mail on the Internal disk") : _L("Mail on the card");
+	if (room)
+		lines[7].AppendFormat(_L(", %S free"), &diskFree);
+	if (memLine)
+		lines[6].AppendFormat(_L(" - memory %S free"), &memFree);   // (where it fits)
 	}
 	TPtrC ptrs[8];
 	for (TInt k = 0; k < 8; k++) ptrs[k].Set(lines[k]);

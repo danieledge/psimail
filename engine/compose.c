@@ -425,7 +425,7 @@ int compose_mime(int acct, const char *outbox_path, const char *mime_path,
 		const char *base = attach[i], *s;
 		char encname[300];
 		for (s = attach[i]; *s; s++) if (*s == '\\' || *s == '/' || *s == ':') base = s + 1;
-		pm_progress("Adding %s...", base);
+		pm_progress("Adding %s\x85", base);
 		fprintf(f, "\r\n--%s\r\nContent-Type: %s\r\nContent-Transfer-Encoding: base64\r\n", boundary, mime_type(base));
 		cs_encode_header(base, encname, sizeof(encname));
 		if (!strcmp(encname, base))

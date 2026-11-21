@@ -121,7 +121,7 @@ void CPmView::StoreRoot(TChar aDrive, TDes& aRoot)
 		{
 		iStoreTried |= bit;
 		CEikonEnv* env = CEikonEnv::Static();
-		TRAPD(busy, env->BusyMsgL(_L("Moving the mail into the System folder..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+		TRAPD(busy, env->BusyMsgL(_L("Moving the mail into the System folder\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 		TBuf<40> parent;
 		OnDrive(parent, KNewParent, aDrive);
 		TInt r = fs.MkDirAll(parent);
@@ -137,7 +137,7 @@ void CPmView::StoreRoot(TChar aDrive, TDes& aRoot)
 			// keep using the old folder: nothing has moved
 			log.Format(_L("could not move %S to %S (%d) - still using %S"), &oldDir, &newDir, r, &oldDir);
 			StoreLog(fs, log, LogOn());
-			env->InfoMsg(_L("The mail could not be moved - it stays in \\PsiMail"));
+			env->InfoMsg(_L("Cannot move the mail - it stays where it was"));
 			aRoot = oldDir;
 			aRoot.Append('\\');
 			return;

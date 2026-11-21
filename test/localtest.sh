@@ -25,17 +25,17 @@ uids() { cut -f1 "$STORE"/A0/F*/search.txt | grep -v '^#' | tr '\n' ' '; }
 run sync INBOX > /dev/null
 run body INBOX 102 > /dev/null
 run body INBOX 104 > /dev/null
-check "search: OK 1 found on this Psion" "$(PM_OFFLINE=1 run search INBOX hello)"
+check "search: OK 1 found here" "$(PM_OFFLINE=1 run search INBOX hello)"
 check "101 " "$(uids)"
-check "search: OK 1 found on this Psion" "$(PM_OFFLINE=1 run search INBOX carrier)"
+check "search: OK 1 found here" "$(PM_OFFLINE=1 run search INBOX carrier)"
 check "102 " "$(uids)"
 # (101 says "short note" too, but its text is not on the Psion)
-check "search: OK 1 found on this Psion" "$(PM_OFFLINE=1 run search INBOX "short note")"
+check "search: OK 1 found here" "$(PM_OFFLINE=1 run search INBOX "short note")"
 check "104 " "$(uids)"
-check "search: OK 0 found on this Psion" "$(PM_OFFLINE=1 run search INBOX "second carrier")"
-check "search: OK 0 found on this Psion" "$(PM_OFFLINE=1 run search INBOX padding)"
+check "search: OK 0 found here" "$(PM_OFFLINE=1 run search INBOX "second carrier")"
+check "search: OK 0 found here" "$(PM_OFFLINE=1 run search INBOX padding)"
 check "search: FAILED Nothing to find" "$(PM_OFFLINE=1 run search INBOX " ")"
 n=$(grep -c SEARCH "$STORE/server.log")
-check "search: OK 1 found on this Psion" "$(run search INBOX "$(printf '\001L')WiRSa")"
+check "search: OK 1 found here" "$(run search INBOX "$(printf '\001L')WiRSa")"
 check "$n" "$(grep -c SEARCH "$STORE/server.log")"
 [ $fail = 0 ] && echo "localtest: all passed" || { echo "localtest: FAILED"; exit 1; }

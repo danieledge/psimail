@@ -26,6 +26,9 @@
 #include <eiktbar.h>
 #include <eikcmbut.h>
 #include <eikbtpan.h>
+#include <eikfnlab.h>           // (1.14) the toolbar's name, as Psion's programs have it
+#include <eikspace.h>
+#include <eikproc.h>
 #include "pmicons.h"
 #include "pmapp.h"
 #include "pgsetup.h"
@@ -117,7 +120,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.13");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.14");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -388,7 +391,7 @@ void CPmView::FinishStartL()
 			if (!iOldEngineNoted)
 				{
 				iOldEngineNoted = ETrue;
-				iEikonEnv->BusyMsgL(_L("Waiting for the last mail engine to stop..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
+				iEikonEnv->BusyMsgL(_L("Waiting for the last mail engine to stop\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0));
 				}
 			return;
 			}
@@ -668,9 +671,15 @@ void CPmView::StartEngineL()
 	TInt r = iProcess.Create(exe, KNullDesC);
 	if (r != KErrNone)
 		{
-		TBuf<80> e;
-		PmErrMsg(e, _L("psimail.exe did not start"), r);
-		iEikonEnv->InfoWinL(_L("Could not start the mail engine"), e);
+		// (1.14) in words: no program file names (Coda sheet 2.13)
+		if (r == KErrNotFound || r == KErrPathNotFound)
+			iEikonEnv->InfoWinL(_L("Part of PsiMail is missing"), _L("Install PsiMail again"));
+		else
+			{
+			TBuf<80> e;
+			PmErrMsg(e, _L("The mail engine did not start"), r);
+			iEikonEnv->InfoWinL(_L("Cannot start the mail engine"), e);
+			}
 		return;
 		}
 	iRunning = ETrue;
@@ -715,7 +724,7 @@ void CPmView::StopEngine(TBool aWait)
 		// give it a few seconds to log out and hang up - saying so, as the
 		// style guide asks of anything that keeps the user waiting (Close
 		// drives this wait from a timer instead: CPmAppUi::BeginExitL)
-		TRAPD(be, iEikonEnv->BusyMsgL(_L("Stopping the mail engine..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+		TRAPD(be, iEikonEnv->BusyMsgL(_L("Stopping the mail engine\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 		for (TInt i = 0; i < 60 && iShared->state != PM_STATE_EXITED; i++)
 			User::After(100000);
 		if (be == KErrNone)
@@ -1929,7 +1938,7 @@ void CPmView::LaunchFileL(const TDesC& aPath)
 		TParsePtrC parse(aPath);
 		TBuf<100> t(_L("Opening "));
 		t.Append(Clip(parse.NameAndExt(), 80));
-		t.Append(_L("..."));
+		t.Append(_L("\x85"));
 		Toast(t);
 		return;
 		}
@@ -1938,7 +1947,7 @@ void CPmView::LaunchFileL(const TDesC& aPath)
 	else
 		{
 		TBuf<80> t;
-		PmErrMsg(t, _L("The file can't be opened"), r);
+		PmErrMsg(t, _L("The file could not be opened"), r);
 		iEikonEnv->InfoWinL(t, Clip(aPath, 120));
 		}
 	}
@@ -1977,7 +1986,7 @@ void CPmView::ForwardAttachmentsL(TUint aUid)
 	if (iFwdPending == 0)
 		((CPmAppUi*)iEikonEnv->EikAppUi())->ForwardReadyL(aUid, *iFwdFiles);
 	else
-		Working(_L("Getting the attachments first..."));
+		Working(_L("Getting the attachments first\x85"));
 	}
 
 // the From of a message in this folder's index, as the server gave it
@@ -2074,7 +2083,7 @@ void CPmView::DraftFromOutboxL(CPmDraft& aDraft)
 		}
 	if (!buf)
 		{
-		iEikonEnv->InfoMsg(_L("Could not open that message"));
+		iEikonEnv->InfoMsg(_L("Cannot open that message"));
 		User::Leave(KErrNotFound);
 		}
 	CleanupStack::PushL(buf);
@@ -2233,7 +2242,7 @@ void CPmView::SaveDraftL(CPmDraft& aDraft, TBool aSend, TBool aQuiet)
 		else
 			{
 			Cmd(PM_CMD_SEND, KNullDesC8, 0, KNullDesC8);
-			Working(_L("Sending..."));
+			Working(_L("Sending\x85"));
 			}
 		}
 	else if (!aQuiet)
@@ -2918,7 +2927,7 @@ TKeyResponse CPmView::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aTyp
 		(iShared->busy && !iShared->online);   // still connecting: nothing to go back from
 	if (code == EKeyEscape && Busy() && escStops && !DownloadingAhead())
 		{
-		StopEngineWork(_L("Stopping..."));  // stop what the engine is doing
+		StopEngineWork(_L("Stopping\x85"));  // stop what the engine is doing
 		return EKeyWasConsumed;
 		}
 	return NativeKeyL(aKeyEvent, aType);
@@ -2990,7 +2999,7 @@ void CPmView::OpenWebL(const TDesC& aUrl)
 	CleanupStack::PopAndDestroy();          // ls
 	if (r != KErrNone)
 		{
-		iEikonEnv->InfoWinL(_L("PsiWeb is not installed"), _L("Install PsiWeb.sis to open links and web pages"));
+		iEikonEnv->InfoWinL(_L("PsiWeb is not installed"), _L("Install PsiWeb to open links and web pages"));
 		return;
 		}
 	CApaCommandLine* cmd = CApaCommandLine::NewLC();
@@ -3002,7 +3011,7 @@ void CPmView::OpenWebL(const TDesC& aUrl)
 	// what is going on, bottom left as the style guide has busy messages
 	// (not an infoprint): PsiWeb takes a few seconds to appear. Working()
 	// keeps it up for 5 s with the engine idle (pmstatus.cpp)
-	Working(_L("Opening in PsiWeb..."));
+	Working(_L("Opening in PsiWeb\x85"));
 	}
 
 void CPmView::ViewAsWebPageL()
@@ -3467,7 +3476,7 @@ void CPmComposeDialog::ShowAttachments()
 			TPtrC name = Clip(parse.NameAndExt(), 40);
 			if (t.Length() + name.Length() + 6 > t.MaxLength())
 				{
-				t.Append(_L(" ..."));
+				t.Append(_L(" \x85"));
 				break;
 				}
 			if (i) t.Append(_L(", "));
@@ -3580,7 +3589,7 @@ TBool CPmComposeDialog::OkToExitL(TInt aButtonId)
 			{
 			CDesCArrayFlat* items = new(ELeave) CDesCArrayFlat(n + 2);
 			CleanupStack::PushL(items);
-			items->AppendL(_L("Add a file..."));
+			items->AppendL(_L("Add a file\x85"));
 			items->AppendL(_L("Add my contact card"));
 			for (TInt i = 0; i < n; i++)
 				{
@@ -3676,16 +3685,18 @@ void CPmPrefsDialog::PreLayoutDynInitL()
 	SetChoiceListCurrentItem(EPmDlgStore, iSettings.iStore ? 1 : 0);
 	SetChoiceListCurrentItem(EPmDlgPictures, (iSettings.iSpare[0] & 3) <= 2 ? (iSettings.iSpare[0] & 3) : 0);
 	SetChoiceListCurrentItem(EPmDlgWebPictures, ((iSettings.iSpare[0] >> 8) & 3) <= 2 ? ((iSettings.iSpare[0] >> 8) & 3) : 0);
-	SetChoiceListCurrentItem(EPmDlgWebProxy, (iSettings.iSpare[0] & 0x4) ? 1 : 0);
+	SetCheckBoxState(EPmDlgWebProxy, (iSettings.iSpare[0] & 0x4) ? CEikButtonBase::ESet : CEikButtonBase::EClear);
 	SetChoiceListCurrentItem(EPmDlgEmailButton, (iSettings.iView & KPmViewEmailButton) ? 0 : 1);
+	// (1.14) on Coda the Email icon opens PsiMail already: said, not asked
+	if (PmCoda())
+		{
+		SetChoiceListCurrentItem(EPmDlgEmailButton, 0);
+		SetLineDimmedNow(EPmDlgEmailButton, ETrue);
+		}
 	SetChoiceListCurrentItem(EPmDlgReading, (iSettings.iView & KPmViewReading) ? 1 : 0);
 	NewMailInitL();                           // the New mail page (pmauto.cpp)
-	// (0.96) the greys are the 5mx's screen's: a colour screen has none to set
-	if (PmColour())
-		{
-		CEikCommandButtonBase* b = ButtonPanel()->ButtonById(EPmBidGreys);
-		if (b) b->SetDimmed(ETrue);
-		}
+	// (a colour screen has no greys to set: its dialog, r_pm_prefs_dialog_colour,
+	// has no Screen greys button, 1.14)
 	}
 
 TBool CPmPrefsDialog::OkToExitL(TInt aButtonId)
@@ -3704,7 +3715,7 @@ TBool CPmPrefsDialog::OkToExitL(TInt aButtonId)
 		if (r > 0)
 			iEikonEnv->InfoMsg(_L("Greys saved - used from the next picture"));
 		else if (r < 0)
-			iEikonEnv->InfoMsg(_L("Not saved - the internal disk is full or in use"));
+			iEikonEnv->InfoMsg(_L("Not saved - the Internal disk is full or in use"));
 		return EFalse;                        // (the dialog stays open)
 		}
 	iSort = ChoiceListCurrentItem(EPmDlgSort);
@@ -3715,8 +3726,10 @@ TBool CPmPrefsDialog::OkToExitL(TInt aButtonId)
 	// bit 2 (0x4): web pictures via the "psiproxy" proxy
 	iSettings.iSpare[0] = (iSettings.iSpare[0] & ~0x307) | ChoiceListCurrentItem(EPmDlgPictures) |
 		(ChoiceListCurrentItem(EPmDlgWebPictures) << 8) |
-		(ChoiceListCurrentItem(EPmDlgWebProxy) ? 0x4 : 0);
-	if (ChoiceListCurrentItem(EPmDlgEmailButton) == 0)
+		(CheckBoxState(EPmDlgWebProxy) == CEikButtonBase::ESet ? 0x4 : 0);
+	if (PmCoda())
+		;                                     // (the line is only said there: the setting as it was)
+	else if (ChoiceListCurrentItem(EPmDlgEmailButton) == 0)
 		iSettings.iView |= KPmViewEmailButton;
 	else
 		iSettings.iView &= ~KPmViewEmailButton;
@@ -3759,7 +3772,7 @@ void CPmAccountDialog::PreLayoutDynInitL()
 	SetText(EPmDlgUser, iAcct.user);
 	SetNumberEditorValue(EPmDlgSyncCount, iAcct.sync_count);
 	SetNumberEditorValue(EPmDlgBodyKb, iAcct.max_body_kb);
-	SetChoiceListCurrentItem(EPmDlgSaveSent, iAcct.save_sent ? 1 : 0);
+	SetCheckBoxState(EPmDlgSaveSent, iAcct.save_sent ? CEikButtonBase::ESet : CEikButtonBase::EClear);
 	// the signature's lines are kept as "\n"
 	TBuf<200> sig;
 	FromC(sig, iAcct.signature);
@@ -3814,7 +3827,7 @@ TBool CPmAccountDialog::OkToExitL(TInt /*aButtonId*/)
 		CopyToC(iAcct.pass, sizeof(iAcct.pass), pw);
 	iAcct.sync_count = NumberEditorValue(EPmDlgSyncCount);
 	iAcct.max_body_kb = NumberEditorValue(EPmDlgBodyKb);
-	iAcct.save_sent = ChoiceListCurrentItem(EPmDlgSaveSent);
+	iAcct.save_sent = CheckBoxState(EPmDlgSaveSent) == CEikButtonBase::ESet ? 1 : 0;
 	TBuf<200> sig;
 	GetEdwinText(sig, EPmDlgSignature);
 	sig.Trim();
@@ -3955,6 +3968,11 @@ void CPmAppUi::ConstructL()
 	// (0.96) the screen: colour and 480 lines on the netBook and Series 7
 	iColour = iCoeEnv->ScreenDevice()->DisplayMode() >= EColor16;
 	iTall = iCoeEnv->ScreenDevice()->SizeInPixels().iHeight >= 400;
+	{
+	TEntry e;
+	iCoda = iCoeEnv->FsSession().Entry(_L("Z:\\System\\Data\\PsiEdition.txt"), e) == KErrNone;
+	}
+	ToolBarL();                              // (1.14) the netBook's toolbar on a tall screen
 	// (1.11) a new C: (a new image, a cold start, a flat battery): the
 	// settings back from the card's copy, before anything looks at them
 	// (passwords are never on the card: psikeep.h)
@@ -3999,13 +4017,17 @@ void CPmAppUi::ConstructL()
 	if (iFirstStart)
 		{
 		iAccountSetup = ETrue;               // (the Email icon question waits for this too)
-		TRAPD(su, RunSetupL());
+		TBool saved = EFalse;
+		TRAPD(su, saved = RunSetupL());
 		iAccountSetup = EFalse;
-		(void)su;
+		// (1.14) Esc on the first question: nothing more is asked now (not
+		// the account, not the Email icon); the screen says how to add an
+		// account, and the next start asks again
+		iSetupCancelled = su == KErrNone && !saved;
 		}
 	if (iKeptBack)
 		EmailButtonSoon();                   // (1.11) said once the window is up, before the Email icon question
-	if (!iSettings.iAccounts[iSettings.iAcct].used)
+	if (!iSettings.iAccounts[iSettings.iAcct].used && !iSetupCancelled)
 		{
 		iAccountSetup = ETrue;               // (the Email icon question waits for this)
 		TBool done = EFalse;
@@ -4014,8 +4036,42 @@ void CPmAppUi::ConstructL()
 		User::LeaveIfError(err);
 		if (done)
 			iView->AccountChangedL();
+		else
+			iSetupCancelled = ETrue;         // (1.14) Esc: no Email icon question on top
 		EmailButtonSoon();
 		}
+	}
+
+// (1.14) The toolbar for this screen (psimail.rss): EIK_APP_INFO's has the
+// 5mx's buttons; on a screen of 480 lines it is replaced by one with the
+// netBook's, and on Coda's netBook image by one that also has the netBook's
+// battery and Coda's extras above the clock, as every program there has.
+// Only Coda's ROM has the extras (PsiBatt.dll and its hook in Eikon), and
+// only the netBook's Eikon the battery, so they are asked for only there.
+void CPmAppUi::ToolBarL()
+	{
+	if (!iTall || !iToolBar)
+		return;
+	TEntry e;
+	TBool extras = iCoda && iCoeEnv->FsSession().Entry(_L("Z:\\System\\Libs\\PsiBatt.dll"), e) == KErrNone;
+	CEikToolBar* bar = new(ELeave) CEikToolBar;
+	CleanupStack::PushL(bar);
+	delete iToolBar;
+	iToolBar = NULL;                         // (ClientRect is then the whole screen)
+	bar->ConstructL(this, extras ? R_PM_TOOLBAR_CODA : R_PM_TOOLBAR_TALL, ClientRect());
+	CleanupStack::Pop();
+	iToolBar = bar;
+	}
+
+// A toolbar control Eikon does not know (CEikToolBar::ConstructFromResourceL):
+// Coda's extras (type 0x7042, a spacer's fields) on a ROM whose Eikon has not
+// had Coda's hook put in. A spacer of no height, so the toolbar is as it would
+// be without them.
+CCoeControl* CPmAppUi::CreateCustomCommandControlL(TInt aControlType)
+	{
+	if (aControlType == 0x7042)
+		return new(ELeave) CEikSpacer;
+	return CEikAppUi::CreateCustomCommandControlL(aControlType);
 	}
 
 // ----- the Email icon below the screen ----------------------------------------
@@ -4106,7 +4162,9 @@ void CPmAppUi::EmailButtonStartL()
 		iEikonEnv->InfoWinL(_L("Settings put back from the card"), _L("Passwords are not kept there: PsiMail asks for each"));
 		}
 	// (not on top of the first account's dialog: asked when that is closed)
-	if (!(iSettings.iView & KPmViewEmailButtonAsked) && !iAccountSetup)
+	// (1.14) not on Coda, where the Email icon opens PsiMail already, and
+	// not after Esc on the first start's questions (asked another time)
+	if (!(iSettings.iView & KPmViewEmailButtonAsked) && !iAccountSetup && !iCoda && !iSetupCancelled)
 		{
 		iSettings.iView |= KPmViewEmailButtonAsked;
 		if (iEikonEnv->QueryWinL(_L("The Email icon can open PsiMail instead of Email"), _L("Use the Email icon for PsiMail?")))
@@ -4152,6 +4210,12 @@ void CPmAppUi::ToolbarPicturesL()
 	{
 	if (!iToolBar)
 		return;
+	// (1.14) the name in its box, as Psion's programs have it: a file name
+	// label, which shows the program's document name
+	iEikonEnv->Process()->SetMainDocFileName(_L("PsiMail"));
+	CEikFileNameLabel* label = (CEikFileNameLabel*)iToolBar->ControlById(EPmCmdFileName);
+	if (label)
+		label->UpdateL();
 	ButtonPictureL(EPmCmdNewPopup, EMbmToolNew);
 	ButtonPictureL(EPmCmdReplyPopup, EMbmToolReply);
 	ButtonPictureL(EPmCmdSendRecv, EMbmToolCheck);
@@ -4165,15 +4229,22 @@ void CPmAppUi::PlaceConnPanel()
 		return;
 	TRect r;
 	CCoeControl* last = iToolBar ? iToolBar->ControlById(EPmCmdTool4) : NULL;
-	// (the clock: the toolbar's last control but its spacer below)
+	// (the first control under the toolbar's stretching gap: the clock, or,
+	// on Coda, the battery and the extras above it; 1.14)
 	TInt n = iToolBar && iToolBar->ControlArray() ? iToolBar->ControlArray()->Count() : 0;
-	CCoeControl* clock = n >= 2 ? iToolBar->Control(n - 2) : NULL;
+	CCoeControl* clock = NULL;
+	for (TInt i = 0; i + 1 < n; i++)
+		if (iToolBar->Control(i) == last)
+			{
+			clock = i + 2 < n ? iToolBar->Control(i + 2) : NULL;   // (after the gap)
+			break;
+			}
 	if (last && clock && iToolBar->IsVisible() && !(iSettings.iView & 1))
 		{
 		TPoint o = iToolBar->Position();
 		TInt top = o.iY + last->Position().iY + last->Size().iHeight + 6;
 		TInt bottom = o.iY + clock->Position().iY - 6;
-		TInt h = 82;
+		TInt h = 80;
 		if (bottom - top >= h)
 			r = TRect(o.iX + 3, bottom - h, o.iX + iToolBar->Size().iWidth - 3, bottom);
 		}
@@ -4314,7 +4385,7 @@ void CPmAppUi::BeginExitL()
 		Exit();
 		return;
 		}
-	TRAPD(be, iEikonEnv->BusyMsgL(_L("Closing..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
+	TRAPD(be, iEikonEnv->BusyMsgL(_L("Closing\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(0)));
 	(void)be;
 	iExitStart = User::TickCount();
 	iExitTicks = 0;
@@ -4539,7 +4610,7 @@ void CPmAppUi::MailtoOrSayL(const TDesC& aUrl)
 		return;
 		}
 	if (aUrl.FindF(_L("attach=")) >= 0)
-		iEikonEnv->InfoWinL(_L("No email account yet"), _L("Set one up in PsiMail, then share the file again"));
+		iEikonEnv->InfoWinL(_L("No account yet"), _L("Add one in PsiMail, then share the file again"));
 	}
 
 // PsiWeb (or anyone) hands PsiMail a mailto: link as a message ...
@@ -4875,7 +4946,7 @@ CPmCalDialog::~CPmCalDialog()
 
 void CPmCalDialog::PreLayoutDynInitL()
 	{
-	SetChoiceListCurrentItem(EPmDlgCalOn, iCal.iCal.enabled ? 1 : 0);
+	SetCheckBoxState(EPmDlgCalOn, iCal.iCal.enabled ? CEikButtonBase::ESet : CEikButtonBase::EClear);
 	// host[:port][/path]
 	TBuf<200> host;
 	FromC(host, iCal.iCal.host);
@@ -4909,7 +4980,10 @@ void CPmCalDialog::PreLayoutDynInitL()
 		cl->SetCurrentItem(def >= 0 ? def : 0);
 		}
 	else
+		{
 		CleanupStack::PopAndDestroy();       // names
+		SetLineDimmedNow(EPmDlgCalDefault, ETrue);   // (1.14) "(none yet)", dimmed, until a sync has found some
+		}
 	}
 
 TBool CPmCalDialog::OkToExitL(TInt /*aButtonId*/)
@@ -4917,7 +4991,7 @@ TBool CPmCalDialog::OkToExitL(TInt /*aButtonId*/)
 	TBuf<200> host;
 	GetEdwinText(host, EPmDlgCalHost);
 	host.Trim();
-	TInt on = ChoiceListCurrentItem(EPmDlgCalOn);
+	TInt on = CheckBoxState(EPmDlgCalOn) == CEikButtonBase::ESet ? 1 : 0;
 	if (on && host.Length() == 0)
 		{
 		iEikonEnv->InfoMsg(_L("No calendar server entered"));
@@ -5044,9 +5118,9 @@ void CPmAppUi::ComposeL(CPmDraft* aDraft, const TDesC& aTitle)
 		// say so and show it again, so nothing written is lost
 		TBuf<100> why;
 		if (err == KErrDiskFull)
-			why = _L("The disk is full - make room, then try again");
+			why = _L("The disk is full - make room");
 		else if (err == KErrNotReady || err == KErrPathNotFound)
-			why = _L("The disk is not present - is the card in?");
+			why = _L("The card is not in");
 		else
 			PmErrMsg(why, _L("Not saved"), err);
 		why.Append(_L(" - try again"));     // (room: "Not saved - " and the longest reason fit 100)
@@ -5402,7 +5476,7 @@ void CPmView::StartInstallerL(const TDesC& aFile)
 		return;
 		}
 	TBuf<KMaxFileName + 80> m;               // (aFile is a TFileName: Format panics rather than clips)
-	PmErrMsg(m, _L("Could not start the installer"), err);   // (1.12: in words, review R105)
+	PmErrMsg(m, _L("Cannot start the installer"), err);   // (1.12: in words, review R105)
 	m.Append(_L(" - open "));
 	m.Append(aFile.Left(Min(aFile.Length(), m.MaxLength() - m.Length() - 23)));
 	m.Append(_L(" from the System screen"));
@@ -5509,7 +5583,7 @@ void CPmView::UpdateDialogL()
 	iUpdReady = EFalse;
 	iUpdRes = PM_RES_OK;
 	iUpdMsg.Zero();
-	UpdateLine(_L("Starting the update..."));
+	UpdateLine(_L("Starting the update\x85"));
 	CPmUpdateProgress* dlg = new(ELeave) CPmUpdateProgress(*this);
 	iUpdDlg = dlg;
 	TRAPD(err, dlg->ExecuteLD(R_PM_UPDATE_PROGRESS));
@@ -5639,7 +5713,7 @@ TBool CPmUpdateDialog::OkToExitL(TInt /*aButtonId*/)
 	iPort = NumberEditorValue(EPmDlgUpdPort);
 	if (iSource == 2 && iHost.Length() == 0)
 		{
-		iEikonEnv->InfoMsg(_L("No local server entered"));
+		iEikonEnv->InfoMsg(_L("No computer's address entered"));
 		TryChangeFocusToL(EPmDlgUpdHost);
 		return EFalse;
 		}
@@ -5728,7 +5802,7 @@ void CPmAppUi::NewFolderL()
 		in = iView->FolderAt(parent - 1).iImap;
 	TBuf8<PM_ARG_MAX> n;
 	SafeCopy(n, name);
-	iView->SetStatus(_L("Creating the folder..."));
+	iView->SetStatus(_L("Creating the folder\x85"));
 	iView->Cmd(PM_CMD_MKFOLDER, in, 0, n);
 	}
 
@@ -5749,7 +5823,7 @@ void CPmAppUi::RenameFolderL()
 		}
 	if (StandardFolder(*f))
 		{
-		iView->Toast(f->iKind == 'I' ? _L("The Inbox can't be renamed") : _L("Standard folders can't be renamed"));
+		iView->Toast(f->iKind == 'I' ? _L("The Inbox cannot be renamed") : _L("Standard folders cannot be renamed"));
 		return;
 		}
 	// "Work/Projects": only the last part is renamed
@@ -5772,7 +5846,7 @@ void CPmAppUi::RenameFolderL()
 		return;
 	TBuf8<PM_ARG_MAX> n;
 	SafeCopy(n, name);
-	iView->SetStatus(_L("Renaming the folder..."));
+	iView->SetStatus(_L("Renaming the folder\x85"));
 	iView->Cmd(PM_CMD_RENFOLDER, imap, 0, n);
 	}
 
@@ -5786,7 +5860,7 @@ void CPmAppUi::DeleteFolderL()
 		}
 	if (StandardFolder(*f))
 		{
-		iView->Toast(f->iKind == 'I' ? _L("The Inbox can't be deleted") : _L("Standard folders can't be deleted"));
+		iView->Toast(f->iKind == 'I' ? _L("The Inbox cannot be deleted") : _L("Standard folders cannot be deleted"));
 		return;
 		}
 	// the statement says what goes (the folder, and how many messages), the
@@ -5800,7 +5874,7 @@ void CPmAppUi::DeleteFolderL()
 		return;
 	if (!GoOnlineL(_L("Go online and delete the folder?")))
 		return;
-	iView->SetStatus(_L("Deleting the folder..."));
+	iView->SetStatus(_L("Deleting the folder\x85"));
 	iView->Cmd(PM_CMD_DELFOLDER, imap, 0, KNullDesC8);
 	}
 
@@ -5832,7 +5906,7 @@ TBool CPmFolderDialog::OkToExitL(TInt /*aButtonId*/)
 	// the server would read these as a path
 	if (iName.Locate('/') >= 0 || iName.Locate('\\') >= 0)
 		{
-		iEikonEnv->InfoMsg(_L("A folder name can't contain / or \\"));
+		iEikonEnv->InfoMsg(_L("A folder name cannot contain / or \\"));
 		TryChangeFocusToL(EPmDlgFolderName);
 		return EFalse;
 		}
@@ -5966,20 +6040,15 @@ TBool CPmAppUi::RunSetupL()
 		return EFalse;
 	UseSharedLink(iCoeEnv->FsSession(), iSettings, NULL);   // (what it wrote, in PsiMail's copy)
 	SaveSettings();
+	RefreshConnPanel();                      // (1.14) the toolbar's box says the new route at once
 	return ETrue;
 	}
 
+// About (1.14: Coda's About box, the same in PsiMail, PsiWeb and PsiTerm):
+// the route is in Status information, not here
 void CPmAppUi::AboutL()
 	{
-	const TInt KBauds[5] = { 9600, 19200, 38400, 57600, 115200 };
-	TInt bi = iSettings.iBaudIndex >= 0 && iSettings.iBaudIndex <= 4 ? iSettings.iBaudIndex : 4;
-	TBuf<80> status;
-	// (1.03) the route in the shared words; a baud rate only on the modem's
-	if (iSettings.iNetMode)
-		status = _L("Mail via Psion TCP/IP (a network card or dial-up)");
-	else
-		status.Format(_L("Mail via the modem at %d baud"), KBauds[bi]);
-	CPmAboutDialog* dlg = new(ELeave) CPmAboutDialog(status);
+	CPmAboutDialog* dlg = new(ELeave) CPmAboutDialog;
 	dlg->ExecuteLD(R_PM_ABOUT_DIALOG);
 	}
 
@@ -5988,13 +6057,86 @@ void CPmAboutDialog::PreLayoutDynInitL()
 	TBuf<32> title(_L("PsiMail "));
 	title.Append(KVersion);
 	SetLabelL(EPmDlgInfo1, title);
-	((CEikLabel*)Control(EPmDlgInfo1))->SetFont(iEikonEnv->TitleFont());   // as PsiTerm's and PsiWeb's
-	// (two lines: one would be wider than Psion's own dialogs)
-	TBuf<80> who(_L("Email & calendar for the Psion 5mx, netBook & Series 7\n"));
-	who.Append(TChar(0xa9));                  // (c), as the Psion's fonts have it
-	who.Append(_L(" 2026 Dan Edge"));
-	SetLabelL(EPmDlgInfo2, who);
-	SetLabelL(EPmDlgInfo3, iStatus);
+	((CEikLabel*)Control(EPmDlgInfo1))->SetFont(iEikonEnv->TitleFont());   // (bold, as PsiTerm's and PsiWeb's)
+	TBuf<32> who;
+	who.Append(TChar(0xa9));                  // the copyright sign, as the Psion's fonts have it
+	who.Append(_L(" Dan Edge 2026"));
+	SetLabelL(EPmDlgInfo3, who);
+	}
+
+TBool CPmAboutDialog::OkToExitL(TInt aButtonId)
+	{
+	if (aButtonId == EPmBidCredits)
+		{
+		CEikDialog* dlg = new(ELeave) CEikDialog;
+		dlg->ExecuteLD(R_PM_CREDITS_DIALOG);
+		return EFalse;
+		}
+	return ETrue;
+	}
+
+// (1.14) Tools > Troubleshooting > Show log: the last few KB of psimail.log
+// (the engine writes it next to the program, on C: when that is the ROM),
+// read only, at its end
+void CPmAppUi::ShowLogL()
+	{
+	TParse parse;
+	parse.Set(Application()->AppFullName(), NULL, NULL);
+	TFileName name(parse.DriveAndPath());
+	if (name.Length() && (name[0] == 'Z' || name[0] == 'z'))
+		name[0] = 'C';
+	name.Append(_L("psimail.log"));
+	RFile file;
+	TInt size = 0;
+	if (file.Open(iCoeEnv->FsSession(), name, EFileRead | EFileShareAny) != KErrNone)
+		{
+		if (iView->LogOn()) iView->Toast(_L("Nothing in the log yet")); else iView->Toast(KPmLogIsOff);
+		return;
+		}
+	CleanupClosePushL(file);
+	User::LeaveIfError(file.Size(size));
+	const TInt KMax = 5800;                  // (the dialog's edwin holds 6000)
+	TInt want = size < KMax ? size : KMax;
+	TInt pos = size - want;
+	User::LeaveIfError(file.Seek(ESeekStart, pos));
+	HBufC8* raw = HBufC8::NewLC(want);
+	TPtr8 r = raw->Des();
+	User::LeaveIfError(file.Read(r, want));
+	HBufC* text = HBufC::NewLC(r.Length() + 1);
+	TPtr t = text->Des();
+	TInt i = 0;
+	if (pos > 0)
+		{
+		// (from the first whole line)
+		while (i < r.Length() && r[i] != '\n') i++;
+		i++;
+		}
+	for (; i < r.Length(); i++)
+		{
+		TUint8 c = r[i];
+		if (c == '\r')
+			continue;
+		if (c == '\n')
+			t.Append(CEditableText::EParagraphDelimiter);
+		else
+			t.Append(c < 32 ? (TText)' ' : (TText)c);
+		}
+	if (!t.Length())
+		{
+		CleanupStack::PopAndDestroy(3);      // text, raw, file
+		iView->Toast(_L("Nothing in the log yet"));
+		return;
+		}
+	CPmLogDialog* dlg = new(ELeave) CPmLogDialog(*text);
+	dlg->ExecuteLD(iTall ? R_PM_LOG_DIALOG_TALL : R_PM_LOG_DIALOG);
+	CleanupStack::PopAndDestroy(3);          // text, raw, file
+	}
+
+void CPmLogDialog::PreLayoutDynInitL()
+	{
+	CEikEdwin* ed = (CEikEdwin*)Control(EPmDlgUpdText);
+	ed->SetTextL(&iText);
+	ed->SetCursorPosL(iText.Length(), EFalse);
 	}
 
 // Each pane is dimmed and ticked on its own: EIKON panics (EIKON 8) when
@@ -6011,7 +6153,6 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		// (0.89) on Psion Internet, also while the link is up with no mail
 		// connection on it ("Stay connected" keeps it)
 		aMenuPane->SetItemDimmed(EPmCmdHangup, !iView->Shared()->online && !(iSettings.iNetMode && PgLinkUp()));
-		aMenuPane->SetItemDimmed(EPmCmdStop, !iView->Busy());
 		aMenuPane->SetItemDimmed(EPmCmdConnect, iView->Busy() || iSettings.iOffline);
 		}
 	else if (aMenuId == R_PM_TROUBLE_MENU)
@@ -6052,16 +6193,22 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		}
 	else if (aMenuId == R_PM_MESSAGE_MENU)
 		{
-		// (the Reply to and Attachments cascades are never dimmed: their
+		// (the Mark and Attachments cascades are never dimmed: their
 		// items are, so the commands can still be seen - style guide 7.1.3)
+		aMenuPane->SetItemDimmed(EPmCmdReply, !msg);
+		aMenuPane->SetItemDimmed(EPmCmdReplyAll, !msg);
 		aMenuPane->SetItemDimmed(EPmCmdForward, !msg);
+		aMenuPane->SetItemDimmed(EPmCmdWhole, m != CPmView::EMessage);
+		aMenuPane->SetItemDimmed(EPmCmdNew, m == CPmView::ENoAccount);
+		}
+	else if (aMenuId == R_PM_MARK_MENU)
+		{
+		// (1.14) Message > Mark: ticked when the message has the mark
 		aMenuPane->SetItemDimmed(EPmCmdUnread, !msg);
 		aMenuPane->SetItemDimmed(EPmCmdFlag, !msg);
 		const TPmRow* row = msg ? iView->CurrentRow() : NULL;
 		aMenuPane->SetItemButtonState(EPmCmdUnread, row && row->iFlags.Locate('S') < 0 ? EEikMenuItemSymbolOn : 0);
 		aMenuPane->SetItemButtonState(EPmCmdFlag, row && row->iFlags.Locate('F') >= 0 ? EEikMenuItemSymbolOn : 0);
-		aMenuPane->SetItemDimmed(EPmCmdWhole, m != CPmView::EMessage);
-		aMenuPane->SetItemDimmed(EPmCmdNew, m == CPmView::ENoAccount);
 		}
 	else if (aMenuId == R_PM_WEB_MENU)
 		{
@@ -6121,13 +6268,11 @@ void CPmAppUi::DynInitMenuPaneL(TInt aMenuId, CEikMenuPane* aMenuPane)
 		aMenuPane->SetItemDimmed(EPmCmdInbox, iView->FolderCount() == 0);
 		aMenuPane->SetItemDimmed(EPmCmdFolders, iView->FolderCount() == 0);
 		}
-	else if (aMenuId == R_PM_REPLY_MENU || aMenuId == R_PM_REPLY_POPUP)
+	else if (aMenuId == R_PM_REPLY_POPUP)
 		{
 		aMenuPane->SetItemDimmed(EPmCmdReply, !msg);
 		aMenuPane->SetItemDimmed(EPmCmdReplyAll, !msg);
-		// (only the toolbar's pop-up has Forward)
-		if (aMenuId == R_PM_REPLY_POPUP)
-			aMenuPane->SetItemDimmed(EPmCmdForward, !msg);
+		aMenuPane->SetItemDimmed(EPmCmdForward, !msg);
 		}
 	DynInitMail2L(aMenuId, aMenuPane);           // invitations, cards, Word (pminvite.cpp)
 	}
@@ -6157,9 +6302,9 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		aCommand != EPmCmdStatusInfo && aCommand != EPmCmdStop && aCommand != EPmCmdPrefs &&
 		aCommand != EPmCmdZoomIn && aCommand != EPmCmdZoomOut && aCommand != EPmCmdCalSettings &&
 		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog &&
-		aCommand != EPmCmdKeepLog)
+		aCommand != EPmCmdKeepLog && aCommand != EPmCmdShowLog)
 		{
-		iView->Toast(_L("No account - add one with Tools > Accounts"));
+		iView->Toast(_L("No account yet - Tools > Accounts > Add"));
 		return;
 		}
 	if (HandleMail2CommandL(aCommand))           // invitations, cards, Word (pminvite.cpp)
@@ -6177,7 +6322,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 			// pressed again while the last check is still connecting (or
 			// stuck): the way to try again is to stop it first
 			if (iEikonEnv->QueryWinL(_L("Still checking mail"), _L("Stop it, so you can try again?")))
-				iView->StopEngineWork(_L("Stopping..."));
+				iView->StopEngineWork(_L("Stopping\x85"));
 			break;
 			}
 		if (iSettings.iOffline)
@@ -6217,7 +6362,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		if (iView->Shared()->online || !iSettings.iNetMode)
 			{
 			iView->Cmd(PM_CMD_HANGUP, KNullDesC8, 0, KNullDesC8);
-			iView->Working(_L("Disconnecting..."));
+			iView->Working(_L("Disconnecting\x85"));
 			}
 		// (0.89) Psion Internet: the link itself goes too, even when "Stay
 		// connected" holds it (pglinktest.cpp; ends psihold.exe)
@@ -6253,7 +6398,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		{
 		TInt sort = iSettings.iSort;
 		CPmPrefsDialog* dlg = new(ELeave) CPmPrefsDialog(iSettings, sort);
-		if (dlg->ExecuteLD(R_PM_PREFS_DIALOG))
+		if (dlg->ExecuteLD(iColour ? R_PM_PREFS_DIALOG_COLOUR : R_PM_PREFS_DIALOG))
 			{
 			SaveSettings();
 			ApplyEmailButton();
@@ -6284,7 +6429,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		break;
 	case EPmCmdStop:
 		if (iView->Busy())
-			iView->StopEngineWork(_L("Stopping..."));   // stop what the engine is doing
+			iView->StopEngineWork(_L("Stopping\x85"));   // stop what the engine is doing
 		break;
 	case EPmCmdToggleToolbar:
 		iView->ToggleViewL(1);
@@ -6527,6 +6672,7 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 			iView->StopEngine();
 			iView->StartEngineL();
 			iView->SettingsChanged();
+			RefreshConnPanel();
 			}
 		break;
 		}
@@ -6548,7 +6694,9 @@ void CPmAppUi::HandleCommandL(TInt aCommand)
 		iSettings.iSpare[0] ^= KPmLogBit;
 		SaveSettings();
 		iView->Shared()->net.log_on = iView->LogOn() || PmDiagOn() ? 1 : 0;
-		iView->Toast(iView->LogOn() ? _L("Keeping a log") : _L("Not keeping a log"));
+		break;                               // (1.14: the tick says it; no infoprint)
+	case EPmCmdShowLog:
+		ShowLogL();
 		break;
 	case EPmCmdBack:
 		break;

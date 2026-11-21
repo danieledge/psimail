@@ -359,7 +359,7 @@ static TInt AgendaMatchL(const TDesC& aFile, const TDesC& aTitle, const TTime& a
 	TEntry entry;
 	if (env->FsSession().Entry(aFile, entry) != KErrNone)   // (the app's session, not one per call)
 		User::Leave(KErrNotFound);
-	env->BusyMsgL(_L("Looking in the Agenda..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
+	env->BusyMsgL(_L("Looking in the Agenda\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
 	CParaFormatLayer* para = CParaFormatLayer::NewL();
 	CleanupStack::PushL(para);
 	CCharFormatLayer* chr = CCharFormatLayer::NewL();
@@ -782,7 +782,7 @@ void CPmAppUi::DynInitMail2L(TInt aMenuId, CEikMenuPane* aMenuPane)
 	{
 	CPmView::TMode m = iView->Mode();
 	TBool msg = (m == CPmView::EList || m == CPmView::EMessage) && iView->CurrentRow() != NULL;
-	if (aMenuId == R_PM_PRINT_MENU)          // (File > Printing: Save as Word file is there, 0.77)
+	if (aMenuId == R_PM_FILE_MENU)           // (File > Save as Word file, 0.77; 1.14: out of Printing)
 		aMenuPane->SetItemDimmed(EPmCmdSaveWord, m != CPmView::EMessage);
 	else if (aMenuId == R_PM_CONTACTS_MENU)
 		{

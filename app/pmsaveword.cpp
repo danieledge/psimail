@@ -203,12 +203,12 @@ void CPmView::SaveAsWordL()
 	{
 	if (iMode != EMessage || !iReader)
 		{
-		Toast(_L("Open a message to save it"));
+		Toast(_L("Nothing to save - open a message first"));
 		return;
 		}
 	if (iWaitingBody)
 		{
-		Toast(_L("Not available - the message isn't downloaded yet"));
+		Toast(_L("Not available until the message has downloaded"));
 		return;
 		}
 	TBuf<100> subject;
@@ -225,7 +225,7 @@ void CPmView::SaveAsWordL()
 	CEikFileSaveAsDialog* dlg = new(ELeave) CEikFileSaveAsDialog(&name, &title, NULL, EFalse);
 	if (!dlg->ExecuteLD(R_EIK_DIALOG_FILE_SAVEAS))
 		return;
-	iEikonEnv->BusyMsgL(_L("Saving..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
+	iEikonEnv->BusyMsgL(_L("Saving\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(300000));
 	TRAPD(err, WriteWordFileL(fs, name, *iReader->RichText()));
 	iEikonEnv->BusyMsgCancel();
 	if (err != KErrNone)

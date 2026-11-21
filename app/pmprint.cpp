@@ -172,7 +172,7 @@ void CPmPrinter::UseTextL(CRichText* aText, const TDesC& aTitle)
 TInt CPmPrinter::PaginateL()
 	{
 	CEikonEnv* env = CEikonEnv::Static();
-	env->BusyMsgL(_L("Paginating..."), EHLeftVBottom, TTimeIntervalMicroSeconds32(500000));
+	env->BusyMsgL(_L("Paginating\x85"), EHLeftVBottom, TTimeIntervalMicroSeconds32(500000));
 	iPages->Reset();
 	iPrinter->SetPrinterDevice(iSetup->PrinterDevice());
 	iPrinter->SetPageMarginsInTwips(iSetup->iPageMarginsInTwips.iMargins);

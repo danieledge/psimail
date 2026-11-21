@@ -60,10 +60,33 @@ RESOURCE ARRAY r_pm_setup_pages
 		};
 	}
 
-// the standard toolbar, laid out as the built-in Email program has it: New,
-// Reply/f'ward (both pop up a choice), Check mail, and Delete (in a list) or
-// Close (reading a message: back to the list), then the clock.
-// (The pictures come from PsiMail.mbm: CPmAppUi::ConstructL puts them on.)
+// The toolbar, laid out as the built-in Email program has it: the name
+// (a tap shows the open programs, as in Word), New, Reply (both pop up a
+// choice: Reply, Reply to all, Forward), Check mail, and Delete (in a list)
+// or Close (reading a message: back to the list), then the clock. The
+// pictures come from PsiMail.mbm (CPmAppUi::ConstructL puts them on).
+// (1.14) Three of it, chosen by the screen at start (CPmAppUi::ToolBarL):
+//   r_pm_toolbar        240 lines (the 5mx): buttons of the 5mx's 37 pixels
+//   r_pm_toolbar_tall   480 lines (Series 7, Psion's own netBook image):
+//                       the netBook's 50-pixel buttons, as Word's and Agenda's
+//   r_pm_toolbar_coda   480 lines on Coda (PsiBatt.dll in the ROM): the same,
+//                       with the netBook's battery and Coda's toolbar extras
+//                       (the charge, free memory, brightness: PsiBatt, type
+//                       0x7042) just above the clock, as in every Coda program
+// The name is a file name label, as Psion's programs have it (bold, in its
+// box; Coda draws that box in the theme's colours), with "PsiMail" set as
+// the program's document name. The first is EIK_APP_INFO's: the others take
+// its place when the screen is tall.
+STRUCT PM_NB_BATTERY
+	{
+	// the netBook's battery control (type 0x47): its 17 bytes, as in
+	// Psion's own toolbars there (psion-netbook's psiview.rss)
+	BYTE b0=0xff; BYTE b1=0xff; BYTE b2=0xff; BYTE b3=0xff;
+	BYTE b4=0x0a; BYTE b5=0x00; BYTE b6=0x00; BYTE b7=0x03;
+	BYTE b8=0x00; BYTE b9=0x00; BYTE b10=0x00; BYTE b11=0x18;
+	BYTE b12=0x00; BYTE b13=0xb5; BYTE b14=0xb1; BYTE b15=0xf3; BYTE b16=0x00;
+	}
+
 RESOURCE TOOLBAR r_pm_toolbar
 	{
 	breadth=KEikStdToolBarWidth;
@@ -71,10 +94,10 @@ RESOURCE TOOLBAR r_pm_toolbar
 		{
 		TBAR_CTRL
 			{
-			type=EEikCtLabel;
+			type=EEikCtFileNameLabel;
+			id=EPmCmdFileName;
 			flags=EEikToolBarCtrlHasSetMinLength;
 			length=KEikStdFileNameLabelHeight;
-			control=LABEL { txt="PsiMail"; horiz_align=EEikLabelAlignHCenter; vert_align=EEikLabelAlignVCenter; };
 			},
 		TBAR_CTRL
 			{
@@ -86,7 +109,7 @@ RESOURCE TOOLBAR r_pm_toolbar
 			{
 			type=EEikCtMenuButton; id=EPmCmdReplyPopup;
 			flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight;
-			control=MNBUT { popout=r_pm_reply_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Reply/\nf'ward"; };
+			control=MNBUT { popout=r_pm_reply_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Reply"; };
 			},
 		TBAR_BUTTON { id=EPmCmdSendRecv; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Check\nmail"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
 		TBAR_BUTTON { id=EPmCmdTool4; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Delete"; flags=EEikToolBarCtrlHasSetMinLength; length=KEikStdToolBarButtonHeight; },
@@ -112,14 +135,115 @@ RESOURCE TOOLBAR r_pm_toolbar
 		};
 	}
 
+RESOURCE TOOLBAR r_pm_toolbar_tall
+	{
+	breadth=KEikStdToolBarWidth;
+	controls=
+		{
+		TBAR_CTRL
+			{
+			type=EEikCtFileNameLabel;
+			id=EPmCmdFileName;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdFileNameLabelHeight;
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtMenuButton; id=EPmCmdNewPopup;
+			flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight;
+			control=MNBUT { popout=r_pm_new_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="New"; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtMenuButton; id=EPmCmdReplyPopup;
+			flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight;
+			control=MNBUT { popout=r_pm_reply_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Reply"; };
+			},
+		TBAR_BUTTON { id=EPmCmdSendRecv; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Check\nmail"; flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight; },
+		TBAR_BUTTON { id=EPmCmdTool4; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Delete"; flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight; },
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength|EEikToolBarCtrlIsStretchable;
+			length=0;
+			control=SPACER;
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtClock;
+			control=CLOCK { digitalresourceid=R_EIK_DIGITAL_CLOCK; analogresourceid=R_EIK_ANALOG_CLOCK; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdGapBelowClock;
+			control=SPACER;
+			}
+		};
+	}
+
+RESOURCE TOOLBAR r_pm_toolbar_coda
+	{
+	breadth=KEikStdToolBarWidth;
+	controls=
+		{
+		TBAR_CTRL
+			{
+			type=EEikCtFileNameLabel;
+			id=EPmCmdFileName;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdFileNameLabelHeight;
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtMenuButton; id=EPmCmdNewPopup;
+			flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight;
+			control=MNBUT { popout=r_pm_new_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="New"; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtMenuButton; id=EPmCmdReplyPopup;
+			flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight;
+			control=MNBUT { popout=r_pm_reply_popup; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Reply"; };
+			},
+		TBAR_BUTTON { id=EPmCmdSendRecv; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Check\nmail"; flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight; },
+		TBAR_BUTTON { id=EPmCmdTool4; layout=EEikCmdButTextRightPictureLeft|EEikCmdButDenseFont|EEikCmdButExcessToText; txt="Delete"; flags=EEikToolBarCtrlHasSetMinLength; length=KPmTallButtonHeight; },
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength|EEikToolBarCtrlIsStretchable;
+			length=0;
+			control=SPACER;
+			},
+		TBAR_CTRL { type=0x47; control=PM_NB_BATTERY { }; },
+		TBAR_CTRL { type=0x7042; control=SPACER; },
+		TBAR_CTRL
+			{
+			type=EEikCtClock;
+			control=CLOCK { digitalresourceid=R_EIK_DIGITAL_CLOCK; analogresourceid=R_EIK_ANALOG_CLOCK; };
+			},
+		TBAR_CTRL
+			{
+			type=EEikCtSpacer;
+			flags=EEikToolBarCtrlHasSetMinLength;
+			length=KEikStdGapBelowClock;
+			control=SPACER;
+			}
+		};
+	}
+
+
 // the shortcuts: EIKON's standard ones for standard commands (Ctrl+E close,
 // Ctrl+N create new, Ctrl+D delete, Ctrl+F find, Ctrl+G go to, Ctrl+K
 // preferences, Ctrl+M zoom, Ctrl+Q switch view, Ctrl+T toolbar, Shift+Ctrl+A
 // about), then the built-in Email program's (Shift+Ctrl+C check mail, Ctrl+U
 // disconnect, Ctrl+X move, Shift+Ctrl+L folders, Shift+Ctrl+Q status,
 // Shift+Ctrl+B sort), then free shifted keys for the rest. The same keys
-// serve both menu bars (the mail's and the calendar's). Check this folder
-// is Shift+Ctrl+X: it was Ctrl+Y, which reads as Redo beside Ctrl+Z Undo.
+// serve both menu bars (the mail's and the calendar's). (1.14) Archive is
+// Shift+Ctrl+X, beside Ctrl+X's Move to folder (Archive is a move to the
+// Archive folder), and no longer Shift+Ctrl+E, a slip of Shift from Ctrl+E's
+// Close; Check this folder, which does no harm by a slip, has Shift+Ctrl+E.
 RESOURCE HOTKEYS r_pm_hotkeys
 	{
 	control=
@@ -148,7 +272,7 @@ RESOURCE HOTKEYS r_pm_hotkeys
 		HOTKEY { command=EPmCmdSendRecv; key='c'; },
 		HOTKEY { command=EPmCmdReplyAll; key='r'; },
 		HOTKEY { command=EPmCmdOffline; key='w'; },
-		HOTKEY { command=EPmCmdArchive; key='e'; },
+		HOTKEY { command=EPmCmdRefresh; key='e'; },
 		HOTKEY { command=EPmCmdOlder; key='g'; },
 		HOTKEY { command=EPmCmdZoomOut; key='m'; },
 		HOTKEY { command=EPmCmdToggleTitle; key='t'; },
@@ -165,7 +289,7 @@ RESOURCE HOTKEYS r_pm_hotkeys
 		HOTKEY { command=EPmCmdPrintSetup; key='p'; },
 		HOTKEY { command=EPmCmdPrintPreview; key='v'; },
 		HOTKEY { command=EPmCmdSaveWord; key='s'; },
-		HOTKEY { command=EPmCmdRefresh; key='x'; },
+		HOTKEY { command=EPmCmdArchive; key='x'; },
 		HOTKEY { command=EPmCmdNextUnread; key='j'; }
 		};
 	}
@@ -198,17 +322,19 @@ RESOURCE MENU_BAR r_pm_cal_menubar
 	}
 
 // File: fetching (the whole account, the folders, the calendar), the
-// connection, Close
+// connection, saving and printing, Close. (1.14) Eight items: Save as Word
+// file is out of the Printing cascade (it is not printing), and Stop is
+// Esc's alone (the busy message is up whenever there is something to stop)
 RESOURCE MENU_PANE r_pm_file_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdSendRecv; txt="Check mail (send & receive)"; },
+		MENU_ITEM { command=EPmCmdSendRecv; txt="Check mail"; },
 		MENU_ITEM { command=EPmCmdFolderMenu; cascade=r_pm_folder_menu; txt="Folder"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdConnect; txt="Connect"; },
 		MENU_ITEM { command=EPmCmdHangup; txt="Disconnect"; },
-		MENU_ITEM { command=EPmCmdStop; txt="Stop"; extratxt="Esc"; },
 		MENU_ITEM { command=EPmCmdOffline; txt="Work offline"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdSaveWord; txt="Save as Word file"<0x85>; },
 		MENU_ITEM { command=EPmCmdPrintMenu; cascade=r_pm_print_menu; txt="Printing"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EEikCmdExit; txt="Close"; }
 		};
@@ -221,11 +347,10 @@ RESOURCE MENU_PANE r_pm_print_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdSaveWord; txt="Save as Word file..."; },
-		MENU_ITEM { command=EPmCmdPageSetup; txt="Page setup..."; },
-		MENU_ITEM { command=EPmCmdPrintSetup; txt="Print setup..."; },
-		MENU_ITEM { command=EPmCmdPrintPreview; txt="Print preview..."; },
-		MENU_ITEM { command=EPmCmdPrint; txt="Print..."; }
+		MENU_ITEM { command=EPmCmdPageSetup; txt="Page setup"<0x85>; },
+		MENU_ITEM { command=EPmCmdPrintSetup; txt="Print setup"<0x85>; },
+		MENU_ITEM { command=EPmCmdPrintPreview; txt="Print preview"<0x85>; },
+		MENU_ITEM { command=EPmCmdPrint; txt="Print"<0x85>; }
 		};
 	}
 
@@ -237,8 +362,8 @@ RESOURCE MENU_PANE r_pm_folder_menu
 		{
 		MENU_ITEM { command=EPmCmdRefresh; txt="Check this folder"; },
 		MENU_ITEM { command=EPmCmdOlder; txt="Get older messages"; },
-		MENU_ITEM { command=EPmCmdNewFolder; txt="Create new..."; },
-		MENU_ITEM { command=EPmCmdRenameFolder; txt="Rename..."; },
+		MENU_ITEM { command=EPmCmdNewFolder; txt="Create new"<0x85>; },
+		MENU_ITEM { command=EPmCmdRenameFolder; txt="Rename"<0x85>; },
 		MENU_ITEM { command=EPmCmdDeleteFolder; txt="Delete"; }
 		};
 	}
@@ -250,10 +375,10 @@ RESOURCE MENU_PANE r_pm_edit_menu
 	items=
 		{
 		MENU_ITEM { command=EPmCmdUndo; txt="Undo"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdMove; txt="Move to folder..."; },
+		MENU_ITEM { command=EPmCmdMove; txt="Move to folder"<0x85>; },
 		MENU_ITEM { command=EPmCmdArchive; txt="Archive"; },
 		MENU_ITEM { command=EPmCmdDelete; txt="Delete"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdSearch; txt="Find..."; },
+		MENU_ITEM { command=EPmCmdSearch; txt="Find"<0x85>; },
 		MENU_ITEM { command=EPmCmdContactsMenu; cascade=r_pm_contacts_menu; txt="Add to Contacts"; },
 		MENU_ITEM { command=EPmCmdInviteMenu; cascade=r_pm_invite_menu; txt="Invitation"; }
 		};
@@ -283,18 +408,31 @@ RESOURCE MENU_PANE r_pm_invite_menu
 		};
 	}
 
+// Message: (1.14) Reply and Reply to all at the top, beside Create new and
+// Forward (the commonest commands, not a cascade down); the two marks in a
+// cascade of their own, which keeps the pane to eight
 RESOURCE MENU_PANE r_pm_message_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdNew; txt="Create new email..."; },
-		MENU_ITEM { command=EPmCmdForward; txt="Forward..."; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdUnread; txt="Unread"; flags=EEikMenuItemCheckBox; },
-		MENU_ITEM { command=EPmCmdFlag; txt="Flagged"; flags=EEikMenuItemCheckBox|EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdNew; txt="Create new email"<0x85>; },
+		MENU_ITEM { command=EPmCmdReply; txt="Reply"<0x85>; },
+		MENU_ITEM { command=EPmCmdReplyAll; txt="Reply to all"<0x85>; },
+		MENU_ITEM { command=EPmCmdForward; txt="Forward"<0x85>; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdWhole; txt="Get whole message"; },
+		MENU_ITEM { command=EPmCmdMarkMenu; cascade=r_pm_mark_menu; txt="Mark"; },
 		MENU_ITEM { command=EPmCmdAttachMenu; cascade=r_pm_attach_menu; txt="Attachments"; },
-		MENU_ITEM { command=EPmCmdWebMenu; cascade=r_pm_web_menu; txt="Web"; },
-		MENU_ITEM { command=EPmCmdReplyMenu; cascade=r_pm_reply_menu; txt="Reply to"; }
+		MENU_ITEM { command=EPmCmdWebMenu; cascade=r_pm_web_menu; txt="Web"; }
+		};
+	}
+
+// Message > Mark (1.14): the message's two marks, ticked when it has them
+RESOURCE MENU_PANE r_pm_mark_menu
+	{
+	items=
+		{
+		MENU_ITEM { command=EPmCmdUnread; txt="Unread"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdFlag; txt="Flagged"; flags=EEikMenuItemCheckBox; }
 		};
 	}
 
@@ -314,17 +452,8 @@ RESOURCE MENU_PANE r_pm_attach_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdOpenAttach; txt="Open..."; },
-		MENU_ITEM { command=EPmCmdSaveAttach; txt="Save..."; }
-		};
-	}
-
-RESOURCE MENU_PANE r_pm_reply_menu
-	{
-	items=
-		{
-		MENU_ITEM { command=EPmCmdReply; txt="Sender..."; },
-		MENU_ITEM { command=EPmCmdReplyAll; txt="All recipients..."; }
+		MENU_ITEM { command=EPmCmdOpenAttach; txt="Open"<0x85>; },
+		MENU_ITEM { command=EPmCmdSaveAttach; txt="Save"<0x85>; }
 		};
 	}
 
@@ -334,8 +463,8 @@ RESOURCE MENU_PANE r_pm_event_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdNew; txt="Create new event..."; },
-		MENU_ITEM { command=EPmCmdEventDetails; txt="Details..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdNew; txt="Create new event"<0x85>; },
+		MENU_ITEM { command=EPmCmdEventDetails; txt="Details"<0x85>; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdToday; txt="Go to today"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdCalendar; txt="Sync calendar"; }
 		};
@@ -347,8 +476,8 @@ RESOURCE MENU_PANE r_pm_view_menu
 		{
 		MENU_ITEM { command=EPmCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPmCmdZoomOut; txt="Zoom out"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdSort; txt="Sort..."; },
-		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdSort; txt="Sort"<0x85>; },
+		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information"<0x85>; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdShowMenu; cascade=r_pm_show_menu; txt="Show"; },
 		MENU_ITEM { command=EPmCmdGoToMenu; cascade=r_pm_goto_menu; txt="Go to"; }
 		};
@@ -363,7 +492,7 @@ RESOURCE MENU_PANE r_pm_cal_view_menu
 		MENU_ITEM { command=EPmCmdZoomIn; txt="Zoom in"; },
 		MENU_ITEM { command=EPmCmdZoomOut; txt="Zoom out"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdSwitchViewMenu; cascade=r_pm_switch_view_menu; txt="Switch view"; },
-		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdStatusInfo; txt="Status information"<0x85>; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdShowMenu; cascade=r_pm_show_menu; txt="Show"; },
 		MENU_ITEM { command=EPmCmdGoToMenu; cascade=r_pm_goto_menu; txt="Go to"; }
 		};
@@ -400,7 +529,7 @@ RESOURCE MENU_PANE r_pm_goto_menu
 		MENU_ITEM { command=EPmCmdInbox; txt="Inbox"; },
 		MENU_ITEM { command=EPmCmdOutbox; txt="Outbox"; },
 		MENU_ITEM { command=EPmCmdShowCalendar; txt="Calendar"; },
-		MENU_ITEM { command=EPmCmdFolders; txt="Folder..."; }
+		MENU_ITEM { command=EPmCmdFolders; txt="Folder"<0x85>; }
 		};
 	}
 
@@ -408,24 +537,27 @@ RESOURCE MENU_PANE r_pm_tools_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdPrefs; txt="Preferences..."; },
-		MENU_ITEM { command=EPmCmdConnSettings; txt="Connection settings..."; },
-		MENU_ITEM { command=EPmCmdCalSettings; txt="Calendar settings..."; },
+		MENU_ITEM { command=EPmCmdPrefs; txt="Preferences"<0x85>; },
+		MENU_ITEM { command=EPmCmdConnSettings; txt="Connection settings"<0x85>; },
+		MENU_ITEM { command=EPmCmdCalSettings; txt="Calendar settings"<0x85>; },
 		MENU_ITEM { command=EPmCmdAccountsMenu; cascade=r_pm_accounts_menu; txt="Accounts"; flags=EEikMenuItemSeparatorAfter; },
-		MENU_ITEM { command=EPmCmdTroubleMenu; cascade=r_pm_trouble_menu; txt="Troubleshooting"; },
-		MENU_ITEM { command=EPmCmdUpdate; txt="Update PsiMail..."; flags=EEikMenuItemSeparatorAfter; },
+		MENU_ITEM { command=EPmCmdUpdate; txt="Update PsiMail"<0x85>; },
+		MENU_ITEM { command=EPmCmdTroubleMenu; cascade=r_pm_trouble_menu; txt="Troubleshooting"; flags=EEikMenuItemSeparatorAfter; },
 		MENU_ITEM { command=EPmCmdHelp; txt="Help on PsiMail"; },
 		MENU_ITEM { command=EPmCmdAbout; txt="About PsiMail"; }
 		};
 	}
 
+// Tools > Troubleshooting (1.14: the same three commands in PsiMail, PsiWeb
+// and PsiTerm, in this order, last before Help), then the mail engine's restart
 RESOURCE MENU_PANE r_pm_trouble_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdRestart; txt="Restart mail engine"; },
-		MENU_ITEM { command=EPmCmdSendLog; txt="Send log to server"; },
-		MENU_ITEM { command=EPmCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; }
+		MENU_ITEM { command=EPmCmdKeepLog; txt="Keep a log"; flags=EEikMenuItemCheckBox; },
+		MENU_ITEM { command=EPmCmdShowLog; txt="Show log"<0x85>; },
+		MENU_ITEM { command=EPmCmdSendLog; txt="Send log to helper"; },
+		MENU_ITEM { command=EPmCmdRestart; txt="Restart mail engine"; }
 		};
 	}
 
@@ -433,12 +565,12 @@ RESOURCE MENU_PANE r_pm_accounts_menu
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdEditAccount; txt="Settings..."; },
-		MENU_ITEM { command=EPmCmdSwitchAccount; txt="Switch..."; },
-		MENU_ITEM { command=EPmCmdNewAccount; txt="Add..."; },
+		MENU_ITEM { command=EPmCmdEditAccount; txt="Settings"<0x85>; },
+		MENU_ITEM { command=EPmCmdSwitchAccount; txt="Switch"<0x85>; },
+		MENU_ITEM { command=EPmCmdNewAccount; txt="Add"<0x85>; },
 		MENU_ITEM { command=EPmCmdDeleteAccount; txt="Remove"; },
-		MENU_ITEM { command=EPmCmdRules; txt="Rules..."; },
-		MENU_ITEM { command=EPmCmdSignatures; txt="Signatures..."; }
+		MENU_ITEM { command=EPmCmdRules; txt="Rules"<0x85>; },
+		MENU_ITEM { command=EPmCmdSignatures; txt="Signatures"<0x85>; }
 		};
 	}
 
@@ -447,8 +579,8 @@ RESOURCE MENU_PANE r_pm_new_popup
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdNew; txt="Email..."; },
-		MENU_ITEM { command=EPmCmdNewEvent; txt="Calendar event..."; }
+		MENU_ITEM { command=EPmCmdNew; txt="Email"<0x85>; },
+		MENU_ITEM { command=EPmCmdNewEvent; txt="Calendar event"<0x85>; }
 		};
 	}
 
@@ -456,9 +588,9 @@ RESOURCE MENU_PANE r_pm_reply_popup
 	{
 	items=
 		{
-		MENU_ITEM { command=EPmCmdReply; txt="Reply..."; },
-		MENU_ITEM { command=EPmCmdReplyAll; txt="Reply to all..."; },
-		MENU_ITEM { command=EPmCmdForward; txt="Forward..."; }
+		MENU_ITEM { command=EPmCmdReply; txt="Reply"<0x85>; },
+		MENU_ITEM { command=EPmCmdReplyAll; txt="Reply to all"<0x85>; },
+		MENU_ITEM { command=EPmCmdForward; txt="Forward"<0x85>; }
 		};
 	}
 
@@ -509,9 +641,9 @@ RESOURCE DIALOG r_pm_rules_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Rule"; id=EPmDlgRuleNo; control=CHOICELIST { array_id=r_pm_rule_numbers; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="When the"; id=EPmDlgRuleWhat; control=CHOICELIST { array_id=r_pm_rule_what; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="contains"; id=EPmDlgRuleWords; control=EDWIN { width=20; maxlength=58; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="then"; id=EPmDlgRuleAct; control=CHOICELIST { array_id=r_pm_rule_act; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="When"; id=EPmDlgRuleWhat; control=CHOICELIST { array_id=r_pm_rule_what; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Contains"; id=EPmDlgRuleWords; control=EDWIN { width=20; maxlength=58; }; },
+		DLG_LINE { type=EEikCtChoiceList; prompt="Then"; id=EPmDlgRuleAct; control=CHOICELIST { array_id=r_pm_rule_act; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Folder"; id=EPmDlgRuleFolder; control=CHOICELIST { maxdisplaychar=20; array_id=r_pm_empty_array; }; }
 		};
 	}
@@ -541,10 +673,10 @@ RESOURCE DIALOG r_pm_sig_dialog
 	buttons=R_EIK_BUTTONS_CANCEL_OK;
 	items=
 		{
-		DLG_LINE { type=EEikCtEdwin; prompt="New messages"; id=EPmDlgSigNew; control=EDWIN { width=22; maxlength=159; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Replies"; id=EPmDlgSigReply; control=EDWIN { width=22; maxlength=159; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="New messages"; id=EPmDlgSigNew; control=EDWIN { width=18; maxlength=159; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Replies"; id=EPmDlgSigReply; control=EDWIN { width=18; maxlength=159; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="In replies"; id=EPmDlgSigWhere; control=CHOICELIST { array_id=r_pm_sig_where; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgSigNote; control=LABEL { txt="/ is a new line - Replies left empty: the same as new messages"; }; }
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgSigNote; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Type / for a new line - Replies, left empty, uses New messages"; }; }
 		};
 	}
 
@@ -566,8 +698,8 @@ RESOURCE DIALOG r_pm_text_dialog
 	}
 
 // (1.05) Edit > Find: the words, and where to look - the server, or the
-// mail downloaded to this Psion (engine/local.c). Working offline, the
-// second line is dimmed at "On this Psion"
+// mail downloaded here (engine/local.c). Working offline, the second line
+// is dimmed at "The mail here"
 RESOURCE DIALOG r_pm_find_dialog
 	{
 	title="Find in this folder";
@@ -577,19 +709,21 @@ RESOURCE DIALOG r_pm_find_dialog
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Search for"; id=EPmDlgWords;
 			control=EDWIN { width=20; maxlength=60; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Look"; id=EPmDlgChoice;
+		DLG_LINE { type=EEikCtChoiceList; prompt="Find in"; id=EPmDlgChoice;
 			control=CHOICELIST { array_id=r_pm_find_where; }; }
 		};
 	}
 
 RESOURCE ARRAY r_pm_find_where
 	{
-	items= { LBUF { txt="On the server"; }, LBUF { txt="On this Psion"; } };
+	items= { LBUF { txt="The server"; }, LBUF { txt="The mail here"; } };
 	}
 
 // Update: where to fetch PsiMail-version.txt and PsiMail.sis from (the same
-// dialog in PsiTerm and PsiWeb). The Local server and Port lines are dimmed
-// unless "Local server" is chosen (CPmUpdateDialog)
+// dialog in PsiTerm and PsiWeb): the released versions (GitHub's main), the
+// test versions (its dev), or a computer on the user's own network. The
+// computer's address and port are dimmed unless that is chosen
+// (CPmUpdateDialog)
 RESOURCE DIALOG r_pm_update_dialog
 	{
 	title="Update PsiMail";
@@ -598,7 +732,7 @@ RESOURCE DIALOG r_pm_update_dialog
 	items=
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Updates from"; id=EPmDlgUpdSource; control=CHOICELIST { array_id=r_pm_source_array; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Local server"; id=EPmDlgUpdHost; control=EDWIN { width=22; maxlength=50; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Computer's address"; id=EPmDlgUpdHost; control=EDWIN { width=16; maxlength=50; }; },
 		DLG_LINE { type=EEikCtNumberEditor; prompt="Port"; id=EPmDlgUpdPort; control=NUMBER_EDITOR { min=1; max=65535; }; }
 		};
 	}
@@ -619,6 +753,34 @@ RESOURCE DIALOG r_pm_update_progress
 		};
 	}
 
+// (1.14) Tools > Troubleshooting > Show log: the end of psimail.log, read
+// only (the same as PsiWeb's and PsiTerm's)
+RESOURCE DIALOG r_pm_log_dialog
+	{
+	title="Log";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CONTINUE;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; id=EPmDlgUpdText;
+			control=EDWIN { width=34; lines=7; maxlength=6000;
+				flags=EEikEdwinReadOnly|EEikEdwinNoAutoSelection; }; }
+		};
+	}
+
+RESOURCE DIALOG r_pm_log_dialog_tall
+	{
+	title="Log";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CONTINUE;
+	items=
+		{
+		DLG_LINE { type=EEikCtEdwin; id=EPmDlgUpdText;
+			control=EDWIN { width=34; lines=14; maxlength=6000;
+				flags=EEikEdwinReadOnly|EEikEdwinNoAutoSelection; }; }
+		};
+	}
+
 RESOURCE DLG_BUTTONS r_pm_update_buttons
 	{
 	buttons=
@@ -629,7 +791,7 @@ RESOURCE DLG_BUTTONS r_pm_update_buttons
 
 RESOURCE ARRAY r_pm_source_array
 	{
-	items={ LBUF { txt="GitHub"; }, LBUF { txt="GitHub - test builds (dev)"; }, LBUF { txt="Local server"; } };
+	items={ LBUF { txt="Released versions"; }, LBUF { txt="Test versions"; }, LBUF { txt="A computer on my network"; } };
 	}
 
 RESOURCE DIALOG r_pm_password_dialog
@@ -651,7 +813,7 @@ RESOURCE DLG_BUTTONS r_pm_login_buttons
 	{
 	buttons=
 		{
-		DLG_BUTTON { id=EPmBidAccount; button=CMBUT { txt="Account..."; }; hotkey='A'; flags=0; },
+		DLG_BUTTON { id=EPmBidAccount; button=CMBUT { txt="Account"<0x85>; }; hotkey='A'; flags=0; },
 		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; },
 		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="OK"; }; hotkey=EEikBidOk; flags=0; }
 		};
@@ -764,7 +926,9 @@ RESOURCE DIALOG r_pm_rename_dialog
 		};
 	}
 
-// Tools > Help on PsiMail: a topic list and its text
+// Tools > Help on PsiMail: a topic list and its text. (1.14) The same in
+// PsiMail, PsiWeb and PsiTerm: 7 whole lines on a screen of 240, 12 on 480,
+// with a scroll bar (CPmHelpText sizes the text to whole lines of its font)
 RESOURCE DIALOG r_pm_help_dialog
 	{
 	title="Help on PsiMail";
@@ -775,11 +939,11 @@ RESOURCE DIALOG r_pm_help_dialog
 		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPmDlgHelpTopic;
 			control=CHOICELIST { array_id=r_pm_empty_array; }; },
 		DLG_LINE { type=EPmCtHelpText; prompt=""; id=EPmDlgHelpText;
-			control=RTXTED { width=495; height=116; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
+			control=RTXTED { width=440; height=112; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}
 
-// (0.96) on a screen of 480 lines: more of the text at once
+// (0.96) on a screen of 480 lines
 RESOURCE DIALOG r_pm_help_dialog_tall
 	{
 	title="Help on PsiMail";
@@ -790,7 +954,7 @@ RESOURCE DIALOG r_pm_help_dialog_tall
 		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPmDlgHelpTopic;
 			control=CHOICELIST { array_id=r_pm_empty_array; }; },
 		DLG_LINE { type=EPmCtHelpText; prompt=""; id=EPmDlgHelpText;
-			control=RTXTED { width=495; height=320; numlines=20; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
+			control=RTXTED { width=440; height=216; numlines=12; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}
 
@@ -871,7 +1035,7 @@ RESOURCE ARRAY r_pm_yesno_array
 
 RESOURCE ARRAY r_pm_store_array
 	{
-	items={ LBUF { txt="Memory disk, if there is one"; }, LBUF { txt="Internal disk"; } };
+	items={ LBUF { txt="The card, if it is in"; }, LBUF { txt="Internal disk"; } };
 	}
 
 RESOURCE ARRAY r_pm_account_pages
@@ -890,13 +1054,15 @@ RESOURCE ARRAY r_pm_account_lines
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Account name"; id=EPmDlgName;
-			control=EDWIN { width=24; maxlength=30; }; },
+			control=EDWIN { width=16; maxlength=30; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt="Your name"; id=EPmDlgFullName;
-			control=EDWIN { width=24; maxlength=62; }; },
+			control=EDWIN { width=16; maxlength=62; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt="Email address"; id=EPmDlgEmail;
-			control=EDWIN { width=24; maxlength=94; }; },
-		DLG_LINE { type=EEikCtEdwin; prompt="Signature ( / = new line)"; id=EPmDlgSignature;
-			control=EDWIN { width=24; maxlength=150; }; }
+			control=EDWIN { width=16; maxlength=94; }; },
+		DLG_LINE { type=EEikCtEdwin; prompt="Signature"; id=EPmDlgSignature;
+			control=EDWIN { width=16; maxlength=150; }; },
+		DLG_LINE { type=EEikCtLabel;
+			control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Type / for a new line"; }; }
 		};
 	}
 
@@ -905,17 +1071,17 @@ RESOURCE ARRAY r_pm_incoming_lines
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="IMAP server"; id=EPmDlgImapHost;
-			control=EDWIN { width=24; maxlength=62; }; },
+			control=EDWIN { width=16; maxlength=62; }; },
 		DLG_LINE { type=EEikCtNumberEditor; prompt="Port"; id=EPmDlgImapPort;
 			control=NUMBER_EDITOR { min=1; max=65535; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Security"; id=EPmDlgImapTls;
 			control=CHOICELIST { array_id=r_pm_security_array; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt="User name"; id=EPmDlgUser;
-			control=EDWIN { width=24; maxlength=94; }; },
+			control=EDWIN { width=16; maxlength=94; }; },
 		DLG_LINE { type=EEikCtSecretEd; prompt="Password"; id=EPmDlgPass;
 			control=SECRETED { num_letters=32; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1;
-			control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Most providers want an app password here, not the normal one"; }; }
+			control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Most providers want an app password here"; }; }
 		};
 	}
 
@@ -924,13 +1090,12 @@ RESOURCE ARRAY r_pm_outgoing_lines
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="SMTP server"; id=EPmDlgSmtpHost;
-			control=EDWIN { width=24; maxlength=62; }; },
+			control=EDWIN { width=16; maxlength=62; }; },
 		DLG_LINE { type=EEikCtNumberEditor; prompt="Port"; id=EPmDlgSmtpPort;
 			control=NUMBER_EDITOR { min=1; max=65535; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Security"; id=EPmDlgSmtpTls;
 			control=CHOICELIST { array_id=r_pm_security_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Copy to Sent folder"; id=EPmDlgSaveSent;
-			control=CHOICELIST { array_id=r_pm_yesno_array; }; }
+		DLG_LINE { type=EEikCtCheckBox; prompt="Copy to Sent folder"; id=EPmDlgSaveSent; }
 		};
 	}
 
@@ -940,7 +1105,7 @@ RESOURCE ARRAY r_pm_options_lines
 		{
 		DLG_LINE { type=EEikCtNumberEditor; prompt="Messages per folder"; id=EPmDlgSyncCount;
 			control=NUMBER_EDITOR { min=10; max=500; }; },
-		DLG_LINE { type=EEikCtNumberEditor; prompt="Text per message (KB)"; id=EPmDlgBodyKb;
+		DLG_LINE { type=EEikCtNumberEditor; prompt="Text per message"; id=EPmDlgBodyKb; trailer="KB";
 			control=NUMBER_EDITOR { min=4; max=1024; }; }
 		};
 	}
@@ -957,11 +1122,21 @@ RESOURCE DIALOG r_pm_prefs_dialog
 	pages=r_pm_prefs_pages;
 	}
 
+// (1.14) on a colour screen, where there are no greys to set: Cancel and OK
+// alone, at their usual width (PsiTerm's and PsiWeb's way)
+RESOURCE DIALOG r_pm_prefs_dialog_colour
+	{
+	title="Preferences";
+	flags=EEikDialogFlagWait;
+	buttons=R_EIK_BUTTONS_CANCEL_OK;
+	pages=r_pm_prefs_pages;
+	}
+
 RESOURCE DLG_BUTTONS r_pm_prefs_buttons
 	{
 	buttons=
 		{
-		DLG_BUTTON { id=EPmBidGreys; button=CMBUT { txt="Screen greys..."; }; hotkey='G'; flags=0; },
+		DLG_BUTTON { id=EPmBidGreys; button=CMBUT { txt="Screen greys"<0x85>; }; hotkey='G'; flags=0; },
 		DLG_BUTTON { id=EEikBidCancel; button=CMBUT { txt="Cancel"; }; hotkey=EEikBidCancel; flags=0; },
 		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="OK"; }; hotkey=EEikBidOk; flags=0; }
 		};
@@ -987,10 +1162,8 @@ RESOURCE ARRAY r_pm_prefs_newmail_lines
 			control=CHOICELIST { array_id=r_pm_check_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="If not connected"; id=EPmDlgCheckConnect;
 			control=CHOICELIST { array_id=r_pm_check_connect_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Send waiting mail when connected"; id=EPmDlgAutoSend;
-			control=CHOICELIST { array_id=r_pm_yes_no_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Show detailed progress"; id=EPmDlgDetailed;
-			control=CHOICELIST { array_id=r_pm_yes_no_array; }; }
+		DLG_LINE { type=EEikCtCheckBox; prompt="Send waiting mail"; id=EPmDlgAutoSend; },
+		DLG_LINE { type=EEikCtCheckBox; prompt="Show detailed progress"; id=EPmDlgDetailed; }
 		};
 	}
 
@@ -1007,7 +1180,7 @@ RESOURCE ARRAY r_pm_check_array
 	items=
 		{
 		LBUF { txt="Off"; }, LBUF { txt="Every 10 minutes"; }, LBUF { txt="Every 15 minutes"; },
-		LBUF { txt="Every 30 minutes"; }, LBUF { txt="Every hour"; }, LBUF { txt="At once"; }
+		LBUF { txt="Every 30 minutes"; }, LBUF { txt="Every hour"; }, LBUF { txt="As it arrives"; }
 		};
 	}
 
@@ -1019,23 +1192,13 @@ RESOURCE ARRAY r_pm_check_connect_array
 		};
 	}
 
-// (No, Yes: the one order every yes/no list in the suite has; pmauto.cpp
-// maps the stored bits accordingly)
-RESOURCE ARRAY r_pm_yes_no_array
-	{
-	items=
-		{
-		LBUF { txt="No"; }, LBUF { txt="Yes"; }
-		};
-	}
-
 RESOURCE ARRAY r_pm_prefs_lines
 	{
 	items=
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Order of messages"; id=EPmDlgSort;
 			control=CHOICELIST { array_id=r_pm_sort_array; }; },
-		DLG_LINE { type=EEikCtNumberEditor; prompt="Download ahead"; id=EPmDlgPrefetch; trailer="newest messages";
+		DLG_LINE { type=EEikCtNumberEditor; prompt="Get in advance"; id=EPmDlgPrefetch; trailer="newest messages";
 			control=NUMBER_EDITOR { min=0; max=50; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Keep mail on"; id=EPmDlgStore;
 			control=CHOICELIST { array_id=r_pm_store_array; }; },
@@ -1054,8 +1217,7 @@ RESOURCE ARRAY r_pm_prefs_screen_lines
 			control=CHOICELIST { array_id=r_pm_pictures_array; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Web pictures"; id=EPmDlgWebPictures;
 			control=CHOICELIST { array_id=r_pm_web_pictures_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Web pictures via helper"; id=EPmDlgWebProxy;
-			control=CHOICELIST { array_id=r_pm_web_proxy_array; }; },
+		DLG_LINE { type=EEikCtCheckBox; prompt="Use the web helper"; id=EPmDlgWebProxy; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Reading mode"; id=EPmDlgReading;
 			control=CHOICELIST { array_id=r_pm_reading_array; }; }
 		};
@@ -1084,14 +1246,6 @@ RESOURCE ARRAY r_pm_web_pictures_array
 	items=
 		{
 		LBUF { txt="Ask"; }, LBUF { txt="Always"; }, LBUF { txt="Never"; }
-		};
-	}
-
-RESOURCE ARRAY r_pm_web_proxy_array
-	{
-	items=
-		{
-		LBUF { txt="No"; }, LBUF { txt="Yes"; }
 		};
 	}
 
@@ -1164,24 +1318,48 @@ RESOURCE ARRAY r_pm_conn_proxy_lines
 		};
 	}
 
-// About: as PsiTerm's (name and version, what it is and whose, the link
-// in use, then the credits in the small font)
+// About (1.14): the same in PsiMail, PsiWeb and PsiTerm (Coda's About box,
+// one machine line for the programs that run on several): the name and
+// version in bold, what it is and for which machines, the copyright, and
+// the support line in the small font. Continue closes it; Credits... shows
+// the code from other people that PsiMail is built on.
+RESOURCE DLG_BUTTONS r_pm_about_buttons
+	{
+	buttons=
+		{
+		DLG_BUTTON { id=EPmBidCredits; button=CMBUT { txt="Credits"<0x85>; }; hotkey='C'; flags=0; },
+		DLG_BUTTON { id=EEikBidOk; button=CMBUT { txt="Continue"; }; hotkey=EEikBidOk; flags=0; }
+		};
+	}
+
 RESOURCE DIALOG r_pm_about_dialog
 	{
 	title="About PsiMail";
 	flags=EEikDialogFlagWait;
+	buttons=r_pm_about_buttons;
+	items=
+		{
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { horiz_align=EEikLabelAlignHLeft; reserve_length=24; txt="PsiMail"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="Email for the Psion Series 5mx, Series 7 & netBook"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="Dan Edge 2026"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Buy me a coffee: buymeacoffee.com/danedge"; }; }
+		};
+	}
+
+// About > Credits...: the code PsiMail is built on, and its licence
+RESOURCE DIALOG r_pm_credits_dialog
+	{
+	title="Credits";
+	flags=EEikDialogFlagWait;
 	buttons=R_EIK_BUTTONS_CONTINUE;
 	items=
 		{
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { standard_font=EEikLabelFontLegend; reserve_length=24; txt="PsiMail"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { reserve_length=80; txt="Email & calendar for the Psion 5mx, netBook & Series 7"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { standard_font=EEikLabelFontAnnotation; reserve_length=60; txt="-"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="IMAP, SMTP & CalDAV over TLS 1.3 - networking from PsiTerm"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="LibTomCrypt, LibTomMath, TweetNaCl, picojpeg, stb_image - public domain"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo7; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="zlib (c) Gailly and Adler; random numbers from Dropbear (c) Matt Johnston - MIT"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="github.com/danieledge/psimail - MIT licence"; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo8; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="This product includes software licensed from Symbian Ltd (c) Symbian Ltd 1998-9"; }; },
-		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Support: buymeacoffee.com/danedge"; }; }
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1; control=LABEL { horiz_align=EEikLabelAlignHLeft; txt="PsiMail is free software: MIT licence"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo2; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Source: github.com/danieledge/psimail"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo3; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="LibTomCrypt, LibTomMath, TweetNaCl, picojpeg, stb_image: public domain"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo4; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="zlib "<0xa9>" Jean-loup Gailly & Mark Adler"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo5; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="Random numbers from Dropbear "<0xa9>" Matt Johnston: MIT licence"; }; },
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo6; control=LABEL { standard_font=EEikLabelFontAnnotation; horiz_align=EEikLabelAlignHLeft; txt="This product includes software licensed from Symbian Ltd "<0xa9>" Symbian Ltd 1998-9"; }; }
 		};
 	}
 
@@ -1230,16 +1408,15 @@ RESOURCE ARRAY r_pm_cal_server_lines
 	{
 	items=
 		{
-		DLG_LINE { type=EEikCtChoiceList; prompt="Sync with Agenda"; id=EPmDlgCalOn;
-			control=CHOICELIST { array_id=r_pm_yesno_array; }; },
+		DLG_LINE { type=EEikCtCheckBox; prompt="Sync with Agenda"; id=EPmDlgCalOn; },
 		DLG_LINE { type=EEikCtEdwin; prompt="CalDAV server"; id=EPmDlgCalHost;
-			control=EDWIN { width=20; maxlength=190; }; },
+			control=EDWIN { width=16; maxlength=190; }; },
 		DLG_LINE { type=EEikCtSecretEd; prompt="Password"; id=EPmDlgCalPass;
 			control=SECRETED { num_letters=32; }; },
 		DLG_LINE { type=EEikCtLabel; id=EPmDlgInfo1;
 			control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Leave it blank to use the mail account's password"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="New entries go to"; id=EPmDlgCalDefault;
-			control=CHOICELIST { maxdisplaychar=18; array_id=r_pm_cal_none_array; }; }
+			control=CHOICELIST { maxdisplaychar=14; array_id=r_pm_cal_none_array; }; }
 		};
 	}
 
@@ -1248,12 +1425,12 @@ RESOURCE ARRAY r_pm_cal_agenda_lines
 	items=
 		{
 		DLG_LINE { type=EEikCtEdwin; prompt="Agenda file"; id=EPmDlgCalFile;
-			control=EDWIN { width=20; maxlength=120; }; },
+			control=EDWIN { width=16; maxlength=120; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Time zone"; id=EPmDlgCalZone;
 			control=CHOICELIST { array_id=r_pm_zones; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="Alarms"; id=EPmDlgCalAlarms;
 			control=CHOICELIST { array_id=r_pm_cal_alarm_array; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="Existing Psion entries"; id=EPmDlgCalExisting;
+		DLG_LINE { type=EEikCtChoiceList; prompt="Existing entries"; id=EPmDlgCalExisting;
 			control=CHOICELIST { array_id=r_pm_cal_existing_array; }; }
 		};
 	}
@@ -1273,7 +1450,7 @@ RESOURCE ARRAY r_pm_cal_dates_lines
 
 RESOURCE ARRAY r_pm_cal_none_array
 	{
-	items={ LBUF { txt="(sync first)"; } };
+	items={ LBUF { txt="(none yet)"; } };
 	}
 
 RESOURCE ARRAY r_pm_cal_alarm_array
@@ -1283,7 +1460,7 @@ RESOURCE ARRAY r_pm_cal_alarm_array
 
 RESOURCE ARRAY r_pm_cal_existing_array
 	{
-	items={ LBUF { txt="Keep on the Psion only"; }, LBUF { txt="Copy to the server"; } };
+	items={ LBUF { txt="Keep here only"; }, LBUF { txt="Copy to the server"; } };
 	}
 
 // the same order as engine/caltz.c
@@ -1340,8 +1517,7 @@ RESOURCE DIALOG r_pm_event_dialog
 			control=EDWIN { width=24; maxlength=110; }; },
 		DLG_LINE { type=EEikCtDateEditor; prompt="Date"; id=EPmDlgEvDate;
 			control=DATE_EDITOR { minDate=DATE { year=1980; }; maxDate=DATE { year=2099; month=11; day=30; }; }; },
-		DLG_LINE { type=EEikCtChoiceList; prompt="All day"; id=EPmDlgEvAllDay;
-			control=CHOICELIST { array_id=r_pm_yesno_array; }; },
+		DLG_LINE { type=EEikCtCheckBox; prompt="All day"; id=EPmDlgEvAllDay; },
 		DLG_LINE { type=EEikCtTimeEditor; prompt="Start"; id=EPmDlgEvStart;
 			control=TIME_EDITOR { minTime=TIME { }; maxTime=TIME { hour=23; minute=59; second=59; }; flags=EEikTimeWithoutSecondsField; }; },
 		DLG_LINE { type=EEikCtTimeEditor; prompt="End"; id=EPmDlgEvEnd;

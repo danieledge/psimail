@@ -156,7 +156,7 @@ int smtp_send(int acct, const char *mime_path, const char *from, const char *rcp
 		}
 		return pm_cancelled() ? PM_RES_CANCELLED : PM_RES_OFFLINE;
 	}
-	pm_progress("Sending: greeting %s...", a->smtp_host);
+	pm_progress("Sending: greeting %s\x85", a->smtp_host);
 	if ((r = reply(0)) != 220) { fclose(f); return fail(why, whymax, r, "Server greeting"); }
 	pmn_printf("EHLO psion\r\n");
 	if ((r = reply(1)) != 250) { fclose(f); return fail(why, whymax, r, "EHLO"); }
@@ -176,7 +176,7 @@ int smtp_send(int acct, const char *mime_path, const char *from, const char *rcp
 		pmn_printf("EHLO psion\r\n");
 		if ((r = reply(1)) != 250) { fclose(f); return fail(why, whymax, r, "EHLO"); }
 	}
-	pm_progress("Sending: logging in...");
+	pm_progress("Sending: logging in\x85");
 	if (auth_has("PLAIN") || !auth_has("LOGIN")) {
 		unsigned char raw[200];
 		char enc[280];
@@ -227,7 +227,7 @@ int smtp_send(int acct, const char *mime_path, const char *from, const char *rcp
 		}
 		if (pmn_write(out, k) != 0) { fclose(f); return fail(why, whymax, -1, "sending"); }
 		sent += n;
-		pm_progress("Sending... %d%%", (int)(sent * 100 / (size ? size : 1)));
+		pm_progress("Sending %d%%\x85", (int)(sent * 100 / (size ? size : 1)));
 		if (pm_cancelled()) { fclose(f); return fail(why, whymax, PMN_CANCEL, "sending"); }
 	}
 	fclose(f);

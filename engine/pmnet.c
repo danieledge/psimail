@@ -143,7 +143,7 @@ int pmn_connect(const char *host, int port, int tls, char *why, int whymax)
 	used();
 	pm_copy(s->host, host, sizeof(s->host));
 	s->port = port;
-	pm_progress("Connecting to %s...", host);
+	pm_progress("Connecting to %s\x85", host);
 	g_dials++;
 	pm_log("net: dial %d: %s:%d%s (%s)", g_dials, host, port, tls ? " tls" : "", modem() ? "modem" : "psion tcp/ip");
 	t0 = pm_ms();
@@ -180,7 +180,7 @@ int pmn_connect(const char *host, int port, int tls, char *why, int whymax)
 int pmn_starttls(const char *host, char *why, int whymax)
 {
 #ifndef PM_NO_TLS
-	pm_progress("Securing the connection to %s...", host);
+	pm_progress("Securing the connection to %s\x85", host);
 	tlsv_set_host(host, pg_shared()->port);
 	if (tls_connect(host, why, whymax) != 0)
 		return -1;

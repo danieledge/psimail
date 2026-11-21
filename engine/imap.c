@@ -355,7 +355,7 @@ int imap_open(int acct, char *why, int whymax)
 		}
 		return pm_cancelled() ? PM_RES_CANCELLED : PM_RES_OFFLINE;
 	}
-	pm_progress("Logging in to %s...", a->imap_host);
+	pm_progress("Logging in to %s\x85", a->imap_host);
 	r = read_response();
 	if (r < 0) return lost(why, whymax, r);
 	if (pm_strncasecmp(g_resp, "* OK", 4) && pm_strncasecmp(g_resp, "* PREAUTH", 9)) {
@@ -462,7 +462,7 @@ int imap_list_folders(int acct, char *why, int whymax)
 	int r, i, o;
 
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
-	pm_progress("Getting the folder list...");
+	pm_progress("Getting the folder list\x85");
 	memset(&fl, 0, sizeof(fl));
 	if (has_cap("LIST-STATUS") && has_cap("SPECIAL-USE"))
 		r = cmd(on_list, &fl, why, whymax, "LIST \"\" \"*\" RETURN (SPECIAL-USE STATUS (MESSAGES UNSEEN))");
@@ -472,7 +472,7 @@ int imap_list_folders(int acct, char *why, int whymax)
 	for (i = 0; i < fl.n && i < 30; i++) {
 		char q[160];
 		if (fl.f[i].have_status || fl.f[i].kind == 'N') continue;
-		pm_progress("Counting messages in folder %d of %d...", i + 1, fl.n);
+		pm_progress("Counting messages in folder %d of %d\x85", i + 1, fl.n);
 		quote(fl.f[i].name, q, sizeof(q));
 		r = cmd(on_list, &fl, why, whymax, "STATUS %s (MESSAGES UNSEEN)", q);
 		if (r == PM_RES_OFFLINE || r == PM_RES_CANCELLED) return r;
@@ -612,7 +612,7 @@ int imap_create_folder(int acct, const char *parent, const char *name, char *why
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
 	folder_info(acct, parent, &kind, &delim);
 	child_name(parent, delim, name, full, sizeof(full));
-	pm_progress("Creating folder %s...", name);
+	pm_progress("Creating folder %s\x85", name);
 	quote(full, q, sizeof(q));
 	if ((r = cmd(0, 0, why, whymax, "CREATE %s", q)) != PM_RES_OK) return r;
 	cmd(0, 0, w2, sizeof(w2), "SUBSCRIBE %s", q);   /* (some servers list only subscribed folders) */
@@ -639,7 +639,7 @@ int imap_rename_folder(int acct, const char *folder, const char *name, char *why
 	if (!strcmp(full, folder)) { set_why(why, whymax, "The folder is called that already"); return PM_RES_FAILED; }
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
 	if (!strcmp(g_sel, folder)) { cmd(0, 0, w2, sizeof(w2), "CLOSE"); g_sel[0] = 0; }
-	pm_progress("Renaming folder to %s...", name);
+	pm_progress("Renaming folder to %s\x85", name);
 	quote(folder, q1, sizeof(q1));
 	quote(full, q2, sizeof(q2));
 	if ((r = cmd(0, 0, why, whymax, "RENAME %s %s", q1, q2)) != PM_RES_OK) return r;
@@ -660,7 +660,7 @@ int imap_delete_folder(int acct, const char *folder, char *why, int whymax)
 	if (kind != '-' && kind != 'N') { set_why(why, whymax, "%s can't be deleted", kind == 'I' ? "The Inbox" : "A standard folder"); return PM_RES_FAILED; }
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
 	if (!strcmp(g_sel, folder)) { cmd(0, 0, w2, sizeof(w2), "CLOSE"); g_sel[0] = 0; }
-	pm_progress("Deleting the folder...");
+	pm_progress("Deleting the folder\x85");
 	quote(folder, q, sizeof(q));
 	if ((r = cmd(0, 0, why, whymax, "DELETE %s", q)) != PM_RES_OK) return r;
 	cmd(0, 0, w2, sizeof(w2), "UNSUBSCRIBE %s", q);
@@ -837,8 +837,8 @@ static void on_fetch_msg(ImapNode *r, void *ctx)
 	}
 	if (!st_flag_has(m->flags, 'S')) sc->newunseen++;
 	sc->count++;
-	if (sc->total) pm_progress("Fetching message %d of %d...", sc->count, sc->total);
-	else pm_progress("Fetching message %d...", sc->count);
+	if (sc->total) pm_progress("Fetching message %d of %d\x85", sc->count, sc->total);
+	else pm_progress("Fetching message %d\x85", sc->count);
 }
 
 static int cmp_uint(const void *a, const void *b)
@@ -875,7 +875,7 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 	}
 	memset(&sc, 0, sizeof(sc));
 	sc.ix = &ix;
-	pm_progress("Opening %s...", folder);
+	pm_progress("Opening %s\x85", folder);
 	r = select_folder(folder, on_fetch_msg, &sc, why, whymax);
 	if (r != PM_RES_OK) { st_index_free(&ix); return r; }
 
@@ -940,7 +940,7 @@ int imap_sync(int acct, const char *folder, int older, char *why, int whymax)
 		s2.seen_uids = (unsigned int *)malloc(256 * sizeof(unsigned int));
 		s2.capseen = s2.seen_uids ? 256 : 0;
 		if (!s2.seen_uids) s2.oom = 1;
-		pm_progress("Checking %s for changes...", folder);
+		pm_progress("Checking %s for changes\x85", folder);
 		damaged = g_damaged;
 		if (s2.seen_uids)
 			r = cmd(on_fetch_msg, &s2, why, whymax, "UID FETCH %u:%u (UID FLAGS)", minuid, maxuid);
@@ -1102,7 +1102,7 @@ static int fetch_part(int acct, const char *folder, unsigned int uid, const char
 			drops++;
 			s_clean = 0;
 			if (s_step > 2048) s_step /= 2;   /* the line can't take that much at once */
-			pm_progress("Reconnecting...");
+			pm_progress("Reconnecting\x85");
 			if ((r = open_folder(acct, folder, why, whymax)) != PM_RES_OK) return r;
 			continue;
 		}
@@ -1156,8 +1156,8 @@ typedef struct
    while downloading ahead) */
 static void body_progress(const char *label, const char *doing, int percent)
 {
-	if (percent >= 0) pm_progress("%s %s... %d%%", doing, label, percent);
-	else pm_progress("%s %s...", doing, label);
+	if (percent >= 0) pm_progress("%s %s %d%%\x85", doing, label, percent);
+	else pm_progress("%s %s\x85", doing, label);
 }
 
 /* ---- plain text to PsiMail's rich text (see ui/pmui.h): quotes ("> ")
@@ -1569,7 +1569,7 @@ static int att_stream(const char *data, int n, void *ctx)
 	if (c->total > 0) {
 		int pc = (int)(c->got * 100 / c->total);
 		pc -= pc % 5;
-		if (pc != c->percent) { c->percent = pc; pm_progress("Downloading %s... %d%%", c->label ? c->label : "the attachment", pc); }
+		if (pc != c->percent) { c->percent = pc; pm_progress("Downloading %s %d%%\x85", c->label ? c->label : "the attachment", pc); }
 	}
 	/* (a streamed literal comes in 1 KB pieces and a quoted body is sliced
 	   to the same - dec_feed writes up to n + 2 bytes - so this is only
@@ -1760,7 +1760,7 @@ int imap_search(int acct, const char *folder, const char *words, char *why, int 
 	cs_cp1252_to_utf8(words, (int)strlen(words), utf, sizeof(utf));
 	for (i = 0; utf[i]; i++) if ((unsigned char)utf[i] >= 0x80) ascii = 0;
 	memset(&l, 0, sizeof(l));
-	pm_progress("Searching %s...", folder);
+	pm_progress("Finding in %s\x85", folder);
 	if (ascii) {
 		quote(utf, q, sizeof(q));
 		r = cmd(on_search, &l, why, whymax, "UID SEARCH TEXT %s", q);
@@ -1851,7 +1851,7 @@ int imap_idle(int acct, int maxsec, int *arrived, char *why, int whymax)
 	n = sprintf(out, "%s IDLE\r\n", tag);
 	if (pmn_write(out, n) != 0) return lost(why, whymax, -1);
 	t0 = pm_ms();
-	pm_progress("Waiting for new mail...");
+	pm_progress("Waiting for new mail\x85");
 	for (;;) {
 		if (!done && !gone && pm_app_gone()) {
 			pm_log("imap: idle: PsiMail.app has ended: DONE");
@@ -1936,7 +1936,7 @@ int imap_append(int acct, const char *folder, const char *path, const char *flag
 		while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
 			if (pmn_write(buf, (int)n) != 0) { fclose(f); return lost(why, whymax, -1); }
 			sent += (long)n;
-			pm_progress("Saving a copy in %s... %d%%", folder, (int)(sent * 100 / (size ? size : 1)));
+			pm_progress("Saving a copy in %s %d%%\x85", folder, (int)(sent * 100 / (size ? size : 1)));
 		}
 	}
 	fclose(f);
@@ -1991,7 +1991,7 @@ int imap_unmove(int acct, const char *dest, unsigned int uid, const char *msgid,
 	int r, seen = 0;
 	*newuid = 0;
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
-	pm_progress("Putting it back in %s...", folder);
+	pm_progress("Putting it back in %s\x85", folder);
 	if ((r = select_folder(dest, 0, 0, why, whymax)) != PM_RES_OK) return r;
 	if (uid) {
 		/* still there? (a UID command on a uid that has gone does nothing, and says OK) */

@@ -556,7 +556,7 @@ int st_pending_replay(int acct, char *why, int whymax)
 			continue;
 		}
 		op = field(&p); folder = field(&p); uid = field(&p); arg = field(&p);
-		pm_progress("Sending changes made offline (%d)...", ++n);
+		pm_progress("Sending changes made offline (%d)\x85", ++n);
 		if (!strcmp(op, "FLAG")) r = imap_flag(acct, folder, (unsigned int)strtoul(uid, 0, 10), arg, why, whymax);
 		else if (!strcmp(op, "MOVE")) r = imap_move(acct, folder, (unsigned int)strtoul(uid, 0, 10), arg, why, whymax);
 		else if (!strcmp(op, "EXPUNGE")) r = imap_expunge(acct, folder, why, whymax);

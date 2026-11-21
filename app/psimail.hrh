@@ -1,5 +1,9 @@
 // PSIMAIL.HRH - command and control ids for PsiMail.app
 
+// (1.14) the toolbar's buttons on a screen of 480 lines: the netBook's own
+// pitch (Word's, Agenda's), where the 5mx's are KEikStdToolBarButtonHeight (37)
+#define KPmTallButtonHeight 50
+
 enum TPmCommands
 	{
 	EPmCmdSendRecv = 0x1000,
@@ -104,7 +108,10 @@ enum TPmCommands
 	EPmCmdNextUnread,        // (1.02) View > Go to > Next unread (Shift+Ctrl+J)
 	EPmCmdRules,             // (1.02) Tools > Accounts > Rules... (pmrules.cpp)
 	EPmCmdSignatures,        // (1.02) Tools > Accounts > Signatures... (pmrules.cpp)
-	EPmCmdToggleThreads      // (1.05) View > Show > Conversations
+	EPmCmdToggleThreads,     // (1.05) View > Show > Conversations
+	EPmCmdFileName,          // (1.14) the toolbar's name (a file name label, as Psion's programs')
+	EPmCmdMarkMenu,          // (1.14) Message > Mark (a cascade: Unread, Flagged)
+	EPmCmdShowLog            // (1.14) Tools > Troubleshooting > Show log
 	};
 
 enum TPmDialogControls
@@ -210,7 +217,8 @@ enum TPmButtons
 	EPmBidContacts,          // compose: pick addresses from Contacts
 	EPmBidAccount,           // the login dialog: the account's settings
 	EPmBidWrite,             // (1.05) a tap on the sender: write to them
-	EPmBidAddContact         //   or add them to Contacts
+	EPmBidAddContact,        //   or add them to Contacts
+	EPmBidCredits            // (1.14) About: Credits...
 	};
 
 enum TPmPages

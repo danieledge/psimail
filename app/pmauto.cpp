@@ -225,9 +225,9 @@ void CPmView::SendWaitingL()
 	Cmd(PM_CMD_SEND, KNullDesC8, 0, KNullDesC8);
 	TBuf<60> t;
 	if (n == 1)
-		t = _L("Sending 1 waiting message...");
+		t = _L("Sending 1 waiting message\x85");
 	else
-		t.Format(_L("Sending %d waiting messages..."), n);
+		t.Format(_L("Sending %d waiting messages\x85"), n);
 	Working(t);
 	}
 
@@ -267,10 +267,9 @@ void CPmPrefsDialog::NewMailInitL()
 	if (c > 5) c = 0;                    // (5: at once, 1.02)
 	SetChoiceListCurrentItem(EPmDlgCheckEvery, c);
 	SetChoiceListCurrentItem(EPmDlgCheckConnect, (v & KPmViewCheckConnect) ? 1 : 0);
-	// (r_pm_yes_no_array is No, Yes - the one order every yes/no list in
-	// the suite has; the stored bits keep their meaning)
-	SetChoiceListCurrentItem(EPmDlgAutoSend, (v & KPmViewNoAutoSend) ? 0 : 1);
-	SetChoiceListCurrentItem(EPmDlgDetailed, (v & KPmViewDetailedProgress) ? 1 : 0);
+	// (1.14 tick boxes; the stored bits keep their meaning)
+	SetCheckBoxState(EPmDlgAutoSend, (v & KPmViewNoAutoSend) ? CEikButtonBase::EClear : CEikButtonBase::ESet);
+	SetCheckBoxState(EPmDlgDetailed, (v & KPmViewDetailedProgress) ? CEikButtonBase::ESet : CEikButtonBase::EClear);
 	SetLineDimmedNow(EPmDlgCheckConnect, c == 0);
 	}
 
@@ -281,9 +280,9 @@ void CPmPrefsDialog::NewMailSave()
 	v |= (ChoiceListCurrentItem(EPmDlgCheckEvery) << KPmViewCheckShift) & KPmViewCheckMask;
 	if (ChoiceListCurrentItem(EPmDlgCheckConnect) == 1)
 		v |= KPmViewCheckConnect;
-	if (ChoiceListCurrentItem(EPmDlgAutoSend) == 0)      // No: don't send by itself
+	if (CheckBoxState(EPmDlgAutoSend) != CEikButtonBase::ESet)   // not ticked: don't send by itself
 		v |= KPmViewNoAutoSend;
-	if (ChoiceListCurrentItem(EPmDlgDetailed) == 1)      // Yes
+	if (CheckBoxState(EPmDlgDetailed) == CEikButtonBase::ESet)
 		v |= KPmViewDetailedProgress;
 	iSettings.iView = v;
 	}
