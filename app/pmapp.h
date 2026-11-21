@@ -743,6 +743,7 @@ public:
 	// (started again, quietly) on the next command or return to the front
 	void MemWordL(TInt aWord, TBool aFront, TDes& aWhy);
 	TBool WakeEngineL();
+	void EngineAsleep();                     // ended for the memory: its handles go too
 	TBool KeepEngine() const;                // the engine must stay: new mail at once, a timed check, the calendar, an update
 	TBool MemBusy() const;                   // a transfer or an update running: not to be slept or closed
 	void MemTick(TBool aFront);              // from TickL: keep_awake for the engine, PsiMemBusy

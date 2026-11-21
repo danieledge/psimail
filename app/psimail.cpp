@@ -767,7 +767,7 @@ void CPmView::EngineEnded()
 		// (1.15) it ended by itself: memory low, nothing to do, nothing
 		// that needs it (keep_awake). Woken by the next command, or when
 		// PsiMail comes to the front (WakeEngineL); no word to the user
-		iEngineAsleep = ETrue;
+		EngineAsleep();
 		return;
 		}
 	if (iUpdDlg && !iUpdEnded)
@@ -1644,7 +1644,18 @@ void CPmView::MemWordL(TInt aWord, TBool aFront, TDes& aWhy)
 	if (aWhy.Length())
 		return;
 	StopEngine();                            // (it logs out and hangs up: a few seconds at most)
+	EngineAsleep();
+	}
+
+// the engine has ended for the memory: the doorbell's handle on its thread
+// goes too, or the ended process's code and data (0.6 MB) stay in memory
+// until the next start (as PsiWeb found, 0.92)
+void CPmView::EngineAsleep()
+	{
 	iEngineAsleep = ETrue;
+	if (iBellWaiter)
+		iBellWaiter->Cancel();
+	iEngRinger.Close();
 	}
 
 // asleep (MemWordL, or the engine's own end at low memory): started again,
