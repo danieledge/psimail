@@ -1003,47 +1003,14 @@ public:
 	CPmHelpDialog(TInt aTopic) : iTopic(aTopic) {}
 	void TopicLineL() { TryChangeFocusToL(EPmDlgHelpTopic); }   // (Up at the top of the text)
 private:
-	SEikControlInfo CreateCustomControlL(TInt aControlType);   // the text with its scroll bar (0.75)
+	SEikControlInfo CreateCustomControlL(TInt aControlType);   // (1.16) core's help text (psihelp.h)
+	static TInt HelpTopLine(TAny* aSelf);                       // Up at the text's top: the Topic line
 	void PreLayoutDynInitL();
 	void PostLayoutDynInitL();
 	void HandleControlStateChangeL(TInt aControlId);
 	TBool OkToExitL(TInt aButtonId);
 	void ShowTopicL(TInt aTopic);
 	TInt iTopic;
-	};
-
-// the help's text: a read-only rich text editor with a scroll bar (pmhelp.cpp)
-class CPmHelpText : public CCoeControl
-	{
-public:
-	~CPmHelpText();
-	CEikRichTextEditor* Editor() const { return iEditor; }
-	void TextChangedL();
-	void SetDialog(CPmHelpDialog* aDialog) { iDialog = aDialog; }
-private:
-	void ConstructFromResourceL(TResourceReader& aReader);
-	void SetContainerWindowL(const CCoeControl& aContainer);
-	TSize MinimumSize();
-	TInt LineHeight() const;                       // (1.14) the text's line, for whole lines
-	void SizeChangedL();
-	void PositionChanged();
-	void Layout();
-	TInt CountComponentControls() const;
-	CCoeControl* ComponentControl(TInt aIndex) const;
-	void Draw(const TRect& aRect) const;
-	TKeyResponse OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType);
-	void HandlePointerEventL(const TPointerEvent& aEvent);
-	void Model(TInt& aTotal, TInt& aShown, TInt& aAbove) const;
-	void DrawBar(CWindowGc& aGc) const;
-	void UpdateBar();
-	TInt ScrollL(TInt aMovement);
-	TBool AtEnd() const;
-	CEikRichTextEditor* iEditor;
-	CPmHelpDialog* iDialog;
-	TRect iBar;
-	TInt iAbove;               // pixels scrolled
-	TInt iPress;               // the pen: 1 up, 2 down, 3 the thumb
-	TInt iGrab;
 	};
 
 // Update PsiMail's progress window, as PsiTerm's: each step line by line (a

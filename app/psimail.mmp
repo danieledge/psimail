@@ -16,7 +16,7 @@ SOURCE        pmstatus.cpp pmheader.cpp pmlogin.cpp pmpreview.cpp pmrules.cpp
 SUBPROJECT    psimailinc\ui
 SOURCE        pmquote.cpp pmcalmodel.cpp
 SUBPROJECT    psitermssh
-SOURCE        pglinktest.cpp psigreyui.cpp pgsetup.cpp
+SOURCE        pglinktest.cpp psigreyui.cpp pgsetup.cpp psihelp.cpp
 SUBPROJECT    psicoreagenda
 SOURCE        pmcal.cpp pmcalc.cpp
 SUBPROJECT    psimail

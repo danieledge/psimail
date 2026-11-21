@@ -30,7 +30,7 @@
 
 #include <eikenv.h>
 #include "pmapp.h"
-#include "psierr.h"           // (1.12) Coda's words for an error (review R105)
+#include "psierr.h"           // (1.12) Coda's words for an error (review R105; 1.16: psion-core's ssh/psierr.h)
 
 _LIT(KOldStore, "?:\\PsiMail");
 _LIT(KNewStore, "?:\\System\\Data\\PsiMail");

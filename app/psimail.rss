@@ -27,6 +27,7 @@ NAME PSMA
 #include "psimail.hrh"
 #include "psilink.rh"           // (1.03) the shared connection words (psion-core)
 #include "psitbar.rh"           // (1.14) Coda's toolbar controls and the battery's fields (psion-core)
+#include "psihelp.hrh"          // (1.16) the family's help text control (psion-core)
 
 RESOURCE RSS_SIGNATURE { }
 
@@ -921,7 +922,8 @@ RESOURCE DIALOG r_pm_rename_dialog
 
 // Tools > Help on PsiMail: a topic list and its text. (1.14) The same in
 // PsiMail, PsiWeb and PsiTerm: 7 whole lines on a screen of 240, 12 on 480,
-// with a scroll bar (CPmHelpText sizes the text to whole lines of its font)
+// with a scroll bar only for a topic longer than the box (core's
+// CPsiHelpText, psihelp.h, sizes the text to whole lines of its font)
 RESOURCE DIALOG r_pm_help_dialog
 	{
 	title="Help on PsiMail";
@@ -931,7 +933,7 @@ RESOURCE DIALOG r_pm_help_dialog
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPmDlgHelpTopic;
 			control=CHOICELIST { array_id=r_pm_empty_array; }; },
-		DLG_LINE { type=EPmCtHelpText; prompt=""; id=EPmDlgHelpText;
+		DLG_LINE { type=EPsiCtHelpText; prompt=""; id=EPmDlgHelpText;
 			control=RTXTED { width=440; height=112; numlines=7; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}
@@ -946,7 +948,7 @@ RESOURCE DIALOG r_pm_help_dialog_tall
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt="Topic"; id=EPmDlgHelpTopic;
 			control=CHOICELIST { array_id=r_pm_empty_array; }; },
-		DLG_LINE { type=EPmCtHelpText; prompt=""; id=EPmDlgHelpText;
+		DLG_LINE { type=EPsiCtHelpText; prompt=""; id=EPmDlgHelpText;
 			control=RTXTED { width=440; height=216; numlines=12; textlimit=8000; flags=EEikEdwinNoAutoSelection|EEikEdwinReadOnly; }; }
 		};
 	}

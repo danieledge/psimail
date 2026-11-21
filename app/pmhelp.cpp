@@ -14,6 +14,7 @@
 #include <frmtview.h>
 #include <frmtlay.h>
 #include <barsread.h>
+#include "psihelp.h"            // (1.16) core's help text: whole lines, a bar only when needed
 
 struct TPmHelpTopic { const char* iTitle; const char* iText; };
 
@@ -396,250 +397,14 @@ static const TPmHelpTopic KHelpTopics[] =
 
 static const TInt KHelpCount = sizeof(KHelpTopics) / sizeof(KHelpTopics[0]);
 
-// ----- the text, with its scroll bar (0.75) ------------------------------------
+// ----- the text: core's (ssh/psihelp.h) -------------------------------------
 //
-// The help's text is a read-only rich text editor with a scroll bar beside
-// it, as EIKON's edwins in dialogs have. The edwin's own scroll bar frame
-// didn't keep its thumb up to date for a read-only text (and sat outside the
-// line unless told otherwise), so, as in the reader, the bar is drawn here
-// (PmDrawScrollBar) and the text scrolled with its view: Up and Down a line,
-// Pg Up and Pg Dn a page, Home and End, and the pen on the bar. Up at the
-// top goes back to the Topic line. The line's resource is the editor's
-// (RTXTED): its width is the text's, the bar comes on top.
-
-const TInt KHelpBarW = 23;                 // EIKON's scroll bar width
-
-CPmHelpText::~CPmHelpText()
-	{
-	delete iEditor;
-	}
-
-void CPmHelpText::ConstructFromResourceL(TResourceReader& aReader)
-	{
-	iEditor = new(ELeave) CEikRichTextEditor(TEikBorder(TEikBorder::ENone));
-	if (DrawableWindow())
-		iEditor->SetContainerWindowL(*this);
-	iEditor->ConstructFromResourceL(aReader);
-	}
-
-void CPmHelpText::SetContainerWindowL(const CCoeControl& aContainer)
-	{
-	CCoeControl::SetContainerWindowL(aContainer);
-	if (iEditor)
-		iEditor->SetContainerWindowL(*this);
-	}
-
-// (1.14) the text's box holds whole lines: 7 on a screen of 240, 12 on 480
-// (the same in PsiMail, PsiWeb and PsiTerm), never one cut through. The
-// line's height is the formatted text's own (its first line), once the
-// dialog has put a topic in
-TInt CPmHelpText::LineHeight() const
-	{
-	CTextLayout* lay = iEditor ? iEditor->TextLayout() : NULL;
-	TRect line;
-	TInt h = 0;
-	if (lay && lay->NumFormattedLines() > 0)
-		{
-		lay->GetLineRect(1, line);
-		h = line.Height();
-		}
-	if (h < 8 || h > 40)
-		h = CEikonEnv::Static()->NormalFont()->HeightInPixels() + 4;
-	return h;
-	}
-
-TSize CPmHelpText::MinimumSize()
-	{
-	TSize s = iEditor->MinimumSize();
-	TInt lines = PmTall() ? 12 : 7;
-	return TSize(s.iWidth + KHelpBarW + 2, lines * LineHeight() + 2);
-	}
-
-void CPmHelpText::SizeChangedL()
-	{
-	Layout();
-	}
-
-void CPmHelpText::PositionChanged()
-	{
-	Layout();
-	}
-
-void CPmHelpText::Layout()
-	{
-	if (!iEditor)
-		return;
-	TRect r = Rect();
-	r.Shrink(1, 1);
-	iBar = TRect(r.iBr.iX - KHelpBarW, r.iTl.iY, r.iBr.iX, r.iBr.iY);
-	TRAPD(err, iEditor->SetRectL(TRect(r.iTl, TPoint(iBar.iTl.iX, r.iBr.iY))));
-	(void)err;
-	}
-
-TInt CPmHelpText::CountComponentControls() const
-	{
-	return iEditor ? 1 : 0;
-	}
-
-CCoeControl* CPmHelpText::ComponentControl(TInt /*aIndex*/) const
-	{
-	return iEditor;
-	}
-
-void CPmHelpText::Model(TInt& aTotal, TInt& aShown, TInt& aAbove) const
-	{
-	CTextLayout* lay = iEditor->TextLayout();
-	aShown = iEditor->Rect().Height();
-	aTotal = lay ? lay->FormattedHeightInPixels() : aShown;
-	if (aTotal < aShown) aTotal = aShown;
-	aAbove = iAbove;
-	if (aAbove > aTotal - aShown) aAbove = aTotal - aShown;
-	if (aAbove < 0) aAbove = 0;
-	}
-
-void CPmHelpText::Draw(const TRect& /*aRect*/) const
-	{
-	CWindowGc& gc = SystemGc();
-	// the edit line's edge, as the dialog's other lines have it
-	gc.SetPenStyle(CGraphicsContext::ESolidPen);
-	gc.SetPenColor(KRgbBlack);
-	gc.SetBrushStyle(CGraphicsContext::ENullBrush);
-	gc.DrawRect(Rect());
-	DrawBar(gc);
-	}
-
-void CPmHelpText::DrawBar(CWindowGc& aGc) const
-	{
-	TInt total, shown, above;
-	Model(total, shown, above);
-	PmDrawScrollBar(aGc, iBar, total, shown, above, iPress);
-	}
-
-void CPmHelpText::UpdateBar()
-	{
-	if (!IsReadyToDraw())
-		return;
-	ActivateGc();
-	DrawBar(SystemGc());
-	DeactivateGc();
-	}
-
-// a new topic: at its top, without a cursor (it is for reading)
-void CPmHelpText::TextChangedL()
-	{
-	iAbove = 0;
-	iEditor->TextView()->SetCursorVisibilityL(TCursor::EFCursorInvisible, TCursor::EFCursorInvisible);
-	UpdateBar();
-	}
-
-// the end of the text is in view (no scrolling on into blank lines)
-TBool CPmHelpText::AtEnd() const
-	{
-	TInt total, shown, above;
-	Model(total, shown, above);
-	return iAbove >= total - shown;
-	}
-
-// scrolls the text: the pixels it moved (0 at the top or the end)
-TInt CPmHelpText::ScrollL(TInt aMovement)
-	{
-	TCursorPosition::TMovementType m = (TCursorPosition::TMovementType)aMovement;
-	TInt px = iEditor->TextView()->ScrollDisplayL(m);
-	if (px < 0) px = -px;
-	TBool down = m == TCursorPosition::EFLineDown || m == TCursorPosition::EFPageDown;
-	iAbove += down ? px : -px;
-	if (iAbove < 0) iAbove = 0;
-	iEditor->TextView()->SetCursorVisibilityL(TCursor::EFCursorInvisible, TCursor::EFCursorInvisible);
-	UpdateBar();
-	return px;
-	}
-
-TKeyResponse CPmHelpText::OfferKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType)
-	{
-	if (aType != EEventKey)
-		return EKeyWasNotConsumed;
-	switch (aKeyEvent.iCode)
-		{
-	case EKeyUpArrow:
-		if (iAbove <= 0 || ScrollL(TCursorPosition::EFLineUp) == 0)
-			{
-			iAbove = 0;
-			UpdateBar();
-			if (iDialog)
-				iDialog->TopicLineL();       // at the top: back to the Topic line
-			return EKeyWasConsumed;
-			}
-		return EKeyWasConsumed;
-	case EKeyDownArrow:
-		if (!AtEnd())
-			ScrollL(TCursorPosition::EFLineDown);
-		return EKeyWasConsumed;
-	case EKeyPageUp:
-		ScrollL(TCursorPosition::EFPageUp);
-		return EKeyWasConsumed;
-	case EKeyPageDown:
-		if (!AtEnd())
-			ScrollL(TCursorPosition::EFPageDown);
-		return EKeyWasConsumed;
-	case EKeyHome:
-		while (iAbove > 0 && ScrollL(TCursorPosition::EFPageUp) > 0) {}
-		iAbove = 0;
-		UpdateBar();
-		return EKeyWasConsumed;
-	case EKeyEnd:
-		{
-		for (TInt guard = 0; guard < 100 && !AtEnd() && ScrollL(TCursorPosition::EFPageDown) > 0; guard++) {}
-		return EKeyWasConsumed;
-		}
-	default:
-		return EKeyWasNotConsumed;
-		}
-	}
-
-// the pen on the bar: the arrows a line, the shaft a page, the thumb dragged
-void CPmHelpText::HandlePointerEventL(const TPointerEvent& aEvent)
-	{
-	TPoint p = aEvent.iPosition;
-	TInt total, shown, above;
-	Model(total, shown, above);
-	TRect shaft, thumb, up, down;
-	PmScrollBarParts(iBar, total, shown, above, shaft, thumb, up, down);
-	if (aEvent.iType == TPointerEvent::EButton1Down)
-		{
-		iPress = 0;
-		if (!iBar.Contains(p))
-			return;                          // (the text: nothing to select)
-		if (up.Contains(p)) { iPress = 1; ScrollL(TCursorPosition::EFLineUp); }
-		else if (down.Contains(p)) { iPress = 2; if (!AtEnd()) ScrollL(TCursorPosition::EFLineDown); }
-		else if (thumb.Contains(p)) { iPress = 3; iGrab = p.iY - thumb.iTl.iY; }
-		else if (p.iY < thumb.iTl.iY) ScrollL(TCursorPosition::EFPageUp);
-		else if (!AtEnd()) ScrollL(TCursorPosition::EFPageDown);
-		UpdateBar();
-		return;
-		}
-	if (aEvent.iType == TPointerEvent::EDrag && iPress == 3)
-		{
-		TInt room = shaft.Height() - thumb.Height();
-		if (room > 0 && total > shown)
-			{
-			TInt want = (p.iY - iGrab - shaft.iTl.iY) * (total - shown) / room;
-			for (TInt guard = 0; guard < 200; guard++)
-				{
-				TInt at = iAbove;
-				if (at + 12 < want && !AtEnd()) ScrollL(TCursorPosition::EFLineDown);
-				else if (at - 12 > want && at > 0) ScrollL(TCursorPosition::EFLineUp);
-				else break;
-				if (iAbove == at) break;
-				}
-			}
-		return;
-		}
-	if (aEvent.iType == TPointerEvent::EButton1Up && iPress)
-		{
-		iPress = 0;
-		UpdateBar();
-		}
-	}
+// (1.16) The help's text is psion-core's CPsiHelpText, as PsiTerm's: whole
+// lines (7 on 240, 12 on 480), scrolled a whole line at a time, so the top
+// line is never cut, and a scroll bar only when the topic is longer than the
+// box. Until 1.15 it was PsiMail's own CPmHelpText, which scrolled by pixels
+// and always drew its bar. Up at the top of the text goes back to the Topic
+// line (HelpTopLine).
 
 SEikControlInfo CPmHelpDialog::CreateCustomControlL(TInt aControlType)
 	{
@@ -647,9 +412,19 @@ SEikControlInfo CPmHelpDialog::CreateCustomControlL(TInt aControlType)
 	info.iControl = NULL;
 	info.iTrailerTextId = 0;
 	info.iFlags = 0;
-	if (aControlType == EPmCtHelpText)
-		info.iControl = new(ELeave) CPmHelpText;
+	if (aControlType == EPsiCtHelpText)
+		{
+		CPsiHelpText* t = new(ELeave) CPsiHelpText;
+		t->SetTop(TCallBack(HelpTopLine, this));
+		info.iControl = t;
+		}
 	return info;
+	}
+
+TInt CPmHelpDialog::HelpTopLine(TAny* aSelf)
+	{
+	TRAPD(err, ((CPmHelpDialog*)aSelf)->TopicLineL());
+	return err;
 	}
 
 void CPmAppUi::HelpL(TInt aTopic)
@@ -674,7 +449,6 @@ void CPmHelpDialog::PreLayoutDynInitL()
 	if (iTopic < 0 || iTopic >= KHelpCount)
 		iTopic = 0;
 	cl->SetCurrentItem(iTopic);
-	((CPmHelpText*)Control(EPmDlgHelpText))->SetDialog(this);
 	ShowTopicL(iTopic);
 	}
 
@@ -710,7 +484,8 @@ void CPmHelpDialog::ShowTopicL(TInt aTopic)
 			p.Replace(at + keep, 5, machine);
 			}
 		}
-	CEikRichTextEditor* ed = ((CPmHelpText*)Control(EPmDlgHelpText))->Editor();
+	CPsiHelpText* box = (CPsiHelpText*)Control(EPmDlgHelpText);
+	CEikRichTextEditor* ed = box->Editor();
 	ed->SetTextL(b);
 	TCharFormat cf;
 	TCharFormatMask cm;
@@ -719,7 +494,7 @@ void CPmHelpDialog::ShowTopicL(TInt aTopic)
 	ed->RichText()->ApplyCharFormatL(cf, cm, 0, title.Length());
 	ed->HandleTextChangedL();
 	ed->SetCursorPosL(0, EFalse);
-	((CPmHelpText*)Control(EPmDlgHelpText))->TextChangedL();
+	box->TextChangedL();                    // (at its top; a bar only if it is longer than the box)
 	CleanupStack::PopAndDestroy();          // b
 	}
 
@@ -727,7 +502,7 @@ void CPmHelpDialog::ShowTopicL(TInt aTopic)
 // moves into the text, where Up and Down scroll it)
 void CPmHelpDialog::PostLayoutDynInitL()
 	{
-	((CPmHelpText*)Control(EPmDlgHelpText))->TextChangedL();
+	((CPsiHelpText*)Control(EPmDlgHelpText))->TextChangedL();
 	TryChangeFocusToL(EPmDlgHelpTopic);
 	}
 
