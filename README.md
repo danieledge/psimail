@@ -37,6 +37,21 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.17
+
+- **Work offline is Shift+Ctrl+O** (File > Work offline). Shift+Ctrl+W is
+  PsiCast's key, in every program, to pause sharing the screen.
+- **Set up PsiMail asks about PsiProxy once.** "Pages and passwords cross
+  your network unencrypted" comes only when PsiProxy on a computer is new
+  to the settings, in a dialog that says why (between this Psion and
+  PsiProxy at its address - fine at home, not on public WiFi), not at every
+  OK.
+- **Connections over Psion Internet:** a server that refuses a connection no
+  longer makes the next one wait 8 seconds, and a connection made again
+  after a hang-up sends the start command (ATD777 for the PsiConnect Atom)
+  as the first one did.
+- The note after settings are put back from the card is a whole sentence.
+
 ## What's new in 1.15
 
 Less memory, above all with no memory card, when the mail is kept on C:
@@ -658,7 +673,7 @@ lists, anniversaries, more than one calendar account.
 | Shift+Up/Down (and Pg Up, Pg Dn, Home, End) | choose several messages: Delete, Move, Archive, Unread and Flagged act on all (1.05) |
 | Right / Left on a conversation | unfold / fold it (View > Show > Conversations, 1.05) |
 | Shift+Ctrl+C / Ctrl+U / Esc | check mail / disconnect / stop |
-| Shift+Ctrl+W | work offline |
+| Shift+Ctrl+O | work offline (1.17; Shift+Ctrl+W is PsiCast's pause key) |
 | Ctrl+N / Ctrl+R / Shift+Ctrl+R / Ctrl+W | new / reply / reply to all / forward |
 | Ctrl+D / Ctrl+X / Shift+Ctrl+X | delete / move to folder / archive |
 | Ctrl+Z | undo the last delete, move or archive |

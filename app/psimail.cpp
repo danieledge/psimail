@@ -124,7 +124,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.16");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.17");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -4336,7 +4336,8 @@ void CPmAppUi::EmailButtonStartL()
 	if (iKeptBack && !iAccountSetup)
 		{
 		iKeptBack = EFalse;
-		iEikonEnv->InfoWinL(_L("Settings put back from the card"), _L("Passwords are not kept there: PsiMail asks for each"));
+		// (1.17) a whole sentence: "asks for each" read as cut off (RN-10)
+		iEikonEnv->InfoWinL(_L("Settings put back from the card"), _L("Passwords are not kept on the card - PsiMail will ask for them"));
 		}
 	// (not on top of the first account's dialog: asked when that is closed)
 	// (1.14) not on Coda, where the Email icon opens PsiMail already, and
@@ -6219,7 +6220,9 @@ void CPmAppUi::DeleteAccountL()
 class CPmSetupDialog : public CPgSetupDialog
 	{
 public:
-	CPmSetupDialog() : CPgSetupDialog(R_PM_TEST_DIALOG, EPmDlgTest1) {}
+	// (1.17) core's PsiProxy question in its own dialog, asked only when
+	// PsiProxy is new to the settings (it was asked at every OK)
+	CPmSetupDialog() : CPgSetupDialog(R_PM_TEST_DIALOG, EPmDlgTest1, R_PGSU_QUERY_DIALOG) {}
 private:
 	void AppSaveL()
 		{

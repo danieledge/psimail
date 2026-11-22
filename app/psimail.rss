@@ -238,6 +238,9 @@ RESOURCE TOOLBAR r_pm_toolbar_coda
 // Shift+Ctrl+X, beside Ctrl+X's Move to folder (Archive is a move to the
 // Archive folder), and no longer Shift+Ctrl+E, a slip of Shift from Ctrl+E's
 // Close; Check this folder, which does no harm by a slip, has Shift+Ctrl+E.
+// (1.17) Work offline is Shift+Ctrl+O ("offline"; PsiMail has no objects
+// to insert): Shift+Ctrl+W is PsiCast's, which takes it in every program
+// to pause remote control.
 RESOURCE HOTKEYS r_pm_hotkeys
 	{
 	control=
@@ -265,7 +268,7 @@ RESOURCE HOTKEYS r_pm_hotkeys
 		{
 		HOTKEY { command=EPmCmdSendRecv; key='c'; },
 		HOTKEY { command=EPmCmdReplyAll; key='r'; },
-		HOTKEY { command=EPmCmdOffline; key='w'; },
+		HOTKEY { command=EPmCmdOffline; key='o'; },
 		HOTKEY { command=EPmCmdRefresh; key='e'; },
 		HOTKEY { command=EPmCmdOlder; key='g'; },
 		HOTKEY { command=EPmCmdZoomOut; key='m'; },
