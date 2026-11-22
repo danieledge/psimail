@@ -4434,6 +4434,9 @@ void CPmAppUi::ReserveConnRoom()
 				gap = TEikGroupControl(gap.iControl, gap.iId, 0, TEikGroupControl::ESetLength | TEikGroupControl::EAllowStretch);
 				TRAP(err, iToolBar->LayoutControlsL());
 				}
+			// (drawn again whole: the block's first look, drawn where the
+			// gap now is, left a letter of its "Battery" under the panel)
+			iToolBar->DrawDeferred();
 			return;
 			}
 	}
