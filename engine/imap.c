@@ -407,11 +407,45 @@ static int select_folder(const char *folder, UntaggedFn fn, void *ctx, char *why
 
 /* -------------------------------------------------------------- folders */
 
+/* (1.18) The list grows as the server lists folders (it was a fixed 80, and
+   Fastmail lists Sent, Trash and Spam after every other folder: an account
+   with 85 lost them). Up to FL_MAX folders are kept, and the standard ones
+   (Inbox, Sent, Drafts, Trash, Junk, Archive) always, in FL_SPARE more
+   places; the rest are counted in `more`, which folders.txt passes on to
+   the folder tree. 148 bytes a folder: 45 KB at the most, only while the
+   list is fetched. */
+#define FL_MAX 300
+#define FL_SPARE 8
+typedef struct { char name[128]; char kind; char delim; unsigned char byname; long total, unseen; int have_status; } FolderEnt;
 typedef struct
 	{
-	int n;
-	struct { char name[128]; char kind; char delim; long total, unseen; int have_status; } f[80];
+	int n, cap, more;
+	FolderEnt *f;
 	} FolderList;
+
+/* the standard folders' usual names, best first, for a server that doesn't
+   flag them (RFC 6154's \Sent and so on) */
+static const struct { char kind; const char *name; } std_names[] = {
+	{ 'S', "Sent" }, { 'S', "Sent Items" }, { 'S', "Sent Messages" }, { 'S', "Sent Mail" },
+	{ 'D', "Drafts" },
+	{ 'T', "Trash" }, { 'T', "Deleted Items" }, { 'T', "Deleted Messages" }, { 'T', "Bin" },
+	{ 'J', "Spam" }, { 'J', "Junk" }, { 'J', "Junk E-mail" }, { 'J', "Junk Email" }, { 'J', "Bulk Mail" },
+	{ 'A', "Archive" }, { 'A', "Archives" },
+};
+
+/* a folder named as a standard one, at the top level or under INBOX
+   ("INBOX.Sent"): its place in std_names + 1, or 0 */
+static unsigned char std_by_name(const char *name, char delim)
+{
+	const char *last = name, *p;
+	int i;
+	for (p = name; *p; p++)
+		if (*p == delim) last = p + 1;
+	if (last != name && !(last - name == 6 && !pm_strncasecmp(name, "INBOX", 5))) return 0;
+	for (i = 0; i < (int)(sizeof(std_names) / sizeof(std_names[0])); i++)
+		if (!pm_strcasecmp(last, std_names[i].name)) return (unsigned char)(i + 1);
+	return 0;
+}
 
 static void on_list(ImapNode *r, void *ctx)
 {
@@ -420,8 +454,10 @@ static void on_list(ImapNode *r, void *ctx)
 	if (!w) return;
 	if (ip_eq(w, "LIST")) {
 		ImapNode *attrs = w->next, *delim = attrs ? attrs->next : 0, *name = delim ? delim->next : 0, *a;
-		char kind = '-', d[4];
-		if (!name || fl->n >= 80) return;
+		char kind = '-', d[4], nm[128];
+		unsigned char byname = 0;
+		FolderEnt *e;
+		if (!name) return;
 		for (a = attrs->child; a; a = a->next) {
 			if (ip_eq(a, "\\Noselect") || ip_eq(a, "\\NonExistent")) kind = 'N';
 			else if (ip_eq(a, "\\Sent")) kind = 'S';
@@ -431,12 +467,29 @@ static void on_list(ImapNode *r, void *ctx)
 			else if (ip_eq(a, "\\Archive")) kind = 'A';
 		}
 		ip_str(delim, d, sizeof(d));
-		ip_str(name, fl->f[fl->n].name, sizeof(fl->f[0].name));
-		if (!pm_strcasecmp(fl->f[fl->n].name, "INBOX")) { strcpy(fl->f[fl->n].name, "INBOX"); kind = 'I'; }
-		fl->f[fl->n].kind = kind;
-		fl->f[fl->n].delim = d[0] ? d[0] : '/';
-		fl->f[fl->n].total = fl->f[fl->n].unseen = -1;
-		fl->n++;
+		if (!d[0]) d[0] = '/';
+		ip_str(name, nm, sizeof(nm));
+		if (!pm_strcasecmp(nm, "INBOX")) { strcpy(nm, "INBOX"); kind = 'I'; }
+		if (kind == '-') byname = std_by_name(nm, d[0]);
+		/* past FL_MAX, only the standard folders (a few at the most) */
+		if (fl->n >= FL_MAX + FL_SPARE || (fl->n >= FL_MAX && (kind == '-' || kind == 'N') && !byname)) {
+			fl->more++;
+			return;
+		}
+		if (fl->n == fl->cap) {
+			int nc = fl->cap + 32;
+			FolderEnt *n2 = (FolderEnt *)realloc(fl->f, nc * sizeof(FolderEnt));
+			if (!n2) { fl->more++; return; }             /* (told as not shown) */
+			fl->f = n2;
+			fl->cap = nc;
+		}
+		e = &fl->f[fl->n++];
+		memset(e, 0, sizeof(*e));
+		strcpy(e->name, nm);
+		e->kind = kind;
+		e->byname = byname;
+		e->delim = d[0];
+		e->total = e->unseen = -1;
 	} else if (ip_eq(w, "STATUS")) {
 		char name[128];
 		ImapNode *items;
@@ -453,9 +506,37 @@ static void on_list(ImapNode *r, void *ctx)
 	}
 }
 
+/* (1.18) The standard folders the server didn't flag, found by their names
+   (the best-named of each kind), then the list put in the order it is
+   shown: the Inbox and the standard folders first, as mail programs show
+   them, then the rest as the server listed them (children stay under their
+   parents) */
+static void order_folders(FolderList *fl)
+{
+	static const char order[] = "IDSAJT";
+	FolderEnt t;
+	int i, j, k, o, best;
+	for (o = 1; order[o]; o++) {
+		for (i = 0; i < fl->n && fl->f[i].kind != order[o]; i++) ;
+		if (i < fl->n) continue;                     /* flagged by the server */
+		for (best = -1, i = 0; i < fl->n; i++)
+			if (fl->f[i].kind == '-' && fl->f[i].byname && std_names[fl->f[i].byname - 1].kind == order[o] &&
+					(best < 0 || fl->f[i].byname < fl->f[best].byname))
+				best = i;
+		if (best >= 0) fl->f[best].kind = order[o];
+	}
+	for (k = 0, o = 0; order[o]; o++)
+		for (i = k; i < fl->n; i++)
+			if (fl->f[i].kind == order[o]) {
+				t = fl->f[i];
+				for (j = i; j > k; j--) fl->f[j] = fl->f[j - 1];
+				fl->f[k++] = t;
+			}
+}
+
 /* (1.15) A folder deleted or renamed from another program left its
    F<hash> folder (every message's files) on the store for good. After a
-   whole LIST - nothing damaged, not cut at 80 - the account's F<hash>
+   whole LIST - nothing damaged, none left out - the account's F<hash>
    folders that match no listed folder go. INBOX always stays. */
 typedef struct { FolderList *list; int acct; char adir[160]; } DirSweep;
 
@@ -489,34 +570,35 @@ static int list_folders(int acct, FolderList *flp, char *why, int whymax);
 
 int imap_list_folders(int acct, char *why, int whymax)
 {
-	/* (1.15) taken for the list only (11.5 KB), not a static for as long as
-	   the engine runs */
-	FolderList *fl = (FolderList *)malloc(sizeof(FolderList));
+	/* (1.15) taken for the list only, not a static for as long as the
+	   engine runs; (1.18) it grows as the server lists folders */
+	FolderList fl;
 	int r;
-	if (!fl) { set_why(why, whymax, "Not enough memory for the folder list"); return PM_RES_FAILED; }
-	r = list_folders(acct, fl, why, whymax);
-	free(fl);
+	memset(&fl, 0, sizeof(fl));
+	r = list_folders(acct, &fl, why, whymax);
+	free(fl.f);
 	return r;
 }
 
 static int list_folders(int acct, FolderList *flp, char *why, int whymax)
 {
 #define fl (*flp)
-	static const char order[] = "IDSAJT-N";
 	char dir[160], path[190], tmp[190], disp[128];
 	FILE *f;
-	int r, i, o, damaged;
+	int r, i, damaged;
 
 	if ((r = imap_open(acct, why, whymax)) != PM_RES_OK) return r;
 	pm_progress("Getting the folder list\x85");
-	memset(&fl, 0, sizeof(fl));
 	damaged = g_damaged;
 	if (has_cap("LIST-STATUS") && has_cap("SPECIAL-USE"))
 		r = cmd(on_list, &fl, why, whymax, "LIST \"\" \"*\" RETURN (SPECIAL-USE STATUS (MESSAGES UNSEEN))");
 	else
 		r = cmd(on_list, &fl, why, whymax, "LIST \"\" \"*\"");
 	if (r != PM_RES_OK) return r;
-	if (fl.n > 0 && fl.n < 80 && g_damaged == damaged) {
+	if (fl.n == 0 && fl.more) { set_why(why, whymax, "Not enough memory for the folder list"); return PM_RES_FAILED; }
+	order_folders(&fl);
+	if (fl.more) pm_log("imap: %d folders listed, %d more not kept", fl.n, fl.more);
+	if (fl.n > 0 && !fl.more && g_damaged == damaged) {
 		static DirSweep ds;
 		ds.list = &fl;
 		ds.acct = acct;
@@ -536,15 +618,16 @@ static int list_folders(int acct, FolderList *flp, char *why, int whymax)
 	snprintf(tmp, sizeof(tmp), "%sfolders.new", dir);
 	if (!(f = fopen(tmp, "w"))) { pm_write_why(why, whymax, "the folder list", path); return PM_RES_FAILED; }
 	fprintf(f, "#PSIMAIL1\n");
-	/* INBOX and the special folders first, then the rest as the server lists them */
-	for (o = 0; order[o]; o++)
-		for (i = 0; i < fl.n; i++) {
-			if (fl.f[i].kind != order[o]) continue;
-			cs_mutf7_decode(fl.f[i].name, disp, sizeof(disp));
-			if (fl.f[i].kind == 'I') strcpy(disp, "Inbox");
-			fprintf(f, "%c\t%ld\t%ld\t%s\t%s\t%c\n", fl.f[i].kind, fl.f[i].unseen, fl.f[i].total,
-				fl.f[i].name, disp, fl.f[i].delim);
-		}
+	/* (1.18) folders the list has no room for: the folder tree says so */
+	if (fl.more) fprintf(f, "#MORE\t%d\n", fl.more);
+	/* INBOX and the standard folders first, then the rest as the server
+	   lists them (order_folders) */
+	for (i = 0; i < fl.n; i++) {
+		cs_mutf7_decode(fl.f[i].name, disp, sizeof(disp));
+		if (fl.f[i].kind == 'I') strcpy(disp, "Inbox");
+		fprintf(f, "%c\t%ld\t%ld\t%s\t%s\t%c\n", fl.f[i].kind, fl.f[i].unseen, fl.f[i].total,
+			fl.f[i].name, disp, fl.f[i].delim);
+	}
 	if (pm_fclose(f) != 0 || pm_replace(tmp, path) != 0) {
 		remove(tmp);                          /* the old list stays */
 		pm_write_why(why, whymax, "the folder list", path);

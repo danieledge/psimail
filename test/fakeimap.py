@@ -5,6 +5,7 @@
               [--mute-noop] [--no-uidplus] [--arrive N[,N...]] [--invite]
               [--user NAME] [--idle-arrive SECS] [--many N] [--hide UID,..]
               [--fat-flags UID:N] [--cut-flags N] [--crafted]
+              [--fastmail N] [--names-only] [--list-status]
 
 Serves an INBOX of a few messages: one whose text has "NO CARRIER" on a
 line of its own (as an email about modems would), one of 30 KB (several
@@ -43,6 +44,14 @@ encoded-word subject and an RFC 2231 file name that each decode to a
 newline and a tab, and a 400 KB attachment; 302 whose attachment is far
 bigger than its BODYSTRUCTURE says (2000 octets); 303 with a small
 attachment called dup.txt.
+--fastmail N lists N folders as Fastmail does (foldertest.sh, PsiMail
+1.18): the Inbox, Drafts, then the person's own folders (one tree under a
+folder that holds no messages), then Scheduled, Archive, Sent, Snoozed, Spam
+and Trash last, flagged \\Archive, \\Sent, \\Junk and \\Trash (RFC 6154).
+--names-only leaves the flags out and names them as Exchange does (Sent
+Items, Deleted Items, Junk E-mail), for a server without SPECIAL-USE.
+--list-status adds LIST-STATUS and SPECIAL-USE to the capabilities and sends
+each folder's STATUS with the LIST, as Fastmail does.
 --news DIR adds the newsletters in test/html/ as messages 201-206, with
 pictures from DIR (made by newspics.py): 201 and 202 point at pictures on
 the web (http://pics.example/..., for a local web server: see newspics.py),
@@ -67,6 +76,9 @@ MANY = 0
 HIDE = []
 FAT = None
 CUT_FLAGS = 0
+FASTMAIL = 0
+NAMES_ONLY = False
+LIST_STATUS = False
 args = sys.argv[2:]
 while args:
     a = args.pop(0)
@@ -85,7 +97,10 @@ while args:
     elif a == '--fat-flags': FAT = [int(x) for x in args.pop(0).split(':')]
     elif a == '--cut-flags': CUT_FLAGS = int(args.pop(0))
     elif a == '--crafted': CRAFTED = True
-CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE') + (' IDLE' if IDLE_ARRIVE is not None else '')
+    elif a == '--fastmail': FASTMAIL = int(args.pop(0))
+    elif a == '--names-only': NAMES_ONLY = True
+    elif a == '--list-status': LIST_STATUS = True
+CAPS = 'IMAP4rev1 LITERAL+' + ('' if NO_UIDPLUS else ' UIDPLUS MOVE') + (' IDLE' if IDLE_ARRIVE is not None else '') + (' LIST-STATUS SPECIAL-USE' if LIST_STATUS else '')
 
 def msg(uid, subject, text):
     return dict(uid=uid, subject=subject, text=text.replace('\n', '\r\n'), msgid='<%d@example.com>' % uid, deleted=False)
@@ -205,6 +220,24 @@ FOLDERS = [
     dict(name='Work', attrs='\\HasChildren'),
     dict(name='Work/Ideas &- Pl&AOQ-ne', attrs='\\HasNoChildren'),
 ]
+if FASTMAIL:
+    # the special ones last, as Fastmail lists them; --names-only: no flags,
+    # Exchange's names
+    if NAMES_ONLY:
+        last = [('Scheduled', ''), ('Archive', ''), ('Sent Items', ''), ('Snoozed', ''),
+                ('Junk E-mail', ''), ('Deleted Items', '')]
+    else:
+        last = [('Scheduled', ''), ('Archive', '\\Archive'), ('Sent', '\\Sent'), ('Snoozed', ''),
+                ('Spam', '\\Junk'), ('Trash', '\\Trash')]
+    FOLDERS = [dict(name='INBOX', attrs='\\HasNoChildren'),
+               dict(name='Drafts', attrs='' if NAMES_ONLY else '\\Drafts'),
+               dict(name='Alerts', attrs='\\Noselect'),
+               dict(name='Alerts/System Alerts', attrs='')]
+    own = FASTMAIL - len(FOLDERS) - len(last)
+    for i in range(max(own, 0)):
+        FOLDERS.append(dict(name='Folder %03d' % (i + 1), attrs=''))
+    for n, a in last:
+        FOLDERS.append(dict(name=n, attrs=a))
 folders_lock = threading.Lock()
 
 def unquote(s):
@@ -220,6 +253,8 @@ def list_lines():
         attrs = ' '.join(a for a in attrs.split() if a not in ('\\HasChildren', '\\HasNoChildren'))
         attrs = ('\\HasChildren ' if kids else '\\HasNoChildren ') + attrs
         out += '* LIST (%s) "/" "%s"\r\n' % (attrs.strip(), fo['name'])
+        if LIST_STATUS and '\\Noselect' not in attrs:
+            out += '* STATUS "%s" (MESSAGES %d UNSEEN 0)\r\n' % (fo['name'], len(box(fo['name'])['msgs']))
     return out
 
 class Drop(Exception): pass

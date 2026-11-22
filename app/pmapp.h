@@ -282,6 +282,7 @@ public:
 	void FolderChangedL(const PmCmd& aCmd);  // a folder was made, renamed or deleted
 	const TDesC8& FolderImap() const { return iFolder; }
 	TInt FolderCount() const;
+	TInt FoldersNotShown() const { return iFoldersMore; }
 	const TPmFolder& FolderAt(TInt aIndex) const;
 	void FocusFoldersL();
 	void StartInstallerL(const TDesC& aFile);
@@ -537,6 +538,7 @@ private:
 	TBuf<60> iSearchWords;
 	TBuf8<128> iFolder;              // IMAP name of the open folder
 	CArrayFixFlat<TPmFolder>* iFolders;
+	TInt iFoldersMore;               // (1.18) folders on the server the list has no room for (folders.txt's #MORE)
 	CArrayFixFlat<TPmRow>* iRows;    // newest first
 	TUint iOpenThread[16];           // (1.05) conversations unfolded (their first messages' uids)
 	TInt iOpenThreads;

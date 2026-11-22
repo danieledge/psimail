@@ -1062,6 +1062,7 @@ void CPmView::AccountChangedL()
 void CPmView::LoadFoldersL()
 	{
 	iFolders->Reset();
+	iFoldersMore = 0;
 	TBuf<120> path;
 	StoreDir(path);
 	path.AppendFormat(_L("A%d\\folders.txt"), iSettings->iAcct);
@@ -1078,6 +1079,11 @@ void CPmView::LoadFoldersL()
 		rest.Set(nl >= 0 ? rest.Mid(nl + 1) : TPtrC());
 		if (line.Length() && line[line.Length() - 1] == '\r')
 			line.Set(line.Left(line.Length() - 1));
+		if (line.Length() > 6 && line.Left(6) == _L("#MORE\t"))
+			{
+			iFoldersMore = ToInt(line.Mid(6));   // (1.18)
+			continue;
+			}
 		if (line.Length() < 3 || line[0] == '#')
 			continue;
 		TPmFolder f;
@@ -5970,7 +5976,11 @@ void CPmAppUi::FoldersL()
 	names->AppendL(_L("Calendar"));
 	TInt choice = iView->CurrentSidebarItem();
 	CleanupStack::Pop();                    // the dialog takes the names
-	CPmChoiceDialog* dlg = new(ELeave) CPmChoiceDialog(_L("Go to folder"), _L("Folder"), names, choice);
+	// (1.18) the server has more folders than the list keeps: the title says so
+	TBuf<40> title(_L("Go to folder"));
+	if (iView->FoldersNotShown() > 0)
+		title.AppendFormat(_L(" (%d not shown)"), iView->FoldersNotShown());
+	CPmChoiceDialog* dlg = new(ELeave) CPmChoiceDialog(title, _L("Folder"), names, choice);
 	if (dlg->ExecuteLD(R_PM_CHOICE_DIALOG) && choice >= 0 && choice < n + 2)
 		iView->OpenSidebarItemL(choice);
 	}

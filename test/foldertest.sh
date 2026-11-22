@@ -2,7 +2,10 @@
 # foldertest.sh [psimail-host] - folder commands against fakeimap.py:
 # create (top level and under Work, a non-ASCII name sent as modified
 # UTF-7), rename (the local files follow), delete (refused for the Inbox, a
-# standard folder and a folder with children; offline).
+# standard folder and a folder with children; offline). Then (1.18) a long
+# list as Fastmail sends it, the standard folders last: they are all kept
+# and put first, flagged (RFC 6154) or by their names, and a list longer
+# than PsiMail keeps says how many are left out.
 set -u
 # the engine's text is Windows-1252: in a UTF-8 locale grep took the 0xE9 of
 # the non-ASCII name for binary and the test failed with nothing wrong
@@ -46,5 +49,42 @@ check "delfolder: OK Folder deleted" "$(run delfolder "Work/Old notes")"
 [ -z "$(ls -d "$STORE"/A0/F* 2>/dev/null)" ] && echo "ok: its files went too" || { echo "FAIL: store dir left"; fail=1; }
 grep -q 'Old notes' "$STORE/A0/folders.txt" && { echo "FAIL: still in folders.txt"; fail=1; } || echo "ok: gone from folders.txt"
 check "delfolder: FAILED No such folder" "$(run delfolder Nowhere)"
+kill $SRV 2>/dev/null; wait $SRV 2>/dev/null
+
+# (1.18) many folders. many PORT ARGS...: a fresh store, folders, the list
+many() {
+	local port=$1; shift
+	rm -rf "$STORE/m"; mkdir -p "$STORE/m"
+	python3 "$HERE/fakeimap.py" $port "$@" > "$STORE/m.log" 2>&1 &
+	SRV=$!
+	sleep 0.5
+	PM_PORT=$port "$H" -s "$STORE/m" folders 2>/dev/null | grep -v '^\['
+	kill $SRV 2>/dev/null; wait $SRV 2>/dev/null
+}
+FT=$STORE/m/A0/folders.txt
+kinds() { grep -v '^#' "$FT" | head -${1:-6} | awk -F'\t' '{printf "%s:%s ", $1, $4}'; }
+check "folders: OK " "$(many 1181 --fastmail 85)"
+check "85" "$(grep -vc '^#' "$FT")"
+check "I:INBOX D:Drafts S:Sent A:Archive J:Spam T:Trash " "$(kinds)"
+grep -q '^#MORE' "$FT" && { echo "FAIL: #MORE with nothing left out"; fail=1; } || echo "ok: no #MORE"
+check "N:Alerts -:Alerts/System Alerts " "$(grep -v '^#' "$FT" | sed -n 7,8p | awk -F'\t' '{printf "%s:%s ", $1, $4}')"
+grep -q '	Snoozed	' "$FT" && grep -q '	Scheduled	' "$FT" && echo "ok: Snoozed and Scheduled listed" || { echo "FAIL: the last folders"; fail=1; }
+grep -q 'STATUS "Trash"' "$STORE/m.log" && echo "ok: the standard folders counted first" || { echo "FAIL: Trash not counted"; fail=1; }
+
+check "folders: OK " "$(many 1182 --fastmail 85 --names-only)"
+check "I:INBOX D:Drafts S:Sent Items A:Archive J:Junk E-mail T:Deleted Items " "$(kinds)"
+
+check "folders: OK " "$(many 1183 --fastmail 85 --list-status)"
+grep -q 'LIST "" "\*" RETURN (SPECIAL-USE STATUS' "$STORE/m.log" && echo "ok: LIST RETURN (SPECIAL-USE STATUS)" || { echo "FAIL: no LIST-STATUS"; fail=1; }
+check "T	0	0	Trash" "$(grep '^T' "$FT" | cut -f1-4)"
+grep -q '< P0.. STATUS' "$STORE/m.log" && { echo "FAIL: STATUS sent though LIST gave it"; fail=1; } || echo "ok: no STATUS commands"
+
+# more than PsiMail keeps (300): the standard ones still in, the rest counted
+check "folders: OK " "$(many 1184 --fastmail 420)"
+check "304" "$(grep -vc '^#' "$FT")"
+check "I:INBOX D:Drafts S:Sent A:Archive J:Spam T:Trash " "$(kinds)"
+check "#MORE	116" "$(grep '^#MORE' "$FT")"
+check "Folder 296" "$(grep -v '^#' "$FT" | tail -1 | cut -f4)"
+
 [ $fail = 0 ] && echo "ALL OK" || echo "FAILED"
 exit $fail

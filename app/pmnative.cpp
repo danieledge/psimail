@@ -1030,6 +1030,13 @@ void CPmView::UpdateFolderListL()
 		}
 	else
 		line = _L("Mail");
+	// (1.18) more folders on the server than the list keeps (the standard
+	// ones are always in it): said on the account's line
+	if (iFoldersMore > 0)
+		{
+		if (line.Length() > 40) line.SetLength(40);
+		line.AppendFormat(_L(" (%d not shown)"), iFoldersMore);
+		}
 	fresh->AppendL(line);
 	depth->AppendL(0);
 	icon->AppendL(EMbmFolderOpen);
