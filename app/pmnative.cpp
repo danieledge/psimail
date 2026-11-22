@@ -1031,11 +1031,12 @@ void CPmView::UpdateFolderListL()
 	else
 		line = _L("Mail");
 	// (1.18) more folders on the server than the list keeps (the standard
-	// ones are always in it): said on the account's line
+	// ones are always in it): "(+116)" on the account's line, short enough
+	// for the column; View > Go to > Folder's title says "116 not shown"
 	if (iFoldersMore > 0)
 		{
 		if (line.Length() > 40) line.SetLength(40);
-		line.AppendFormat(_L(" (%d not shown)"), iFoldersMore);
+		line.AppendFormat(_L(" (+%d)"), iFoldersMore);
 		}
 	fresh->AppendL(line);
 	depth->AppendL(0);

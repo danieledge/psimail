@@ -240,7 +240,7 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "Every folder on the server is in the list on the left, with the number of unread messages after "
 	  "its name. Standard folders - Inbox, Sent, Drafts, Trash, Junk and Archive - come first and have "
 	  "their own pictures. The list holds up to 300 other folders; if the server has more, the "
-	  "account's line says how many are not shown.\n"
+	  "account's line shows how many more (+20), and so does View > Go to > Folder.\n"
 	  "\n"
 	  "File > Folder > Create new makes a folder, at the top level or inside another one. File > Folder "
 	  "> Rename and Delete act on the highlighted folder (or the open one). The Inbox and the standard "
