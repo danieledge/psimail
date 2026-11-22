@@ -3145,6 +3145,10 @@ void CPmView::ConnPanelText(TInt& aLight, TDes& aText) const
 	TBool modem = iSettings->iNetMode == 0;
 	const PmAccount& a = iSettings->iAccounts[iSettings->iAcct];
 	TBool atomTls = modem && (iSettings->iSpare[0] & KPmModemTlsBit);
+	// (1.18) "Mail on" or "Mail off": on Coda the toolbar's own Internet
+	// line sits just below, and "Offline" here beside its "Online" read as
+	// a contradiction (this is the mail server's connection, that the
+	// Internet link). "Mail online" did not fit the box
 	// (1.14) in a word or two that fit the box: Online or Offline (amber
 	// while it connects; working offline is ticked on the File menu), the
 	// route, whether it is secure, and when the mail was last checked - the
@@ -3152,12 +3156,12 @@ void CPmView::ConnPanelText(TInt& aLight, TDes& aText) const
 	if (iShared && iShared->online && !iSettings->iOffline)
 		{
 		aLight = (a.used && a.imap_tls == PM_TLS_NONE && !atomTls) ? 3 : 2;
-		aText = _L("Online");
+		aText = _L("Mail on");
 		}
 	else
 		{
 		aLight = !iSettings->iOffline && iShared && iShared->busy ? 1 : 0;
-		aText = _L("Offline");
+		aText = _L("Mail off");
 		}
 	aText.Append('\n');
 	aText.Append(modem ? _L("By modem") : _L("By network"));

@@ -1259,6 +1259,7 @@ public:
 	TBool iSoonBusy;                               // (1.11) EmailButtonStartL is running (its dialogs)
 	void KeepOnCard();                             // (1.11) the card's copies of PsiMail.ini and Calendar.ini, without passwords   // (1.00) a command from the view's own controls (the preview's actions)
 	void PlaceConnPanel();                         // (1.00) the toolbar's connection panel: into the gap, or hidden
+	void ReserveConnRoom();                        // (1.18) ... its gap kept from Coda's toolbar
 	void RefreshConnPanel();                       // ... drawn again if what it says changed
 	TBool iColour;                                 // (0.96) a colour screen: the netBook, the Series 7
 	TBool iTall;                                   // ... of 400 lines or more

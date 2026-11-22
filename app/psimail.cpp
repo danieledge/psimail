@@ -124,7 +124,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.17");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.18");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -4183,6 +4183,7 @@ void CPmAppUi::ConstructL()
 		// (1.00) the connection panel in the toolbar's gap (tall screens)
 		TRAPD(cp, iConnPanel = CPmConnPanel::NewL(*iView));
 		(void)cp;
+		ReserveConnRoom();
 		PlaceConnPanel();
 		}
 	iCoeEnv->RootWin().EnableOnEvents(EEventControlAlways);   // (0.68) switch-on events even when in the background
@@ -4399,6 +4400,36 @@ void CPmAppUi::ToolbarPicturesL()
 	ButtonPictureL(EPmCmdSendRecv, EMbmToolCheck);
 	ButtonPictureL(EPmCmdTool4, EMbmToolDelete);
 	iToolBar->DrawNow();
+	}
+
+// (1.18) Coda's toolbar spreads its battery, memory and Internet lines
+// over the free room it finds (PsiBatt.dll), which left the panel no gap:
+// the gap after the buttons is kept for it, as the toolbar's stretching
+// spacer's own length, which Coda's toolbar counts as taken. Undone if
+// the toolbar then runs past its foot (a toolbar with no room for both).
+const TInt KPmConnRoom = 80 + 12;           // PlaceConnPanel's box and its 6 pixels each side
+
+void CPmAppUi::ReserveConnRoom()
+	{
+	CArrayFix<TEikGroupControl>* a = iToolBar ? iToolBar->ControlArray() : NULL;
+	CCoeControl* last = iToolBar ? iToolBar->ControlById(EPmCmdTool4) : NULL;
+	TInt n = a ? a->Count() : 0;
+	for (TInt i = 0; last && i + 1 < n; i++)
+		if (a->At(i).iControl == last)
+			{
+			TEikGroupControl& gap = a->At(i + 1);
+			if (!gap.IsStretchable() || i + 2 >= n)
+				return;
+			gap.SetLength(KPmConnRoom);
+			TRAPD(err, iToolBar->LayoutControlsL());
+			CCoeControl* end = a->At(n - 1).iControl;
+			if (err != KErrNone || end->Position().iY + end->Size().iHeight > iToolBar->Size().iHeight)
+				{
+				gap = TEikGroupControl(gap.iControl, gap.iId, 0, TEikGroupControl::ESetLength | TEikGroupControl::EAllowStretch);
+				TRAP(err, iToolBar->LayoutControlsL());
+				}
+			return;
+			}
 	}
 
 void CPmAppUi::PlaceConnPanel()
