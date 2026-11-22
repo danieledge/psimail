@@ -37,6 +37,15 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.19
+
+- **The Email icon on the netBook and the Series 7.** "Email icon opens:
+  PsiMail" took the key of the 5mx's Email icon, which on the netBook and
+  the Series 7 is the Contacts icon: Contacts opened PsiMail. PsiMail now
+  takes the Email icon's own key on each Psion (from the System screen's
+  list of icons), and on Coda, whose Email icon opens PsiMail already, it
+  takes no key at all, even with the setting on from an older version.
+
 ## What's new in 1.17
 
 - **Work offline is Shift+Ctrl+O** (File > Work offline). Shift+Ctrl+W is
@@ -807,9 +816,13 @@ Like PsiWeb, two programs share a chunk of memory (`psimail.h`):
   hand-drawn screens and their built-in fonts are gone; everything is
   drawn with EIKON's own controls and fonts.
 * `button/`: the Email icon. The EIKON server turns a tap on the icons
-  below the screen into keys (the Email icon is `EEikAppbarApp5Key`), which
-  the System screen captures to start the built-in programs; the newest
-  capture of a key wins. `pmbutton.exe` captures that one key (again
+  below the screen into keys (`EEikAppbarSystemKey` + the icon's place),
+  which the System screen captures to start the built-in programs; the
+  newest capture of a key wins. The Email icon is `EEikAppbarApp5Key` on
+  the 5mx and `EEikAppbarApp1Key` on the netBook and the Series 7, whose
+  Shell keeps its icons as a list of UIDs in `Shell.rsc`: `pmbutton.exe`
+  finds Email's place there (no list: the 5mx's key; a list without Email,
+  as on Coda: it takes nothing and stops). It captures that one key (again
   whenever a window group comes or goes, so it stays the newest) and brings
   PsiMail to the front or opens it; it has no window and sleeps on the
   window server. It runs only while `C:\System\Apps\PsiMail\Button.ini`

@@ -4,7 +4,12 @@
 // key events (RWindow::AddKeyRect in eiksrv.cpp): EEikAppbarSystemKey for the
 // System icon, then EEikAppbarApp1Key.. for the rest. On the Series 5mx the
 // icons are System, Word, Sheet, Contacts, Agenda, Email, Calc, Jotter,
-// Extras, so Email is EEikAppbarApp5Key. The System screen captures those
+// Extras, so Email is EEikAppbarApp5Key. (1.19) On the netBook and the
+// Series 7 the order is another (System, Email, Web, Word, Sheet, Contacts,
+// Agenda, Time, Calc, Jotter, from the Shell's list in Shell.RSC), so Email
+// is EEikAppbarApp1Key and App5 is Contacts: taking App5 there made the
+// Contacts icon open PsiMail. The key is now found from that list (EmailKey
+// below). The System screen captures those
 // keys (RWindowGroup::CaptureKey) and starts the built-in programs; there is
 // no setting that changes which program it starts. The most recent capture
 // of a key wins, so this program captures the Email key after the System
@@ -36,7 +41,7 @@
 
 const TUid KUidPsiMail = { 0x01000A7C };
 const TUid KUidPmButton = { 0x01000A80 };
-const TInt KEmailKey = EEikAppbarApp5Key;
+static TInt gEmailKey = EEikAppbarApp5Key;   // (1.19) set by EmailKey() at the start
 const TInt KRecaptureDelay = 3000000;   // and once more 3 s after a window group change
 
 _LIT(KMutexName, "PsiMailButton");
@@ -51,6 +56,68 @@ static TBool Wanted(RFs& aFs)
 	{
 	TEntry entry;
 	return aFs.Entry(KMarker, entry) == KErrNone;
+	}
+
+// (1.19) The Email icon's key on this Psion. The netBook's and the Series 7's
+// Shell keep their program icons as a list of 14 UIDs in Shell.RSC (a count
+// of 14, then the System screen's UID first); the icon at place k sends
+// EEikAppbarSystemKey + k. Email's UID found in it: that key. The list there
+// without Email (Coda's netBook, whose Email icon opens PsiMail already):
+// 0, nothing to take. No such list (the Series 5mx, whose Shell has its
+// icons in its code): EEikAppbarApp5Key, as before.
+_LIT(KShellRsc, "Z:\\System\\Apps\\Shell\\Shell.rsc");
+const TInt KShellSlots = 14;
+const TUint32 KUidShellApp = 0x10000076;
+const TUint32 KUidEmailApp = 0x10000FFB;
+
+static TUint32 U32(const TUint8* p)
+	{
+	return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
+	}
+
+static TInt EmailKey(RFs& aFs)
+	{
+	RFile f;
+	if (f.Open(aFs, KShellRsc, EFileRead | EFileShareReadersOnly) != KErrNone)
+		return EEikAppbarApp5Key;
+	TInt size = 0;
+	HBufC8* buf = NULL;
+	if (f.Size(size) == KErrNone && size > 0 && size <= 65536)
+		buf = HBufC8::New(size);
+	TInt err = buf ? KErrNone : KErrNoMemory;
+	if (buf)
+		{
+		TPtr8 p(buf->Des());
+		err = f.Read(p);
+		}
+	f.Close();
+	if (err != KErrNone)
+		{
+		delete buf;
+		return EEikAppbarApp5Key;
+		}
+	const TUint8* b = buf->Ptr();
+	const TInt len = buf->Length();
+	TInt hits = 0, key = EEikAppbarApp5Key;
+	for (TInt at = 0; at + 2 + KShellSlots * 4 <= len; at++)
+		{
+		if (b[at] != KShellSlots || b[at + 1] != 0 || U32(b + at + 2) != KUidShellApp)
+			continue;
+		if (++hits > 1)
+			{
+			key = EEikAppbarApp5Key;       // (twice: not ours to guess)
+			break;
+			}
+		key = 0;
+		for (TInt k = 0; k < KShellSlots; k++)
+			if (U32(b + at + 2 + k * 4) == KUidEmailApp)
+				{
+				key = EEikAppbarSystemKey + k;
+				break;
+				}
+		}
+	delete buf;
+	return key;
 	}
 
 // Capturing the key again a moment after a window group change: the System
@@ -80,7 +147,7 @@ void CPmRecapture::Capture()
 	{
 	if (iCapture > 0)
 		iGroup.CancelCaptureKey(iCapture);
-	iCapture = iGroup.CaptureKey(KEmailKey, 0, 0);   // (< 0: not now; the next change tries again)
+	iCapture = iGroup.CaptureKey(gEmailKey, 0, 0);   // (< 0: not now; the next change tries again)
 	}
 
 // Stops this program when it is no longer wanted: Button.ini deleted
@@ -216,7 +283,7 @@ void CPmButton::RunL()
 		iRecapture.Cancel();
 		iRecapture.After(KRecaptureDelay);
 		}
-	else if (type == EEventKey && event.Key()->iCode == (TUint)KEmailKey)
+	else if (type == EEventKey && event.Key()->iCode == (TUint)gEmailKey)
 		OpenPsiMailL();
 	}
 
@@ -271,6 +338,14 @@ static void MainL()
 	if (find.FindByDir(KAppName, KAppDir) != KErrNone || fs.Entry(find.File(), appEntry) != KErrNone)
 		{
 		fs.Delete(KMarker);              // PsiMail was removed: so is the preference
+		CleanupStack::PopAndDestroy();   // fs
+		return;
+		}
+	// (1.19) the Email icon's key here; none (Coda: the icon is PsiMail's
+	// already): nothing to do, and Contacts' key is left alone
+	gEmailKey = EmailKey(fs);
+	if (gEmailKey == 0)
+		{
 		CleanupStack::PopAndDestroy();   // fs
 		return;
 		}

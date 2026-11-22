@@ -124,7 +124,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.18");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.19");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -4278,7 +4278,13 @@ void CPmAppUi::ApplyEmailButton()
 	RFs& fs = iCoeEnv->FsSession();
 	TApaTaskList tasks(iEikonEnv->WsSession());
 	TApaTask helper = tasks.FindApp(KUidPmButton);
-	if (iSettings.iView & KPmViewEmailButton)
+	// (1.19) never on Coda, whose Email icon opens PsiMail already: a
+	// setting carried over from before 1.14 (when it was asked there too,
+	// and kept by the card's copy of the settings) started pmbutton.exe,
+	// which took the key at the 5mx's Email place, the netBook's Contacts
+	// icon: Contacts opened PsiMail. The setting is kept as it is; the
+	// marker goes and a running helper is stopped
+	if ((iSettings.iView & KPmViewEmailButton) && !iCoda)
 		{
 		fs.MkDirAll(KButtonMarker);
 		RFile file;
