@@ -61,7 +61,7 @@ for mode in uidplus plain; do
 	check "hello" "$(row "$(echo "$got" | sed -n 2p | awk '{print $4}')")"
 
 	# offline: the move waits in pending.txt; undone before it went
-	check "move: OFFLINE Moved here; the server will be told next time" "$(PM_OFFLINE=1 run move INBOX 104 Work)"
+	check "move: OFFLINE Moved - server updated next time" "$(PM_OFFLINE=1 run move INBOX 104 Work)"
 	yes "queued" grep -q "^MOVE	INBOX	104	Work" "$STORE/A0/pending.txt"
 	got=$(PM_OFFLINE=1 run undo INBOX 104)
 	check "undo: OK Undone" "$(echo "$got" | head -1)"
@@ -74,7 +74,7 @@ for mode in uidplus plain; do
 	# moved on the server, undone offline: back here at once, the server next time
 	check "move: OK " "$(run move INBOX 105 '')"
 	got=$(PM_OFFLINE=1 run undo INBOX 105)
-	check "undo: OFFLINE Put back here; the server will be told next time" "$(echo "$got" | head -1)"
+	check "undo: OFFLINE Put back - server updated next time" "$(echo "$got" | head -1)"
 	check "last" "$(row 105)"
 	yes "an UNMOVE waits" grep -q "^UNMOVE	Trash	" "$STORE/A0/pending.txt"
 	check "sync: OK No new messages" "$(run sync INBOX)"

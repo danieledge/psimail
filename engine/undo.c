@@ -382,7 +382,7 @@ int undo_run(int acct, const char *folder, unsigned int uid, char *why, int whym
 	load(acct);
 	for (i = g_nrec - 1; i >= 0; i--) if (g_rec[i].id == u.id) { forget(acct, i); save(acct); break; }
 	snprintf(s->last_file, sizeof(s->last_file), "%u", newuid);
-	if (r == PM_RES_OFFLINE) snprintf(why, whymax, "Put back here; the server will be told next time");
+	if (r == PM_RES_OFFLINE) snprintf(why, whymax, "Put back - server updated next time");
 	else snprintf(why, whymax, "Undone");
 	st_changed();
 	return r;

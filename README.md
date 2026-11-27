@@ -37,6 +37,10 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.20
+
+- Wording clean-up throughout.
+
 ## What's new in 1.19
 
 - **The Email icon on the netBook and the Series 7.** "Email icon opens:

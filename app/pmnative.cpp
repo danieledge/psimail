@@ -3376,7 +3376,7 @@ void CPmView::StatusInfoL()
 		lines[6].Append(Clip(iStatus, 60));
 		}
 	else
-		lines[6] = iRunning ? _L("The mail engine is ready") : iEngineAsleep ? _L("The mail engine is resting, to save memory") : _L("The mail engine is not running");
+		lines[6] = iRunning ? _L("The mail engine is ready") : iEngineAsleep ? _L("Mail engine off, to save memory") : _L("The mail engine is not running");
 	TBool memLine = !(Busy() && iLastProgress.Length()) && !iStatus.Length();
 	{
 	// where the mail is kept (pmstore.cpp), the disk's room, and memory

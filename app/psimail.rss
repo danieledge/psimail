@@ -673,7 +673,7 @@ RESOURCE DIALOG r_pm_sig_dialog
 		DLG_LINE { type=EEikCtEdwin; prompt="New messages"; id=EPmDlgSigNew; control=EDWIN { width=18; maxlength=159; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt="Replies"; id=EPmDlgSigReply; control=EDWIN { width=18; maxlength=159; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt="In replies"; id=EPmDlgSigWhere; control=CHOICELIST { array_id=r_pm_sig_where; }; },
-		DLG_LINE { type=EEikCtLabel; id=EPmDlgSigNote; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="Type / for a new line - Replies, left empty, uses New messages"; }; }
+		DLG_LINE { type=EEikCtLabel; id=EPmDlgSigNote; control=LABEL { standard_font=EEikLabelFontAnnotation; txt="/ starts a new line. Blank Replies uses New messages"; }; }
 		};
 	}
 
@@ -1309,7 +1309,7 @@ RESOURCE ARRAY r_pm_conn_proxy_lines
 		{
 		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_AFTER_USE; id=EPmDlgKeepUp; control=CHOICELIST { array_id=r_pm_keepup_array; }; },
 		DLG_LINE { type=EEikCtLabel; control=LABEL { standard_font=EEikLabelFontAnnotation;
-			txt="Disconnect with Ctrl+U - the modem route always hangs up after use"; }; },
+			txt="The modem hangs up after use. Disconnect: Ctrl+U"; }; },
 		DLG_LINE { type=EEikCtChoiceList; prompt=PSILINK_TXT_HELPER; id=EPmDlgUseProxy; control=CHOICELIST { array_id=r_pm_helper_array; }; },
 		DLG_LINE { type=EEikCtEdwin; prompt=PSILINK_TXT_HELPER_HOST; id=EPmDlgProxyHost; control=EDWIN { width=22; maxlength=60; }; },
 		DLG_LINE { type=EEikCtNumberEditor; prompt=PSILINK_TXT_HELPER_PORT; id=EPmDlgProxyPort; control=NUMBER_EDITOR { min=1; max=65535; }; }

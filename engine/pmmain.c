@@ -539,7 +539,7 @@ static int run(PmCmd *c, char *why, int whymax)
 		local_update(a, c->folder, c->uid, c->arg, 0);
 		r = s->offline ? PM_RES_OFFLINE : imap_flag(a, c->folder, c->uid, c->arg, why, whymax);
 		if (queued(r)) {
-			snprintf(why, whymax, "Changed here; the server will be told next time");
+			snprintf(why, whymax, "Changed - server updated next time");
 			r = PM_RES_OFFLINE;
 		} else
 			st_pending_drop(a, line);
@@ -553,7 +553,7 @@ static int run(PmCmd *c, char *why, int whymax)
 		r = s->offline ? PM_RES_OFFLINE : imap_move(a, c->folder, c->uid, c->arg, why, whymax);
 		undo_note_result(a, queued(r) ? PM_RES_OFFLINE : r, imap_copyuid());
 		if (queued(r)) {
-			snprintf(why, whymax, "Moved here; the server will be told next time");
+			snprintf(why, whymax, "Moved - server updated next time");
 			r = PM_RES_OFFLINE;
 		} else
 			st_pending_drop(a, line);

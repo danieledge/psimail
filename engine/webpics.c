@@ -484,12 +484,12 @@ int pm_send_log(char *why, int whymax)
 	int k, status = 0, ok = 1, lport, nopp = 0, saved = 0;
 	const char *lhost;
 
-	if (!PROXY_ON(s)) { snprintf(why, whymax, "Not available - set a proxy in Connection settings"); return PM_RES_FAILED; }
+	if (!PROXY_ON(s)) { snprintf(why, whymax, "Not available - no web helper set"); return PM_RES_FAILED; }
 	if (s->offline) { snprintf(why, whymax, "Working offline"); return PM_RES_OFFLINE; }
 	/* (behind the Atom's own proxy: PsiDevBox.ini if set, else the Atom's, which
 	   passes it on to a PsiProxy or says it has none) */
 	if (!pg_devbox(s->proxy_host, s->proxy_port, &lhost, &lport)) {
-		snprintf(why, whymax, "Not available - set a proxy in Connection settings");
+		snprintf(why, whymax, "Not available - no web helper set");
 		return PM_RES_FAILED;
 	}
 	pm_log_release();                        /* (the log is open for writing: shut it to read it) */
