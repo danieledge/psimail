@@ -422,7 +422,7 @@ void CPmView::PreviewTextL(TDes& aText, CArrayFixFlat<TInt>& aSpans, const TDesC
 	if (rest.Length())
 		{
 		TInt p0 = aText.Length();
-		aText.Append(_L("More in the message - press Enter to open it"));
+		aText.Append(_L("More in the message. Press Enter to open it"));
 		PvSpanL(aSpans, p0, aText.Length() - p0, EPvItalic);
 		aText.Append(KPara);
 		}
@@ -526,7 +526,7 @@ void CPmView::PreviewSyncL()
 		if (entry.iSize > KPreviewFile && t.Find(_L("More in the message")) < 0)
 			{
 			TInt p0 = t.Length();
-			t.Append(_L("More in the message - press Enter to open it"));
+			t.Append(_L("More in the message. Press Enter to open it"));
 			PvSpanL(*spans, p0, t.Length() - p0, EPvItalic);
 			t.Append(TChar(CEditableText::EParagraphDelimiter));
 			}
@@ -534,7 +534,7 @@ void CPmView::PreviewSyncL()
 	else
 		{
 		t.Append(iSettings->iOffline ? _L("Not downloaded - you are working offline")
-			: _L("Not downloaded yet - press Enter to get it"));
+			: _L("Not downloaded yet. Press Enter to get it"));
 		PvSpanL(*spans, 0, t.Length(), EPvItalic);
 		t.Append(TChar(CEditableText::EParagraphDelimiter));
 		}

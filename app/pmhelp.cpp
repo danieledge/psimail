@@ -185,7 +185,7 @@ static const TPmHelpTopic KHelpTopics[] =
 	  "otherwise (Copy to Sent folder).\n"
 	  "\n"
 	  "A reply starts in the text, with the message it answers folded to one line, \"[Frank wrote: 23 "
-	  "lines - Ctrl+Q shows them]\": it is sent in full under your reply. Ctrl+Q puts it in the text to "
+	  "lines. Ctrl+Q shows them]\": it is sent in full under your reply. Ctrl+Q puts it in the text to "
 	  "edit; deleting the line leaves it out. Quotes of 3 lines or fewer are shown as they are.\n"
 	  "\n"
 	  "A signature goes at the end of every new message: set it in the account settings (Signature), "
@@ -360,7 +360,7 @@ static const TPmHelpTopic KHelpTopics[] =
 
 	{ "Updating PsiMail",
 	  "Tools > Update PsiMail looks for a newer PsiMail: Released versions, Test versions, or A "
-	  "computer on my network (a server of your own, with its address and port). It downloads the new "
+	  "local computer (a server of your own, with its address and port). It downloads the new "
 	  "version in pieces to the card, checks its signature and offers to install it. PsiMail closes "
 	  "while the installer runs; start it again afterwards.\n"
 	  "\n"

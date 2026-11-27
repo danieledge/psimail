@@ -124,7 +124,7 @@ _LIT(KIniFile, "C:\\System\\Apps\\PsiMail\\PsiMail.ini");
 _LIT(KCalIniFile, "C:\\System\\Apps\\PsiMail\\Calendar.ini");
 _LIT(KUpdIniFile, "C:\\System\\Apps\\PsiMail\\Update.ini");
 _LIT(KPrintIniFile, "C:\\System\\Apps\\PsiMail\\Print.ini");     // (pmprint.cpp's; kept on the card, 1.11)
-_LIT(KVersion, "1.21");          // also pkg/psimail.pkg
+_LIT(KVersion, "1.22");          // also pkg/psimail.pkg
 
 // Coda's debug mode (the netBook's Control panel > Diagnostics, or
 // the 5mx's with PsiExtras): while C:\System\Data\PsiDiag.on is there the
@@ -136,7 +136,7 @@ static TBool PmDiagOn()
 	TEntry e;
 	return CEikonEnv::Static()->FsSession().Entry(_L("C:\\System\\Data\\PsiDiag.on"), e) == KErrNone;
 	}
-_LIT(KPmLogIsOff, "Logging is off - turn on Tools > Troubleshooting > Keep a log");   // (0.93)
+_LIT(KPmLogIsOff, "Logging is off. Turn on Tools > Troubleshooting > Keep a log");   // (0.93)
 const TInt KTick = 250000;       // look at the engine 4 times a second
 const TInt KTickQuiet = 2000000; // (0.81) ...or every 2 s when nothing is going on: the doorbell brings news
 const TInt KCalmTicks = 4;       // quick ticks with nothing going on before the slow pace (1 s)
@@ -1937,7 +1937,7 @@ void CPmView::CalendarSyncL()
 	{
 	if (!iCal->iCal.enabled)
 		{
-		Toast(_L("Calendar sync is off - see Tools > Calendar settings"));
+		Toast(_L("Calendar sync is off. See Tools > Calendar settings"));
 		return;
 		}
 	if (CalendarBusy())
@@ -3454,7 +3454,7 @@ void CPmComposeDialog::FoldQuote(TDes& aBody)
 	if (!iDraft.iQuote)
 		return;
 	TBuf<40> n;
-	n.Format(_L("%d lines - Ctrl+Q shows them]"), lines - 1);
+	n.Format(_L("%d lines. Ctrl+Q shows them]"), lines - 1);
 	iDraft.iFoldLine.Append(n.Left(Min(n.Length(), iDraft.iFoldLine.MaxLength() - iDraft.iFoldLine.Length())));
 	TBuf<82> line(iDraft.iFoldLine);
 	line.Append('\n');
@@ -6568,7 +6568,7 @@ void CPmAppUi::DoCommandL(TInt aCommand)
 		aCommand != EPmCmdRestart && aCommand != EPmCmdHelp && aCommand != EPmCmdSendLog &&
 		aCommand != EPmCmdKeepLog && aCommand != EPmCmdShowLog)
 		{
-		iView->Toast(_L("No account yet - Tools > Accounts > Add"));
+		iView->Toast(_L("No account yet. Use Tools > Accounts > Add"));
 		return;
 		}
 	if (HandleMail2CommandL(aCommand))           // invitations, cards, Word (pminvite.cpp)

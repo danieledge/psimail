@@ -2045,7 +2045,7 @@ void CPmView::UpdateReaderL()
 				t.Append(_L(", "));
 				t.Append(z);
 				if (pe.iSize > PM_PIC_MAX_KB * 1024) t.Append(_L(" - too big to download]"));
-				else t.Append(_L(" - not downloaded, tap to get it]"));
+				else t.Append(_L(" - not downloaded. Tap to get it]"));
 				lr.iLen = t.Length() - lr.iPos;
 				lr.iLink = -2000 - e;
 				if (pe.iSize <= PM_PIC_MAX_KB * 1024)
@@ -2060,7 +2060,7 @@ void CPmView::UpdateReaderL()
 		if (iTruncated > 0)
 			{
 			TBuf<120> m;
-			m.Format(_L("[%d KB more not downloaded - Message > Get whole message]"), (iTruncated + 1023) / 1024);
+			m.Format(_L("[%d KB more not downloaded. Message > Get whole message]"), (iTruncated + 1023) / 1024);
 			p0 = t.Length();
 			t.Append(m);
 			AddSpan(*spans, p0, t.Length() - p0, ESpanItalic);
@@ -3318,7 +3318,7 @@ void CPmView::StatusInfoL()
 		lines[0].AppendFormat(_L(" (%S)"), &e);
 		}
 	else
-		lines[0].Append(_L("none yet - Tools > Accounts > Add"));
+		lines[0].Append(_L("none yet. Tools > Accounts > Add"));
 	const TInt KBauds[5] = { 9600, 19200, 38400, 57600, 115200 };
 	TInt bi = iSettings->iBaudIndex;
 	if (bi < 0 || bi > 4) bi = 4;

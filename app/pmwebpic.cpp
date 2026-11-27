@@ -202,7 +202,7 @@ void CPmView::ShowWebPicturesL()
 		}
 	if (PicturesPref() != 0)
 		{
-		Toast(_L("Pictures are off - Tools > Preferences"));
+		Toast(_L("Pictures are off. See Tools > Preferences"));
 		return;
 		}
 	if (iSettings->iOffline)

@@ -79,7 +79,7 @@ void CPmView::EngineStoppedL(const TDesC& aWhy)
 		{
 		status.Format(_L("The mail engine stopped (%S) - use Tools > Restart mail engine"), &iEngineNote);
 		if (bodyWaiting)
-			iBodyError = _L("Not downloaded - the mail engine stopped - Tools > Restart mail engine starts it again");
+			iBodyError = _L("Not downloaded. The mail engine stopped. Tools > Restart mail engine starts it again");
 		}
 	SetStatus(status);
 	iReaderUid = 0;                          // the reader laid out again with what it has

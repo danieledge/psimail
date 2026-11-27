@@ -188,7 +188,7 @@ TBool CPmContacts::Ready()
 		}
 	if (n < 0)
 		{
-		env->InfoMsg(_L("No Contacts file - open the Contacts program to make one"));
+		env->InfoMsg(_L("No Contacts file. Open the Contacts program to make one"));
 		return EFalse;
 		}
 	if (n == 0)

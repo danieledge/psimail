@@ -37,6 +37,10 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.22
+
+- Wording clean-up.
+
 ## What's new in 1.21
 
 - Wording clean-up.

@@ -788,7 +788,7 @@ RESOURCE DLG_BUTTONS r_pm_update_buttons
 
 RESOURCE ARRAY r_pm_source_array
 	{
-	items={ LBUF { txt="Released versions"; }, LBUF { txt="Test versions"; }, LBUF { txt="A computer on my network"; } };
+	items={ LBUF { txt="Released versions"; }, LBUF { txt="Test versions"; }, LBUF { txt="A local computer"; } };
 	}
 
 RESOURCE DIALOG r_pm_password_dialog
