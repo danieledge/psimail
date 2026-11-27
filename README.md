@@ -37,6 +37,11 @@ please report them via [GitHub issues](https://github.com/danieledge/psimail/iss
 - [The suite](#the-suite)
 - [Not yet](#not-yet)
 
+## What's new in 1.21
+
+- Wording clean-up.
+- Going offline shows its own message.
+
 ## What's new in 1.20
 
 - Wording clean-up throughout.

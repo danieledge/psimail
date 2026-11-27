@@ -57,6 +57,7 @@ const TUid KUidPsiMail = { 0x01000A7C };
 const TUid KUidPmButton = { 0x01000A80 };   // pmbutton.exe (mail/button): the Email icon opens PsiMail
 const TInt KPmViewEmailButton = 0x100;      // TPmSettings::iView bits
 const TInt KPmViewEmailButtonAsked = 0x200;
+const TUint KPmHangupQuiet = 1;             // PM_CMD_HANGUP's uid: going offline, no "Disconnected" over its message
 // TPmSettings::iView bits 12-18 (spare until 0.74): new mail (pmauto.cpp).
 // All zero is the standard: sound & message, no timed check, send waiting mail
 const TInt KPmViewAlertShift = 12;          // 0x3000: 0 sound & message, 1 message only, 2 off

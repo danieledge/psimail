@@ -247,6 +247,8 @@ TBool CPmView::OutcomeText(const PmCmd& aCmd, TInt aRes, const TDesC& aMsg, TDes
 	TInt op = aCmd.op;
 	if (op == PM_CMD_UPDATE)
 		return EFalse;                           // (its own dialogs)
+	if (op == PM_CMD_HANGUP && aCmd.uid == KPmHangupQuiet)
+		return EFalse;                           // (the offline message stays)
 	if (op == PM_CMD_PICTURES && aRes == PM_RES_OK)
 		return EFalse;                           // (the pictures themselves say so)
 	if (op == PM_CMD_PUTLOG)
